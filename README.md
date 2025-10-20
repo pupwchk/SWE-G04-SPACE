@@ -1,2 +1,2 @@
-# SPACE : Lifelog Based Home Appliance Agent
+# SPACE : Lifelog Based Home Appliance Manager
 25-2 SWE G04 
