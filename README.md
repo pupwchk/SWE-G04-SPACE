@@ -1,5 +1,5 @@
 # SPACE
-**AI-Driven Multimodal Smart Home Manager **
+**AI-Driven Multimodal Smart Home Manager**
 
 ---
 
