@@ -19,7 +19,7 @@ http {
 
         ssl_certificate /ssl/<your_ssl_cert.pem>;
         ssl_certificate_key /ssl/<your_ssl_private_key.key>;
-
+    
         access_log /var/log/nginx/data-access.log combined;
 
         location / {

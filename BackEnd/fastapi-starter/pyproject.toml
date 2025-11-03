@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 [tool.poetry]
 name = "fastapi-starter"
 version = "0.1.0"
@@ -23,29 +22,3 @@ autopep8 = "^2.0.4"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
-=======
-[tool.poetry]
-name = "fastapi-starter"
-version = "0.1.0"
-description = ""
-authors = ["nabidam <navidabbaspoor@gmail.com>"]
-readme = "README.md"
-
-[tool.poetry.dependencies]
-python = "^3.11"
-fastapi = "^0.110.0"
-uvicorn = {extras = ["standard"], version = "^0.24.0.post1"}
-alembic = "^1.12.1"
-sqlalchemy = "^2.0.23"
-mysqlclient = "^2.2.0"
-python-dotenv = "^1.0.0"
-pydantic = "^2.5.2"
-poetry-plugin-export = "^1.6.0"
-
-[tool.poetry.group.dev.dependencies]
-autopep8 = "^2.0.4"
-
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
->>>>>>> bcd457ea32467cf8181e23873afa32c1735331de
