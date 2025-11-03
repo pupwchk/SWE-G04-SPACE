@@ -1,5 +1,11 @@
+<<<<<<< HEAD
 *.pyc
 
 .env
 docker-compose.yml
 Dockerfile
+=======
+*.pyc
+
+.env
+>>>>>>> bcd457ea32467cf8181e23873afa32c1735331de
