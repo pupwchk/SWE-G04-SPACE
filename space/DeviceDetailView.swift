@@ -69,7 +69,7 @@ struct DeviceDetailView: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 16)
-                .background(Color(hex: "F0F8FF"))
+                .background(Color(hex: "F3DEE5"))
                 .cornerRadius(16)
                 .padding(.horizontal, 20)
                 .padding(.top, 16)
@@ -172,7 +172,7 @@ struct TemperatureCard: View {
             // Icon with gradient background
             ZStack {
                 Circle()
-                    .fill(iconColor.opacity(0.15))
+                    .fill(Color.white.opacity(0.5))
                     .frame(width: 60, height: 60)
 
                 Image(systemName: icon)
@@ -197,7 +197,7 @@ struct TemperatureCard: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 20)
         .padding(.horizontal, 12)
-        .background(Color(hex: "F0F8FF"))
+        .background(Color(hex: "F3DEE5"))
         .cornerRadius(16)
     }
 }
@@ -213,7 +213,7 @@ struct IceMakerOption: View {
         VStack(spacing: 12) {
             ZStack {
                 Circle()
-                    .fill(Color(hex: "A50034").opacity(0.1))
+                    .fill(Color.white.opacity(0.5))
                     .frame(width: 80, height: 80)
 
                 Image(systemName: icon)
@@ -227,7 +227,7 @@ struct IceMakerOption: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 16)
-        .background(isSelected ? Color(hex: "A50034").opacity(0.05) : Color.white)
+        .background(isSelected ? Color(hex: "F3DEE5") : Color.white)
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)

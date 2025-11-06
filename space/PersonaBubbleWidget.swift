@@ -10,16 +10,21 @@ import SwiftUI
 /// Persona bubble widget with floating animation
 struct PersonaBubbleWidget: View {
     @State private var bubblePositions: [BubbleData] = []
-    @State private var selectedPersonas: Set<String> = []
+    @Binding var selectedPersonas: Set<String>
+    @State private var navigateToTest = false
 
     let personas = ["Running", "Webtoon", "Stress", "School", "Sleep", "Developer", "TV", "Walking", "home"]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Choose personal")
+            Text(selectedPersonas.isEmpty ? "Choose personal" : selectedPersonas.joined(separator: ", "))
                 .font(.system(size: 16, weight: .regular))
                 .foregroundColor(.black)
                 .padding(.horizontal, 20)
+
+            NavigationLink(destination: PersonalTestView(selectedPersonas: $selectedPersonas), isActive: $navigateToTest) {
+                EmptyView()
+            }
 
             GeometryReader { geometry in
                 ZStack {
@@ -47,6 +52,9 @@ struct PersonaBubbleWidget: View {
                 .onAppear {
                     initializeBubbles(in: geometry.size)
                     startAnimation(in: geometry.size)
+                }
+                .onTapGesture {
+                    navigateToTest = true
                 }
             }
             .frame(height: 250)
@@ -113,6 +121,6 @@ struct BubbleData: Identifiable {
 }
 
 #Preview {
-    PersonaBubbleWidget()
+    PersonaBubbleWidget(selectedPersonas: .constant([]))
         .background(Color(hex: "F9F9F9"))
 }
