@@ -11,6 +11,7 @@ import SwiftUI
 struct MenuView: View {
     @State private var showMyPage = false
     @State private var showGeneral = false
+    @State private var showResetAlert = false
 
     var body: some View {
         NavigationStack {
@@ -76,6 +77,13 @@ struct MenuView: View {
                             MenuRow(icon: "questionmark.circle", title: "FAQ", action: {
                                 handleFAQ()
                             })
+
+                            Divider()
+                                .padding(.leading, 64)
+
+                            MenuRow(icon: "arrow.counterclockwise", title: "페르소나 초기화", action: {
+                                showResetAlert = true
+                            })
                         }
                         .background(Color.white)
 
@@ -104,6 +112,14 @@ struct MenuView: View {
             .navigationDestination(isPresented: $showGeneral) {
                 GeneralView()
             }
+            .alert("페르소나 초기화", isPresented: $showResetAlert) {
+                Button("취소", role: .cancel) { }
+                Button("초기화", role: .destructive) {
+                    handleResetPersona()
+                }
+            } message: {
+                Text("저장된 모든 페르소나가 삭제됩니다.\n처음부터 다시 시작하시겠습니까?")
+            }
         }
     }
 
@@ -126,6 +142,11 @@ struct MenuView: View {
     private func handleLogout() {
         print("Logout tapped")
         // TODO: Implement logout logic
+    }
+
+    private func handleResetPersona() {
+        PersonaManager.shared.clearPersonas()
+        print("Personas cleared successfully")
     }
 }
 
