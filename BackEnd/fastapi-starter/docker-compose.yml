@@ -7,30 +7,33 @@ services:
       dockerfile: Dockerfile
     command: >
       bash -c "
+      echo '⏳ Waiting for database...' &&
+      while ! nc -z db 5432; do sleep 1; done &&
+      echo '✅ Database is up!' &&
       poetry run alembic upgrade head &&
-      poetry run uvicorn app.main:app --host 0.0.0.0 --port 11325 --reload
+      exec poetry run uvicorn app.main:app --host 0.0.0.0 --port 11325
       "
     volumes:
       - .:/code
     ports:
-      - '11325:11325'   # 호스트:컨테이너 (FastAPI)
-    env_file:
-      - .env
+      - "11325:11325"
     depends_on:
       - db
+    env_file:
+      - .env
 
-  services:
-    db:
-      image: postgres:16
-      restart: always
-      environment:
-        POSTGRES_USER: user
-        POSTGRES_PASSWORD: password
-        POSTGRES_DB: db
-      ports:
-        - "5432:5432"
-      volumes:
-        - ./data/postgres:/var/lib/postgresql/data
+
+
+
+  db:
+    image: postgres:16
+    restart: always
+    env_file:
+      - .env.postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
 
   nginx:
     image: nginx:latest

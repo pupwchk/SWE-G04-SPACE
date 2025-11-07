@@ -1,5 +1,6 @@
 *.pyc
 
 .env
-docker-compose.yml
-Dockerfile
+.env.*
+
+data/postgres/
