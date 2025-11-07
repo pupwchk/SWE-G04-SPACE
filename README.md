@@ -15,6 +15,8 @@ An LSTM-based neural network with attention mechanisms predicts stress levels, f
 
 Through Smart Health Home, we demonstrate a practical approach to creating adaptive living environments that proactively respond to users' health conditions, enhancing comfort, wellness, and quality of life.
 
+AWS EC2 connect completed.
+
 ---
 
 ## Group Members
