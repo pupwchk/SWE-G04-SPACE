@@ -21,7 +21,7 @@ class RealtimeStressMonitor:
 
     def __init__(self,
                  window_size: int = 60,
-                 update_interval: int = 10,
+                 update_interval: int = 1,
                  on_stress_change: Optional[Callable[[StressAssessment], None]] = None,
                  on_high_stress_alert: Optional[Callable[[StressAssessment], None]] = None):
         """
@@ -29,7 +29,7 @@ class RealtimeStressMonitor:
 
         Args:
             window_size: Number of RR intervals for HRV calculation (default: 60)
-            update_interval: Seconds between stress assessments (default: 10)
+            update_interval: Minutes between stress assessments (default: 1)
             on_stress_change: Callback when stress level changes
             on_high_stress_alert: Callback when high stress is detected
         """
@@ -65,7 +65,7 @@ class RealtimeStressMonitor:
         if hrv_metrics is not None:
             should_update = (
                 self.last_update_time is None or
-                (timestamp - self.last_update_time).total_seconds() >= self.update_interval
+                (timestamp - self.last_update_time).total_seconds() >= self.update_interval * 60
             )
 
             if should_update:

@@ -1,0 +1,16 @@
+Full Dataset Evaluation (Reference)
+============================================================
+
+              precision    recall  f1-score   support
+
+         Low       1.00      1.00      1.00       569
+      Medium       1.00      1.00      1.00      1032
+        High       1.00      1.00      1.00       128
+
+    accuracy                           1.00      1729
+   macro avg       1.00      1.00      1.00      1729
+weighted avg       1.00      1.00      1.00      1729
+
+Accuracy: 1.0000
+F1-score (macro): 1.0000
+F1-score (weighted): 1.0000
