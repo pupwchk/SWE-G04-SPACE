@@ -7,7 +7,12 @@ from alembic import context
 from app.config.db import Base
 
 from app.config.env import DATABASE_URL
-from app.models.user import User
+from app.models import user
+from app.models import tracking
+
+import os
+from dotenv import load_dotenv
+
 
 # def my_compare_server_default(context, inspected_column,
 #             metadata_column, inspected_default, metadata_default,
@@ -25,6 +30,8 @@ from app.models.user import User
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
+load_dotenv(os.path.join(os.path.dirname(__file__), '../../.env'))
+
 config = context.config
 
 # Interpret the config file for Python logging.
@@ -32,6 +39,14 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
+# 1) .env에서 DATABASE_URL을 우선적으로 읽고
+# 2) 그래도 없으면 app.config.env 의 설정을 fallback으로 쓸 수도 있음
+from app.config.env import DATABASE_URL as APP_DATABASE_URL  # 선택사항
+
+database_url = os.getenv("DATABASE_URL", APP_DATABASE_URL)
+
+if not database_url:
+    raise RuntimeError("DATABASE_URL is not set. Please configure it in .env")
 
 config.set_main_option('sqlalchemy.url', DATABASE_URL)
 # config.set_main_option('compare_server_default', "true")
