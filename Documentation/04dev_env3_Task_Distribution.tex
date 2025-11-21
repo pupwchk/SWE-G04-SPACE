@@ -1,0 +1,42 @@
+\clearpage
+\subsection{Task Distribution}
+
+\subsubsection{Project Manager - Junho Uh}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+A Project Manager orchestrates the development and delivery of the smart health-home integration system within specified constraints of scope, time, and budget. Their role involves developing comprehensive project plans, establishing critical milestones, and implementing Agile methodologies to ensure efficient delivery. They coordinate resource allocation and timeline management using Jira for issue tracking, Notion for documentation, and GitHub for version control. 
+
+Critical responsibilities include managing deliverables across iOS/watchOS health monitoring, backend infrastructure, LLM-based home automation logic, and smart appliance integration. They ensure seamless coordination between health data collection, AI-driven state prediction, and home environment optimization through connected devices. Their success is measured through project completion metrics, team performance, and the system's ability to accurately predict user states and automatically adjust home conditions for optimal comfort and wellness.
+\end{adjustwidth}
+
+\subsubsection{Frontend Developer - Donghyun Lim}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+Frontend developers utilize Swift 5.10 and SwiftUI to create iOS and watchOS applications that bridge health monitoring with smart home control. They design interfaces for real-time health data visualization (heart rate, HRV, sleep patterns) alongside home appliance status and control panels. The development integrates HealthKit for biometric data collection, CoreLocation for spatial context, and custom APIs for communicating with smart home devices. 
+
+They implement the WCSession framework for seamless data synchronization between Apple Watch and iPhone, ensuring that health metrics captured on the wearable trigger appropriate home automation responses. The role requires expertise in creating intuitive control interfaces where users can monitor their predicted wellness state and manually override or customize automated home adjustments. They work closely with UI-UX designers to ensure the health-to-home automation workflow is accessible and engaging, while coordinating with backend developers to implement real-time bidirectional communication between health sensors, prediction models, and connected appliances.
+\end{adjustwidth}
+
+\subsubsection{Backend Developer - Dogyeom Kim, Junho Uh}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+Backend developers design the database schema and API architecture that connects health data collection, AI prediction models, LLM-based decision making, and smart home device control. They manage a MySQL database analyzing relationships among user health states, environmental conditions, location contexts, and home appliance configurations. Using FastAPI, they create RESTful endpoints that receive health samples and GPS data from iOS/watchOS applications, process them through prediction models, and generate LLM prompts that determine optimal home states. 
+
+They integrate OpenAI's GPT API to translate predicted user conditions (stress levels, fatigue, sleep readiness) into natural language commands for controlling temperature, lighting, humidity, and other smart appliances. The backend utilizes Docker for containerization and Google Cloud Platform for scalable deployment, while implementing secure protocols for IoT device communication. They design the feature-engineering pipeline that aggregates time-series health data with environmental factors to feed both prediction models and LLM context, ensuring the system maintains data consistency throughout the health-to-home automation workflow.
+\end{adjustwidth}
+
+\subsubsection{UI-UX Designer - Donghyun Lim, Dogyeom Kim}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+UI-UX designers, using Figma, determine how the integrated health monitoring and smart home control interface is presented across iPhone and Apple Watch platforms. They create a unified design system that seamlessly blends health data visualization with home automation controls, ensuring users can easily understand their current wellness state and corresponding home environment adjustments. 
+
+The design process includes creating mockups that display predicted user conditions alongside automated appliance responses, with intuitive override controls and customization options. Designers must balance information density between health metrics (heart rate, sleep quality, stress indicators) and home status displays (temperature, lighting, air quality) within the limited screen space of wearable devices. They leverage Figma's component system to maintain consistent design patterns across health monitoring dashboards and appliance control interfaces. Once designs are finalized, they communicate specifications to frontend developers through Figma's developer handoff features, ensuring pixel-perfect implementation of the health-to-home automation user experience.
+\end{adjustwidth}
+
+\subsubsection{AI Developer - Yeonseong Shin, Junho Uh}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+AI developers build machine learning pipelines and LLM integration systems that predict user wellness states and generate optimal home automation commands. They collect and preprocess multi-modal data from HealthKit (heart rate, HRV, sleep, activity), CoreLocation (GPS, location patterns), and environmental sensors to extract features for stress prediction and fatigue detection models. The AI workflow implements machine learning algorithms that analyze correlations between physiological patterns and contextual factors, then feeds these predictions into OpenAI's GPT API to generate natural language commands for smart home devices. 
+
+They design the integration pipeline where predicted states (e.g., "user is stressed and approaching home") trigger LLM prompts that determine appropriate environmental adjustments (dimmed lighting, cooler temperature, calming music). AI developers train and evaluate models using metrics such as prediction accuracy and user comfort scores, while optimizing the LLM prompt engineering to ensure reliable and contextually appropriate appliance control. They ensure the GPT API's responses are parsed correctly and translated into specific device commands, maintaining low latency between state prediction and home automation execution to provide seamless, anticipatory environmental optimization based on real-time health intelligence.
+\end{adjustwidth}
