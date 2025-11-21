@@ -19,6 +19,44 @@ from sqlalchemy.sql import func
 from app.config.db import Base
 
 
+class StressAssessment(Base):
+    """스트레스 평가 결과 (1분 간격)"""
+    __tablename__ = "stress_assessments"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    stress_level = Column(String, nullable=False)  # VERY_LOW, LOW, MODERATE, HIGH, VERY_HIGH
+    stress_score = Column(Float, nullable=False)  # 0-100
+    confidence = Column(Float, nullable=False)
+    hrv_metrics = Column(JSONB, nullable=False)
+    timestamp = Column(DateTime(timezone=True), nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class FatiguePrediction(Base):
+    """피로도 예측 결과 (일일)"""
+    __tablename__ = "fatigue_predictions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    fatigue_level = Column(String, nullable=False)  # Low, Medium, High
+    fatigue_class = Column(Integer, nullable=False)  # 0, 1, 2
+    confidence = Column(Float, nullable=False)  # 0-1
+    class_probabilities = Column(JSONB, nullable=False)  # {"Low": 0.7, "Medium": 0.2, "High": 0.1}
+    timestamp = Column(DateTime(timezone=True), nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
 class Place(Base):
     """
     ERD: Place
