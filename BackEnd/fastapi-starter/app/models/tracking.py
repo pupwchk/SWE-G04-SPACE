@@ -38,6 +38,25 @@ class StressAssessment(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
+class FatiguePrediction(Base):
+    """피로도 예측 결과 (일일)"""
+    __tablename__ = "fatigue_predictions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    fatigue_level = Column(String, nullable=False)  # Low, Medium, High
+    fatigue_class = Column(Integer, nullable=False)  # 0, 1, 2
+    confidence = Column(Float, nullable=False)  # 0-1
+    class_probabilities = Column(JSONB, nullable=False)  # {"Low": 0.7, "Medium": 0.2, "High": 0.1}
+    timestamp = Column(DateTime(timezone=True), nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
 class Place(Base):
     """
     ERD: Place
