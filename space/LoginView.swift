@@ -14,6 +14,11 @@ struct LoginView: View {
     @State private var email: String = ""
     @State private var password: String = ""
     @State private var showSignUp: Bool = false
+    @State private var isLoading: Bool = false
+    @State private var errorMessage: String?
+    @State private var showError: Bool = false
+
+    @StateObject private var supabaseManager = SupabaseManager.shared
 
     var body: some View {
         ZStack {
@@ -44,7 +49,7 @@ struct LoginView: View {
         }
         .ignoresSafeArea(edges: .top)
         .sheet(isPresented: $showSignUp) {
-            SignUpView()
+            SignUpView(isLoggedIn: $isLoggedIn)
         }
     }
 
@@ -78,7 +83,7 @@ struct LoginView: View {
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(Color.gray.opacity(0.8))
 
-                TextField("", text: $email)
+                TextField("your@email.com", text: $email)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 14)
                     .background(Color.white)
@@ -88,7 +93,9 @@ struct LoginView: View {
                             .stroke(Color.gray.opacity(0.25), lineWidth: 1)
                     )
                     .autocapitalization(.none)
+                    .disableAutocorrection(true)
                     .keyboardType(.emailAddress)
+                    .textContentType(.emailAddress)
             }
 
             // Password field
@@ -97,7 +104,7 @@ struct LoginView: View {
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(Color.gray.opacity(0.8))
 
-                SecureField("", text: $password)
+                SecureField("Enter your password", text: $password)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 14)
                     .background(Color.white)
@@ -106,6 +113,7 @@ struct LoginView: View {
                         RoundedRectangle(cornerRadius: 10)
                             .stroke(Color.gray.opacity(0.25), lineWidth: 1)
                     )
+                    .textContentType(.password)
             }
 
             // Forgot password link
@@ -121,18 +129,38 @@ struct LoginView: View {
             }
             .padding(.top, -4)
 
+            // Error message
+            if let errorMessage = errorMessage {
+                Text(errorMessage)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(.red)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 6)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.red.opacity(0.1))
+                    .cornerRadius(8)
+            }
+
             // Login button
             Button(action: {
                 handleLogin()
             }) {
-                Text("MY LG ID 로그인")
-                    .font(.system(size: 17, weight: .bold))
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 15)
-                    .background(Color(hex: "A50034"))
-                    .cornerRadius(10)
+                HStack(spacing: 8) {
+                    if isLoading {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            .scaleEffect(0.8)
+                    }
+                    Text(isLoading ? "로그인 중..." : "로그인")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundColor(.white)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 15)
+                .background(isLoading ? Color(hex: "A50034").opacity(0.7) : Color(hex: "A50034"))
+                .cornerRadius(10)
             }
+            .disabled(isLoading || email.isEmpty || password.isEmpty)
             .buttonStyle(.plain)
             .padding(.top, 4)
 
@@ -223,12 +251,33 @@ struct LoginView: View {
 
     // MARK: - Login Handler
     private func handleLogin() {
-        // TODO: Implement actual login logic with API call
-        print("Login with email: \(email)")
+        // Reset error message
+        errorMessage = nil
+        isLoading = true
 
-        // For now, simply navigate to main tab view
-        withAnimation {
-            isLoggedIn = true
+        Task {
+            do {
+                let user = try await supabaseManager.signIn(email: email, password: password)
+                print("Login successful: \(user.email)")
+
+                await MainActor.run {
+                    isLoading = false
+                    withAnimation {
+                        isLoggedIn = true
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    isLoading = false
+                    errorMessage = error.localizedDescription
+                    showError = true
+
+                    // Clear error message after 5 seconds
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+                        errorMessage = nil
+                    }
+                }
+            }
         }
     }
 
