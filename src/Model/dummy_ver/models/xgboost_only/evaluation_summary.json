@@ -1,0 +1,31 @@
+{
+  "evaluation_date": "2025-11-23T13:57:22.552185",
+  "models_evaluated": [
+    "student",
+    "worker",
+    "general"
+  ],
+  "summary": {
+    "student": {
+      "accuracy": 0.7,
+      "f1_macro": 0.5791842050834858,
+      "f1_weighted": 0.6679628045815096,
+      "cv_mean": 0.6875000000000001,
+      "cv_std": 0.018957188610128888
+    },
+    "worker": {
+      "accuracy": 0.705,
+      "f1_macro": 0.543074396943417,
+      "f1_weighted": 0.6691515678177269,
+      "cv_mean": 0.675,
+      "cv_std": 0.009682458365518551
+    },
+    "general": {
+      "accuracy": 0.725,
+      "f1_macro": 0.6369413841409285,
+      "f1_weighted": 0.7170324021572361,
+      "cv_mean": 0.6912499999999999,
+      "cv_std": 0.03201562118716427
+    }
+  }
+}
