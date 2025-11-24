@@ -45,7 +45,7 @@ struct PersonalTestView: View {
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 24) {
                     // Title
-                    Text("Personal Test")
+                    Text("성향 테스트")
                         .font(.system(size: 40, weight: .bold))
                         .foregroundColor(.white)
                         .padding(.top, 20)

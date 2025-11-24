@@ -54,7 +54,7 @@ struct TimelineWidget: View {
                 .font(.system(size: 36))
                 .foregroundColor(Color(hex: "A50034"))
 
-            Text("Record my timeline")
+            Text("타임라인 기록하기")
                 .font(.system(size: 14, weight: .medium))
                 .foregroundColor(.black)
         }

@@ -29,7 +29,7 @@ struct MyPageView: View {
             .padding(.vertical, 16)
 
             // Title
-            Text("My page")
+            Text("마이페이지")
                 .font(.system(size: 18, weight: .semibold))
                 .frame(maxWidth: .infinity)
                 .padding(.bottom, 30)

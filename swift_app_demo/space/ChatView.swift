@@ -32,7 +32,7 @@ struct ChatView: View {
                     })
                 }
             }
-            .navigationTitle("chat")
+            .navigationTitle("채팅")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 if selectedMode != nil {

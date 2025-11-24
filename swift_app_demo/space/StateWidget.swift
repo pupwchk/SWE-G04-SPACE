@@ -19,7 +19,7 @@ struct StateWidget: View {
             VStack(spacing: 0) {
                 // Header
                 HStack {
-                    Text("Health")
+                    Text("건강")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(.black)
 
@@ -38,8 +38,8 @@ struct StateWidget: View {
                     // Sleep
                     healthMetricRow(
                         icon: "moon.fill",
-                        label: "Sleep",
-                        value: String(format: "%.1fh", healthManager.sleepHours),
+                        label: "수면",
+                        value: String(format: "%.1f시간", healthManager.sleepHours),
                         color: .blue
                     )
 
@@ -50,7 +50,7 @@ struct StateWidget: View {
                     // Stress
                     healthMetricRow(
                         icon: "brain.fill",
-                        label: "Stress",
+                        label: "스트레스",
                         value: "\(healthManager.stressLevel)%",
                         color: stressColor(for: healthManager.stressLevel)
                     )
@@ -62,7 +62,7 @@ struct StateWidget: View {
                     // Calories
                     healthMetricRow(
                         icon: "flame.fill",
-                        label: "Calories",
+                        label: "칼로리",
                         value: String(format: "%.0f", healthManager.caloriesBurned),
                         color: .orange
                     )

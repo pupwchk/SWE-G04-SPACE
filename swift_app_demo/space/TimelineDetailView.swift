@@ -56,11 +56,11 @@ struct TimelineDetailView: View {
                     }
                 }
             }
-            .navigationTitle("My Timeline")
+            .navigationTitle("나의 타임라인")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Close") {
+                    Button("닫기") {
                         dismiss()
                     }
                 }
@@ -78,7 +78,7 @@ struct TimelineDetailView: View {
                     .stroke(Color(hex: "A50034"), lineWidth: 4)
 
                 if let firstCoord = timeline.coordinates.first?.coordinate {
-                    Annotation("Start", coordinate: firstCoord) {
+                    Annotation("시작", coordinate: firstCoord) {
                         ZStack {
                             Circle()
                                 .fill(Color.green)
@@ -91,7 +91,7 @@ struct TimelineDetailView: View {
                 }
 
                 if let lastCoord = timeline.coordinates.last?.coordinate {
-                    Annotation("End", coordinate: lastCoord) {
+                    Annotation("종료", coordinate: lastCoord) {
                         ZStack {
                             Circle()
                                 .fill(Color(hex: "A50034"))
@@ -197,25 +197,25 @@ struct TimelineDetailView: View {
             if let timeline = selectedTimeline {
                 // Selected timeline stats
                 HStack(spacing: 20) {
-                    statItem(title: "Distance", value: timeline.distanceFormatted, icon: "figure.walk")
-                    statItem(title: "Duration", value: timeline.durationFormatted, icon: "clock.fill")
-                    statItem(title: "Avg Speed", value: String(format: "%.1f km/h", timeline.averageSpeed), icon: "speedometer")
+                    statItem(title: "거리", value: timeline.distanceFormatted, icon: "figure.walk")
+                    statItem(title: "시간", value: timeline.durationFormatted, icon: "clock.fill")
+                    statItem(title: "평균 속도", value: String(format: "%.1f km/h", timeline.averageSpeed), icon: "speedometer")
                 }
             } else if isTracking {
                 // Current tracking stats
                 HStack(spacing: 20) {
                     statItem(
-                        title: "Distance",
+                        title: "거리",
                         value: String(format: "%.2f km", locationManager.totalDistance / 1000),
                         icon: "figure.walk"
                     )
                     statItem(
-                        title: "Speed",
+                        title: "속도",
                         value: String(format: "%.1f km/h", locationManager.currentSpeed),
                         icon: "speedometer"
                     )
                     statItem(
-                        title: "Altitude",
+                        title: "고도",
                         value: String(format: "%.0f m", locationManager.currentAltitude),
                         icon: "arrow.up.arrow.down"
                     )
@@ -234,7 +234,7 @@ struct TimelineDetailView: View {
                 .padding(.top, 8)
             } else {
                 // Not tracking
-                Text("Start tracking to see your timeline")
+                Text("타임라인을 보려면 기록을 시작하세요")
                     .font(.system(size: 14))
                     .foregroundColor(.gray)
                     .padding(.vertical, 20)
@@ -273,7 +273,7 @@ struct TimelineDetailView: View {
                 }) {
                     HStack {
                         Image(systemName: "arrow.left")
-                        Text("Back")
+                        Text("뒤로")
                     }
                     .frame(maxWidth: .infinity)
                     .frame(height: 50)
@@ -288,7 +288,7 @@ struct TimelineDetailView: View {
                 }) {
                     HStack {
                         Image(systemName: "stop.fill")
-                        Text("Stop")
+                        Text("중지")
                     }
                     .frame(maxWidth: .infinity)
                     .frame(height: 50)
@@ -304,7 +304,7 @@ struct TimelineDetailView: View {
                 }) {
                     HStack {
                         Image(systemName: "play.fill")
-                        Text("Start Tracking")
+                        Text("기록 시작")
                     }
                     .frame(maxWidth: .infinity)
                     .frame(height: 50)
@@ -321,7 +321,7 @@ struct TimelineDetailView: View {
     private var timelineHistorySection: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("History")
+                Text("기록")
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundColor(.black)
 
@@ -331,7 +331,7 @@ struct TimelineDetailView: View {
                     Button(action: {
                         timelineManager.clearAllTimelines()
                     }) {
-                        Text("Clear All")
+                        Text("전체 삭제")
                             .font(.system(size: 13))
                             .foregroundColor(Color(hex: "A50034"))
                     }
@@ -398,7 +398,7 @@ struct TimelineDetailView: View {
                     selectedTimeline = nil
                 }
             } label: {
-                Label("Delete", systemImage: "trash")
+                Label("삭제", systemImage: "trash")
             }
         }
     }
@@ -490,7 +490,7 @@ struct CheckpointBubbleView: View {
                 Image(systemName: "clock.fill")
                     .font(.system(size: 11))
                     .foregroundColor(.gray)
-                Text("Stayed: \(checkpoint.stayDurationFormatted)")
+                Text("체류: \(checkpoint.stayDurationFormatted)")
                     .font(.system(size: 12))
                     .foregroundColor(.primary)
             }
@@ -500,7 +500,7 @@ struct CheckpointBubbleView: View {
                 Image(systemName: checkpoint.stressChange.icon)
                     .font(.system(size: 11))
                     .foregroundColor(Color(hex: checkpoint.stressChange.color))
-                Text("Stress: \(checkpoint.stressChange.label)")
+                Text("스트레스: \(checkpoint.stressChange.label)")
                     .font(.system(size: 12))
                     .foregroundColor(.primary)
             }

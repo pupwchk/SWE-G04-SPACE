@@ -20,16 +20,16 @@ struct DeviceView: View {
                         .font(.system(size: 80))
                         .foregroundColor(Color(hex: "A50034"))
 
-                    Text("Device")
+                    Text("기기")
                         .font(.system(size: 32, weight: .bold))
                         .foregroundColor(.black)
 
-                    Text("Manage your connected devices")
+                    Text("연결된 기기를 관리하세요")
                         .font(.system(size: 16))
                         .foregroundColor(.gray)
                 }
             }
-            .navigationTitle("Device")
+            .navigationTitle("기기")
             .navigationBarTitleDisplayMode(.inline)
         }
     }
