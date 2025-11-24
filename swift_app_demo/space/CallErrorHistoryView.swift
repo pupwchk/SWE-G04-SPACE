@@ -2,6 +2,7 @@ import SwiftUI
 
 struct CallErrorHistoryView: View {
     @State private var callErrorEnabled = true
+    @StateObject private var callHistoryManager = CallHistoryManager.shared
 
     var body: some View {
         VStack(spacing: 0) {
@@ -42,8 +43,22 @@ struct CallErrorHistoryView: View {
             // Call error history list
             ScrollView {
                 VStack(spacing: 12) {
-                    ForEach(0..<4) { _ in
-                        CallErrorCard()
+                    if callHistoryManager.callRecords.isEmpty {
+                        // Empty state
+                        VStack(spacing: 16) {
+                            Image(systemName: "phone.circle")
+                                .font(.system(size: 50))
+                                .foregroundColor(.gray.opacity(0.3))
+
+                            Text("통화 기록이 없습니다")
+                                .font(.system(size: 16))
+                                .foregroundColor(.gray)
+                        }
+                        .padding(.top, 60)
+                    } else {
+                        ForEach(callHistoryManager.callRecords) { record in
+                            CallErrorCard(record: record)
+                        }
                     }
                 }
                 .padding(.horizontal, 20)
@@ -58,6 +73,8 @@ struct CallErrorHistoryView: View {
 }
 
 struct CallErrorCard: View {
+    let record: CallRecord
+
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: "phone.fill")
@@ -66,16 +83,24 @@ struct CallErrorCard: View {
                 .frame(width: 28)
 
             VStack(alignment: .leading, spacing: 8) {
-                Text("My home")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(.black)
+                HStack {
+                    Text(record.contactName)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.black)
 
-                Text("무슨 내용으로 전화를 했을까? 집에 할일이 생겼다거나 아떠구저떠구아떠구 저떠구\n무슨 내용으로 전화를 했을까? 집에 할일이 생겼다거나 아떠구저떠구아떠구 저떠구")
+                    Spacer()
+
+                    Text(record.formattedDuration)
+                        .font(.system(size: 12))
+                        .foregroundColor(.gray.opacity(0.7))
+                }
+
+                Text(record.summary)
                     .font(.system(size: 14))
                     .foregroundColor(.black)
                     .lineSpacing(4)
 
-                Text("2025년 11월 3일 : 12:32")
+                Text(record.formattedTimestamp)
                     .font(.system(size: 12))
                     .foregroundColor(.gray.opacity(0.5))
             }
