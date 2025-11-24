@@ -59,8 +59,8 @@ struct LoginView: View {
             // Base burgundy background
             Color(hex: "A50034")
 
-            // Rotated "SPACE" text
-            Text("SPACE")
+            // Rotated "HARU" text
+            Text("HARU")
                 .font(.system(size: 80, weight: .bold, design: .default))
                 .foregroundColor(.white)
                 .rotationEffect(.degrees(-15))
@@ -72,7 +72,7 @@ struct LoginView: View {
     private var loginCard: some View {
         VStack(alignment: .leading, spacing: 18) {
             // Title
-            Text("Welcome to SPACE")
+            Text("Welcome to HARU")
                 .font(.system(size: 26, weight: .bold, design: .default))
                 .foregroundColor(.black)
                 .padding(.bottom, 4)

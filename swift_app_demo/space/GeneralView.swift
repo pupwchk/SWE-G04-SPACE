@@ -63,7 +63,7 @@ struct GeneralView: View {
                     Button(action: {
                         showSpaceNotification = true
                     }) {
-                        GeneralRow(title: "SPACE 알림")
+                        GeneralRow(title: "HARU 알림")
                     }
                     .buttonStyle(.plain)
 

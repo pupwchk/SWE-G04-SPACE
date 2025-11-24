@@ -12,18 +12,18 @@ struct SpaceNotificationView: View {
                 SpaceNotificationRow(
                     icon: "sparkles",
                     title: "AI 제안 피드백 알림",
-                    subtitle: "SPACE가 추천한 아이템 대한\n피드백 알림을 받니다",
+                    subtitle: "HARU가 추천한 아이템 대한\n피드백 알림을 받니다",
                     isOn: $aiRecommendation
                 )
 
                 Divider()
                     .padding(.leading, 68)
 
-                // SPACE 방해금지 시간 추천
+                // HARU 방해금지 시간 추천
                 SpaceNotificationRow(
                     icon: "moon.stars",
-                    title: "SPACE 방해금지 시간 추천",
-                    subtitle: "사용자의 위치, 앱 사용 등 패턴을 분석하여\nSPACE가 자동으로 방해 금지 시간을 설정합니다.",
+                    title: "HARU 방해금지 시간 추천",
+                    subtitle: "사용자의 위치, 앱 사용 등 패턴을 분석하여\nHARU가 자동으로 방해 금지 시간을 설정합니다.",
                     isOn: $dndFollowup
                 )
 
@@ -41,7 +41,7 @@ struct SpaceNotificationView: View {
 
             Spacer()
         }
-        .navigationTitle("SPACE 알림")
+        .navigationTitle("HARU 알림")
         .navigationBarTitleDisplayMode(.inline)
         .background(Color(hex: "F9F9F9"))
     }

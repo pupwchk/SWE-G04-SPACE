@@ -12,7 +12,7 @@ struct SplashView: View {
     @State private var middleCircleScale: CGFloat = 0.0
     @State private var outerCircleScale: CGFloat = 0.0
     @State private var logoOpacity: Double = 0.0
-    @State private var logoRotation: Double = 0.0
+    @State private var fillProgress: CGFloat = 0.0
 
     var body: some View {
         ZStack {
@@ -43,11 +43,21 @@ struct SplashView: View {
                        height: UIScreen.main.bounds.width * 0.52)
                 .scaleEffect(innerCircleScale)
 
-            // Logo text (larger to span across circles)
-            Text("SPACE")
+            // Logo text with fill animation (transparent outline → white fill, left to right)
+            Text("HARU")
                 .font(.system(size: 96, weight: .bold, design: .default))
-                .foregroundColor(.white)
-                .rotationEffect(.degrees(logoRotation))
+                .foregroundStyle(
+                    LinearGradient(
+                        stops: [
+                            .init(color: .white, location: 0),
+                            .init(color: .white, location: fillProgress),
+                            .init(color: .white.opacity(0.3), location: fillProgress),
+                            .init(color: .white.opacity(0.3), location: 1)
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
                 .opacity(logoOpacity)
                 .scaleEffect(innerCircleScale)
         }
@@ -71,13 +81,13 @@ struct SplashView: View {
                 }
             }
 
-            // Logo fade in and rotation (0.6 ~ 2.0s)
+            // Logo fade in and fill animation (0.6 ~ 2.0s)
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
                 withAnimation(.easeIn(duration: 0.8)) {
                     logoOpacity = 1.0
                 }
                 withAnimation(.easeInOut(duration: 2.5)) {
-                    logoRotation = 360.0
+                    fillProgress = 1.0
                 }
             }
         }

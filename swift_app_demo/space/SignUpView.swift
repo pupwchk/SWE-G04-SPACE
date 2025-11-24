@@ -60,8 +60,8 @@ struct SignUpView: View {
             // Base burgundy background
             Color(hex: "A50034")
 
-            // Rotated "SPACE" text
-            Text("SPACE")
+            // Rotated "HARU" text
+            Text("HARU")
                 .font(.system(size: 80, weight: .bold, design: .default))
                 .foregroundColor(.white)
                 .rotationEffect(.degrees(-15))
