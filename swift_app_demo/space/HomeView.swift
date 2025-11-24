@@ -9,11 +9,8 @@ import SwiftUI
 
 /// Home screen - main dashboard view
 struct HomeView: View {
-    @Binding var selectedTab: Int
-
     @State private var hasDevices = false
     @State private var hasAppliances = false
-    @State private var selectedTones: Set<String> = []
 
     // Sample devices data
     let sampleDevices = [
@@ -31,43 +28,22 @@ struct HomeView: View {
         NavigationStack {
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 16) {
-                    // Persona widget
-                    PersonaBubbleWidgetNew()
+                    // Section 1: 3 Fixed Widgets (Timeline, State, Persona)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("타임라인, 상태, 페르소나")
+                            .font(.system(size: 16, weight: .regular))
+                            .foregroundColor(.black)
+                            .padding(.horizontal, 20)
 
-                    // Show ToneBubbleWidget or widgets based on tone selection
-                    if selectedTones.isEmpty {
-                        // Show ToneBubbleWidget when no tones selected
-                        ToneBubbleWidget(selectedTones: $selectedTones)
-                    } else {
-                        // Show 3 widgets when tones are selected
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("map + state + tone")
-                                .font(.system(size: 16, weight: .regular))
-                                .foregroundColor(.black)
-                                .padding(.horizontal, 20)
-
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 12) {
-                                    TimelineWidget()
-                                    StateWidget()
-                                    ToneWidget(tones: selectedTones)
-                                }
-                                .padding(.horizontal, 20)
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 12) {
+                                TimelineWidget()
+                                StateWidget()
+                                PersonaWidget()
                             }
+                            .padding(.horizontal, 20)
                         }
                     }
-                }
-                .onChange(of: selectedTones) { _, newValue in
-                    print("HomeView selectedTones changed: \(newValue)")
-                }
-                .onAppear {
-                    // Load saved tones when view appears
-                    let loadedTones = ToneManager.shared.selectedTones
-                    print("Loaded tones on appear: \(loadedTones)")
-                    selectedTones = loadedTones
-                }
-
-                VStack(alignment: .leading, spacing: 16) {
 
                     // Device section
                     VStack(alignment: .leading, spacing: 8) {
@@ -110,19 +86,13 @@ struct HomeView: View {
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 12) {
                                     ForEach(0..<sampleAppliances.count, id: \.self) { index in
-                                        Button(action: {
-                                            // Navigate to Appliance tab
-                                            selectedTab = 1
-                                        }) {
-                                            ApplianceCard(
+                                        ApplianceCard(
                                                 icon: sampleAppliances[index].icon,
                                                 title: sampleAppliances[index].title,
                                                 subtitle: sampleAppliances[index].subtitle,
                                                 status: sampleAppliances[index].status,
                                                 isOn: index == 0
                                             )
-                                        }
-                                        .buttonStyle(.plain)
                                     }
                                 }
                                 .padding(.horizontal, 20)
@@ -168,5 +138,5 @@ struct HomeView: View {
 }
 
 #Preview {
-    HomeView(selectedTab: .constant(0))
+    HomeView()
 }

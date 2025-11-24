@@ -202,19 +202,8 @@ struct PersonalTestView: View {
         // Collect all answers
         let answers = [q1Answer, q2Answer, q3Answer, q4Answer, q5Answer, q6Answer, q7Answer, q8Answer]
 
-        // Generate persona based on answers
-        let personaManager = PersonaManager.shared
-        let generatedPersona = personaManager.generatePersona(from: answers)
-
-        print("Generated persona: \(generatedPersona)")
-
-        // Add persona to selected personas
-        personaManager.addPersona(generatedPersona)
-
-        print("Saved personas: \(personaManager.selectedPersonas)")
-
-        // Update the binding
-        selectedPersonas = personaManager.selectedPersonas
+        // TODO: Integrate with PersonaRepository to generate and save persona
+        print("Persona test answers: \(answers)")
 
         // Navigate back to home
         dismiss()

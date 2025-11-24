@@ -75,29 +75,30 @@ CREATE POLICY "Users can delete their own settings"
 
 -- ========================================
 
--- 3. User Tones Table
--- Stores selected speaking tones for chat and phone
-CREATE TABLE IF NOT EXISTS public.user_tones (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    tone_name TEXT NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
-    UNIQUE(user_id, tone_name)
-);
-
-ALTER TABLE public.user_tones ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Users can view their own tones"
-    ON public.user_tones FOR SELECT
-    USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can insert their own tones"
-    ON public.user_tones FOR INSERT
-    WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Users can delete their own tones"
-    ON public.user_tones FOR DELETE
-    USING (auth.uid() = user_id);
+-- 3. User Tones Table - DEPRECATED (removed from application)
+-- This table is no longer used in the application
+-- Kept for historical data only
+-- CREATE TABLE IF NOT EXISTS public.user_tones (
+--     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+--     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+--     tone_name TEXT NOT NULL,
+--     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+--     UNIQUE(user_id, tone_name)
+-- );
+--
+-- ALTER TABLE public.user_tones ENABLE ROW LEVEL SECURITY;
+--
+-- CREATE POLICY "Users can view their own tones"
+--     ON public.user_tones FOR SELECT
+--     USING (auth.uid() = user_id);
+--
+-- CREATE POLICY "Users can insert their own tones"
+--     ON public.user_tones FOR INSERT
+--     WITH CHECK (auth.uid() = user_id);
+--
+-- CREATE POLICY "Users can delete their own tones"
+--     ON public.user_tones FOR DELETE
+--     USING (auth.uid() = user_id);
 
 -- ========================================
 
@@ -164,7 +165,7 @@ CREATE POLICY "Users can delete their own call history"
 
 -- 6. Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_user_settings_user_id ON public.user_settings(user_id);
-CREATE INDEX IF NOT EXISTS idx_user_tones_user_id ON public.user_tones(user_id);
+-- CREATE INDEX IF NOT EXISTS idx_user_tones_user_id ON public.user_tones(user_id); -- DEPRECATED
 CREATE INDEX IF NOT EXISTS idx_timeline_records_user_id ON public.timeline_records(user_id);
 CREATE INDEX IF NOT EXISTS idx_call_history_user_id ON public.call_history(user_id);
 

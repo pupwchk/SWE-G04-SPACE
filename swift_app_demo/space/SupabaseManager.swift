@@ -434,102 +434,6 @@ class SupabaseManager: ObservableObject {
         print("✅ Settings updated successfully")
     }
 
-    // MARK: - Tone Management
-
-    /// Fetch user tones
-    func fetchUserTones() async throws -> [String] {
-        guard let accessToken = getAccessToken() else {
-            throw AuthError.notAuthenticated
-        }
-
-        guard let userId = currentUser?.id else {
-            throw AuthError.notAuthenticated
-        }
-
-        guard let url = URL(string: "\(supabaseURL)/rest/v1/user_tones?user_id=eq.\(userId)&select=tone_name") else {
-            throw AuthError.invalidURL
-        }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw AuthError.invalidResponse
-        }
-
-        if httpResponse.statusCode != 200 {
-            return []
-        }
-
-        struct ToneResponse: Codable {
-            let toneName: String
-            enum CodingKeys: String, CodingKey {
-                case toneName = "tone_name"
-            }
-        }
-
-        let tones = try JSONDecoder().decode([ToneResponse].self, from: data)
-        return tones.map { $0.toneName }
-    }
-
-    /// Save user tones (replaces all existing tones)
-    func saveUserTones(_ tones: Set<String>) async throws {
-        guard let accessToken = getAccessToken() else {
-            throw AuthError.notAuthenticated
-        }
-
-        guard let userId = currentUser?.id else {
-            throw AuthError.notAuthenticated
-        }
-
-        // First, delete all existing tones
-        guard let deleteUrl = URL(string: "\(supabaseURL)/rest/v1/user_tones?user_id=eq.\(userId)") else {
-            throw AuthError.invalidURL
-        }
-
-        var deleteRequest = URLRequest(url: deleteUrl)
-        deleteRequest.httpMethod = "DELETE"
-        deleteRequest.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
-        deleteRequest.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-
-        let (_, deleteResponse) = try await URLSession.shared.data(for: deleteRequest)
-
-        // Insert new tones
-        if !tones.isEmpty {
-            guard let insertUrl = URL(string: "\(supabaseURL)/rest/v1/user_tones") else {
-                throw AuthError.invalidURL
-            }
-
-            var insertRequest = URLRequest(url: insertUrl)
-            insertRequest.httpMethod = "POST"
-            insertRequest.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
-            insertRequest.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-            insertRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-            let toneRecords = tones.map { ["user_id": userId, "tone_name": $0] }
-            insertRequest.httpBody = try JSONSerialization.data(withJSONObject: toneRecords)
-
-            let (data, response) = try await URLSession.shared.data(for: insertRequest)
-
-            guard let httpResponse = response as? HTTPURLResponse else {
-                throw AuthError.invalidResponse
-            }
-
-            if httpResponse.statusCode != 201 {
-                if let responseString = String(data: data, encoding: .utf8) {
-                    print("❌ Save tones failed: \(responseString)")
-                }
-                throw AuthError.serverError("Failed to save tones")
-            }
-        }
-
-        print("✅ Tones saved successfully")
-    }
-
     // MARK: - Persona Management
 
     /// Lazy initialization of Persona Repository
@@ -629,6 +533,47 @@ class SupabaseManager: ObservableObject {
 
         try await personaRepository.setActivePersona(userId: userId, personaId: personaId)
         print("✅ Active persona set successfully")
+    }
+
+    // MARK: - Multi-Persona Selection
+
+    /// Fetch selected personas (up to 5)
+    func fetchSelectedPersonas() async throws -> [Persona] {
+        guard let userId = currentUser?.id else {
+            throw AuthError.notAuthenticated
+        }
+
+        return try await personaRepository.fetchSelectedPersonas(userId: userId)
+    }
+
+    /// Add a selected persona
+    func addSelectedPersona(personaId: String, order: Int) async throws {
+        guard let userId = currentUser?.id else {
+            throw AuthError.notAuthenticated
+        }
+
+        try await personaRepository.addSelectedPersona(userId: userId, personaId: personaId, order: order)
+        print("✅ Persona selected successfully")
+    }
+
+    /// Remove a selected persona
+    func removeSelectedPersona(personaId: String) async throws {
+        guard let userId = currentUser?.id else {
+            throw AuthError.notAuthenticated
+        }
+
+        try await personaRepository.removeSelectedPersona(userId: userId, personaId: personaId)
+        print("✅ Persona unselected successfully")
+    }
+
+    /// Set selected personas (replaces all existing selections, max 5)
+    func setSelectedPersonas(personaIds: [String]) async throws {
+        guard let userId = currentUser?.id else {
+            throw AuthError.notAuthenticated
+        }
+
+        try await personaRepository.setSelectedPersonas(userId: userId, personaIds: personaIds)
+        print("✅ Selected personas updated successfully")
     }
 
     /// Create user profile in database

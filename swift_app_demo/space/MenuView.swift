@@ -173,8 +173,8 @@ struct MenuView: View {
     }
 
     private func handleResetPersona() {
-        ToneManager.shared.clearTones()
-        print("Tones cleared successfully")
+        // TODO: Integrate with PersonaRepository to reset personas
+        print("Reset persona requested")
     }
 
     // MARK: - Data Loading

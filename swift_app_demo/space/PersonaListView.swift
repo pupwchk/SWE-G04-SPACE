@@ -48,26 +48,52 @@ struct PersonaListView: View {
                         }
                     }
                 } else {
-                    ScrollView {
-                        LazyVStack(spacing: 16) {
-                            ForEach(viewModel.personas) { persona in
-                                PersonaCard(
-                                    persona: persona,
-                                    isActive: viewModel.activePersonaId == persona.id,
-                                    adjectives: viewModel.getAdjectivesFor(persona: persona),
-                                    onTap: {
-                                        Task {
-                                            await viewModel.setActivePersona(persona.id)
-                                        }
-                                    },
-                                    onEdit: {
-                                        personaToEdit = persona
-                                    },
-                                    onDelete: {
-                                        personaToDelete = persona
-                                        showingDeleteAlert = true
+                    VStack(spacing: 0) {
+                        // Selection count header
+                        HStack {
+                            Text("선택된 페르소나: \(viewModel.selectedPersonaIds.count)/5")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(Color(hex: "A50034"))
+
+                            Spacer()
+
+                            if !viewModel.selectedPersonaIds.isEmpty {
+                                Button("선택 저장") {
+                                    Task {
+                                        await viewModel.saveSelectedPersonas()
                                     }
-                                )
+                                }
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 8)
+                                .background(Color(hex: "A50034"))
+                                .cornerRadius(20)
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 12)
+                        .background(Color.white)
+
+                        ScrollView {
+                            LazyVStack(spacing: 16) {
+                                ForEach(viewModel.personas) { persona in
+                                    PersonaCard(
+                                        persona: persona,
+                                        isSelected: viewModel.selectedPersonaIds.contains(persona.id),
+                                        adjectives: viewModel.getAdjectivesFor(persona: persona),
+                                        onTap: {
+                                            viewModel.togglePersonaSelection(persona.id)
+                                        },
+                                        onEdit: {
+                                            personaToEdit = persona
+                                        },
+                                        onDelete: {
+                                            personaToDelete = persona
+                                            showingDeleteAlert = true
+                                        }
+                                    )
+                                }
                             }
 
                             // Add button at the end
@@ -154,7 +180,7 @@ struct PersonaListView: View {
 /// 페르소나 카드 컴포넌트
 struct PersonaCard: View {
     let persona: Persona
-    let isActive: Bool
+    let isSelected: Bool
     let adjectives: [Adjective]
     let onTap: () -> Void
     let onEdit: () -> Void
@@ -162,47 +188,43 @@ struct PersonaCard: View {
 
     var body: some View {
         Button(action: onTap) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    // Nickname
-                    Text(persona.nickname)
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundColor(.black)
+            HStack(spacing: 12) {
+                // Selection checkbox
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 24))
+                    .foregroundColor(isSelected ? Color(hex: "A50034") : .gray.opacity(0.3))
 
-                    Spacer()
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        // Nickname
+                        Text(persona.nickname)
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundColor(.black)
 
-                    // Active indicator
-                    if isActive {
-                        Text("활성")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 4)
-                            .background(Color(hex: "A50034"))
-                            .cornerRadius(12)
+                        Spacer()
+
+                        // Menu button
+                        Menu {
+                            Button(action: onEdit) {
+                                Label("편집", systemImage: "pencil")
+                            }
+                            Button(role: .destructive, action: onDelete) {
+                                Label("삭제", systemImage: "trash")
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundColor(.gray)
+                                .padding(8)
+                        }
                     }
 
-                    // Menu button
-                    Menu {
-                        Button(action: onEdit) {
-                            Label("편집", systemImage: "pencil")
-                        }
-                        Button(role: .destructive, action: onDelete) {
-                            Label("삭제", systemImage: "trash")
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(.gray)
-                            .padding(8)
-                    }
-                }
-
-                // Adjective tags
-                if !adjectives.isEmpty {
-                    FlowLayout(spacing: 8) {
-                        ForEach(adjectives) { adjective in
-                            SelectedAdjectiveTag(text: adjective.adjectiveName)
+                    // Adjective tags
+                    if !adjectives.isEmpty {
+                        FlowLayout(spacing: 8) {
+                            ForEach(adjectives) { adjective in
+                                SelectedAdjectiveTag(text: adjective.adjectiveName)
+                            }
                         }
                     }
                 }
@@ -213,7 +235,7 @@ struct PersonaCard: View {
             .cornerRadius(12)
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(isActive ? Color(hex: "A50034") : Color.clear, lineWidth: 2)
+                    .stroke(isSelected ? Color(hex: "A50034") : Color.clear, lineWidth: 2)
             )
             .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
         }
@@ -284,7 +306,8 @@ struct FlowLayout<Content: View>: View {
 class PersonaListViewModel: ObservableObject {
     @Published var personas: [Persona] = []
     @Published var adjectives: [Adjective] = []
-    @Published var activePersonaId: String?
+    @Published var selectedPersonaIds: [String] = [] // Multi-selection support
+    private let maxSelection = 5
 
     @Published var isLoading = false
     @Published var errorMessage: String?
@@ -294,16 +317,19 @@ class PersonaListViewModel: ObservableObject {
         errorMessage = nil
 
         do {
-            // Load personas and adjectives in parallel
+            // Load personas, adjectives, and selected personas in parallel
             async let personasTask = SupabaseManager.shared.fetchPersonas()
             async let adjectivesTask = SupabaseManager.shared.fetchAdjectives()
-            async let activePersonaTask = SupabaseManager.shared.fetchActivePersona()
+            async let selectedPersonasTask = SupabaseManager.shared.fetchSelectedPersonas()
 
             personas = try await personasTask
             adjectives = try await adjectivesTask
-            activePersonaId = try await activePersonaTask
+            let selectedPersonas = try await selectedPersonasTask
 
-            print("✅ Loaded \(personas.count) personas, \(adjectives.count) adjectives")
+            // Extract IDs from selected personas
+            selectedPersonaIds = selectedPersonas.map { $0.id }
+
+            print("✅ Loaded \(personas.count) personas, \(adjectives.count) adjectives, \(selectedPersonaIds.count) selected")
         } catch {
             errorMessage = "데이터를 불러오는데 실패했습니다"
             print("❌ Failed to load data: \(error)")
@@ -316,14 +342,39 @@ class PersonaListViewModel: ObservableObject {
         return adjectives.filter { persona.adjectiveIds.contains($0.id) }
     }
 
-    func setActivePersona(_ personaId: String) async {
+    /// Toggle persona selection (max 5)
+    func togglePersonaSelection(_ personaId: String) {
+        if let index = selectedPersonaIds.firstIndex(of: personaId) {
+            // Deselect
+            selectedPersonaIds.remove(at: index)
+        } else {
+            // Select (if not at max)
+            if selectedPersonaIds.count < maxSelection {
+                selectedPersonaIds.append(personaId)
+            } else {
+                errorMessage = "최대 5개까지만 선택할 수 있습니다"
+                // Clear error after 2 seconds
+                Task {
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                    errorMessage = nil
+                }
+            }
+        }
+    }
+
+    /// Save selected personas to database
+    func saveSelectedPersonas() async {
+        guard !selectedPersonaIds.isEmpty else { return }
+
         do {
-            try await SupabaseManager.shared.setActivePersona(personaId: personaId)
-            activePersonaId = personaId
-            print("✅ Set active persona: \(personaId)")
+            try await SupabaseManager.shared.setSelectedPersonas(personaIds: selectedPersonaIds)
+            print("✅ Saved \(selectedPersonaIds.count) selected personas")
+
+            // Show success message
+            errorMessage = nil
         } catch {
-            errorMessage = "활성 페르소나 설정 실패"
-            print("❌ Failed to set active persona: \(error)")
+            errorMessage = "선택 저장 실패"
+            print("❌ Failed to save selected personas: \(error)")
         }
     }
 
@@ -331,9 +382,12 @@ class PersonaListViewModel: ObservableObject {
         do {
             try await SupabaseManager.shared.deletePersona(personaId: personaId)
             personas.removeAll { $0.id == personaId }
-            if activePersonaId == personaId {
-                activePersonaId = nil
+
+            // Also remove from selection if it was selected
+            if let index = selectedPersonaIds.firstIndex(of: personaId) {
+                selectedPersonaIds.remove(at: index)
             }
+
             print("✅ Deleted persona: \(personaId)")
         } catch {
             errorMessage = "페르소나 삭제 실패"

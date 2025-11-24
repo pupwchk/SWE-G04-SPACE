@@ -25,21 +25,37 @@ CREATE TABLE IF NOT EXISTS personas (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 3. 활성 페르소나 테이블 (user_active_persona)
--- 각 사용자의 현재 활성화된 페르소나 저장
+-- 3. 활성 페르소나 테이블 (user_active_persona) - DEPRECATED
+-- 단일 페르소나만 지원하므로 더 이상 사용하지 않음
+-- 하위 호환성을 위해 유지하되, user_selected_personas 사용 권장
 CREATE TABLE IF NOT EXISTS user_active_persona (
     user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     persona_id UUID REFERENCES personas(id) ON DELETE SET NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- 4. 선택된 페르소나 테이블 (user_selected_personas)
+-- 사용자가 선택한 여러 페르소나 저장 (최대 5개)
+CREATE TABLE IF NOT EXISTS user_selected_personas (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    persona_id UUID NOT NULL REFERENCES personas(id) ON DELETE CASCADE,
+    selection_order INTEGER NOT NULL, -- 표시 순서 (1-5)
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(user_id, persona_id), -- 동일한 페르소나 중복 선택 방지
+    UNIQUE(user_id, selection_order) -- 동일한 순서에 여러 페르소나 방지
+);
+
 -- 인덱스 생성
 CREATE INDEX IF NOT EXISTS idx_personas_user_id ON personas(user_id);
 CREATE INDEX IF NOT EXISTS idx_adjectives_name ON adjectives(adjective_name);
+CREATE INDEX IF NOT EXISTS idx_selected_personas_user_id ON user_selected_personas(user_id);
+CREATE INDEX IF NOT EXISTS idx_selected_personas_order ON user_selected_personas(user_id, selection_order);
 
 -- RLS (Row Level Security) 정책 설정
 ALTER TABLE personas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_active_persona ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_selected_personas ENABLE ROW LEVEL SECURITY;
 
 -- personas 테이블 RLS 정책
 CREATE POLICY "Users can view their own personas"
@@ -69,6 +85,23 @@ CREATE POLICY "Users can update their own active persona"
 
 CREATE POLICY "Users can modify their own active persona"
     ON user_active_persona FOR UPDATE
+    USING (auth.uid() = user_id);
+
+-- user_selected_personas 테이블 RLS 정책
+CREATE POLICY "Users can view their own selected personas"
+    ON user_selected_personas FOR SELECT
+    USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert their own selected personas"
+    ON user_selected_personas FOR INSERT
+    WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update their own selected personas"
+    ON user_selected_personas FOR UPDATE
+    USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete their own selected personas"
+    ON user_selected_personas FOR DELETE
     USING (auth.uid() = user_id);
 
 -- adjectives 테이블은 모든 사용자가 읽기 가능

@@ -16,6 +16,12 @@ protocol PersonaRepositoryProtocol {
     func deletePersona(id: String) async throws
     func fetchActivePersona(userId: String) async throws -> String?
     func setActivePersona(userId: String, personaId: String?) async throws
+
+    // Multi-persona selection methods
+    func fetchSelectedPersonas(userId: String) async throws -> [Persona]
+    func addSelectedPersona(userId: String, personaId: String, order: Int) async throws
+    func removeSelectedPersona(userId: String, personaId: String) async throws
+    func setSelectedPersonas(userId: String, personaIds: [String]) async throws
 }
 
 /// Create Persona Request DTO
@@ -58,6 +64,36 @@ struct SetActivePersonaRequest: Encodable {
     enum CodingKeys: String, CodingKey {
         case userId = "user_id"
         case personaId = "persona_id"
+    }
+}
+
+/// Selected Persona Request DTO
+struct SelectedPersonaRequest: Encodable {
+    let userId: String
+    let personaId: String
+    let selectionOrder: Int
+
+    enum CodingKeys: String, CodingKey {
+        case userId = "user_id"
+        case personaId = "persona_id"
+        case selectionOrder = "selection_order"
+    }
+}
+
+/// Selected Persona Response DTO
+struct SelectedPersonaResponse: Decodable {
+    let id: String
+    let userId: String
+    let personaId: String
+    let selectionOrder: Int
+    let createdAt: String
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case userId = "user_id"
+        case personaId = "persona_id"
+        case selectionOrder = "selection_order"
+        case createdAt = "created_at"
     }
 }
 
@@ -145,6 +181,82 @@ class PersonaRepository: PersonaRepositoryProtocol {
 
         // Then insert new
         _ = try await service.insert(table: "user_active_persona", data: request)
+    }
+
+    // MARK: - Multi-Persona Selection
+
+    /// Fetch selected personas (up to 5)
+    func fetchSelectedPersonas(userId: String) async throws -> [Persona] {
+        // First, get the selected persona IDs with their order
+        let selectedRecords: [SelectedPersonaResponse] = try await service.query(
+            table: "user_selected_personas",
+            select: "*",
+            filter: "user_id=eq.\(userId)&order=selection_order.asc"
+        )
+
+        // If no selected personas, return empty array
+        if selectedRecords.isEmpty {
+            return []
+        }
+
+        // Get the persona IDs
+        let personaIds = selectedRecords.map { $0.personaId }
+
+        // Fetch all personas
+        let allPersonas: [Persona] = try await service.query(
+            table: "personas",
+            select: "*",
+            filter: "id=in.(\(personaIds.joined(separator: ",")))"
+        )
+
+        // Sort personas by selection order
+        let orderedPersonas = selectedRecords.compactMap { record in
+            allPersonas.first { $0.id == record.personaId }
+        }
+
+        return orderedPersonas
+    }
+
+    /// Add a selected persona with specific order
+    func addSelectedPersona(userId: String, personaId: String, order: Int) async throws {
+        let request = SelectedPersonaRequest(
+            userId: userId,
+            personaId: personaId,
+            selectionOrder: order
+        )
+
+        _ = try await service.insert(table: "user_selected_personas", data: request)
+    }
+
+    /// Remove a selected persona
+    func removeSelectedPersona(userId: String, personaId: String) async throws {
+        try await service.delete(
+            table: "user_selected_personas",
+            filter: "user_id=eq.\(userId)&persona_id=eq.\(personaId)"
+        )
+    }
+
+    /// Set selected personas (replaces all existing selections)
+    func setSelectedPersonas(userId: String, personaIds: [String]) async throws {
+        // Validate max 5 personas
+        let limited = Array(personaIds.prefix(5))
+
+        // First, delete all existing selections
+        try? await service.delete(
+            table: "user_selected_personas",
+            filter: "user_id=eq.\(userId)"
+        )
+
+        // Insert new selections
+        for (index, personaId) in limited.enumerated() {
+            let request = SelectedPersonaRequest(
+                userId: userId,
+                personaId: personaId,
+                selectionOrder: index + 1
+            )
+
+            _ = try await service.insert(table: "user_selected_personas", data: request)
+        }
     }
 }
 
