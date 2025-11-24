@@ -1,16 +1,16 @@
 //
-//  RoutineDataModel.swift
+//  TimelineDataModel.swift
 //  space
 //
-//  Data model for routine tracking
+//  Data model for timeline tracking
 //
 
 import Foundation
 import CoreLocation
 import MapKit
 
-/// Single routine record
-struct RoutineRecord: Identifiable, Codable, Equatable {
+/// Single timeline record
+struct TimelineRecord: Identifiable, Codable, Equatable {
     let id: UUID
     let startTime: Date
     let endTime: Date
@@ -209,65 +209,65 @@ struct Checkpoint: Identifiable, Codable, Equatable {
     }
 }
 
-/// Manager for routine records
-class RoutineManager: ObservableObject {
-    static let shared = RoutineManager()
+/// Manager for timeline records
+class TimelineManager: ObservableObject {
+    static let shared = TimelineManager()
 
-    @Published var routines: [RoutineRecord] = []
-    @Published var currentRoutine: RoutineRecord?
+    @Published var timelines: [TimelineRecord] = []
+    @Published var currentTimeline: TimelineRecord?
 
-    private let userDefaultsKey = "saved_routines"
+    private let userDefaultsKey = "saved_timelines"
 
     init() {
-        loadRoutines()
+        loadTimelines()
     }
 
     // MARK: - CRUD Operations
 
-    func saveRoutine(_ routine: RoutineRecord) {
-        routines.insert(routine, at: 0) // Add to beginning
+    func saveTimeline(_ timeline: TimelineRecord) {
+        timelines.insert(timeline, at: 0) // Add to beginning
         saveToUserDefaults()
-        print("✅ Routine saved: \(routine.distanceFormatted), \(routine.durationFormatted)")
+        print("✅ Timeline saved: \(timeline.distanceFormatted), \(timeline.durationFormatted)")
     }
 
-    func deleteRoutine(_ routine: RoutineRecord) {
-        routines.removeAll { $0.id == routine.id }
+    func deleteTimeline(_ timeline: TimelineRecord) {
+        timelines.removeAll { $0.id == timeline.id }
         saveToUserDefaults()
-        print("🗑️ Routine deleted")
+        print("🗑️ Timeline deleted")
     }
 
-    func clearAllRoutines() {
-        routines.removeAll()
+    func clearAllTimelines() {
+        timelines.removeAll()
         saveToUserDefaults()
-        print("🗑️ All routines cleared")
+        print("🗑️ All timelines cleared")
     }
 
     // MARK: - Persistence
 
     private func saveToUserDefaults() {
-        if let encoded = try? JSONEncoder().encode(routines) {
+        if let encoded = try? JSONEncoder().encode(timelines) {
             UserDefaults.standard.set(encoded, forKey: userDefaultsKey)
         }
     }
 
-    private func loadRoutines() {
+    private func loadTimelines() {
         if let data = UserDefaults.standard.data(forKey: userDefaultsKey),
-           let decoded = try? JSONDecoder().decode([RoutineRecord].self, from: data) {
-            routines = decoded
-            print("📂 Loaded \(routines.count) routine(s)")
+           let decoded = try? JSONDecoder().decode([TimelineRecord].self, from: data) {
+            timelines = decoded
+            print("📂 Loaded \(timelines.count) timeline(s)")
         }
     }
 
-    // MARK: - Create Routine from Location Data
+    // MARK: - Create Timeline from Location Data
 
-    func createRoutine(
+    func createTimeline(
         startTime: Date,
         endTime: Date,
         coordinates: [CLLocationCoordinate2D],
         timestamps: [Date],
         speeds: [Double],
         checkpoints: [Checkpoint] = []
-    ) -> RoutineRecord? {
+    ) -> TimelineRecord? {
         guard !coordinates.isEmpty else { return nil }
 
         // Convert coordinates
@@ -290,7 +290,7 @@ class RoutineManager: ObservableObject {
 
         let duration = endTime.timeIntervalSince(startTime)
 
-        return RoutineRecord(
+        return TimelineRecord(
             id: UUID(),
             startTime: startTime,
             endTime: endTime,
@@ -305,17 +305,17 @@ class RoutineManager: ObservableObject {
 
     // MARK: - Checkpoint Management
 
-    func addCheckpoint(to routineId: UUID, checkpoint: Checkpoint) {
-        if let index = routines.firstIndex(where: { $0.id == routineId }) {
-            routines[index].checkpoints.append(checkpoint)
+    func addCheckpoint(to timelineId: UUID, checkpoint: Checkpoint) {
+        if let index = timelines.firstIndex(where: { $0.id == timelineId }) {
+            timelines[index].checkpoints.append(checkpoint)
             saveToUserDefaults()
             print("📍 Checkpoint added: \(checkpoint.mood.emoji)")
         }
     }
 
-    func removeCheckpoint(from routineId: UUID, checkpointId: UUID) {
-        if let index = routines.firstIndex(where: { $0.id == routineId }) {
-            routines[index].checkpoints.removeAll { $0.id == checkpointId }
+    func removeCheckpoint(from timelineId: UUID, checkpointId: UUID) {
+        if let index = timelines.firstIndex(where: { $0.id == timelineId }) {
+            timelines[index].checkpoints.removeAll { $0.id == checkpointId }
             saveToUserDefaults()
             print("🗑️ Checkpoint removed")
         }
@@ -324,7 +324,7 @@ class RoutineManager: ObservableObject {
     // MARK: - Dummy Data for Testing
 
     func loadDummyData() {
-        guard routines.isEmpty else { return }
+        guard timelines.isEmpty else { return }
 
         // Seoul area sample coordinates (Gangnam)
         let baseLatitude = 37.5012
@@ -373,7 +373,7 @@ class RoutineManager: ObservableObject {
             )
         ]
 
-        let dummyRoutine = RoutineRecord(
+        let dummyTimeline = TimelineRecord(
             id: UUID(),
             startTime: startTime,
             endTime: Date(),
@@ -385,7 +385,7 @@ class RoutineManager: ObservableObject {
             checkpoints: checkpoints
         )
 
-        routines.append(dummyRoutine)
+        timelines.append(dummyTimeline)
         saveToUserDefaults()
         print("📂 Dummy data loaded with \(checkpoints.count) checkpoints")
     }

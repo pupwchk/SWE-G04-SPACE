@@ -67,12 +67,12 @@ class PersonaManager: ObservableObject {
         guard answers.count >= 8,
               let q1 = answers[0], // Energy time: 아침/점심/저녁
               let q4 = answers[3], // Morning/Night person
-              let q6 = answers[5]  // Routine
+              let q6 = answers[5]  // Timeline
         else {
             return "Developer" // Default
         }
 
-        // Morning person + 운동 루틴 = "Running"
+        // Morning person + 운동 타임라인 = "Running"
         if q1 == 0 && q4 == 0 && (q6 == 0 || q6 == 1) {
             return "Running"
         }
@@ -102,12 +102,12 @@ class PersonaManager: ObservableObject {
             return "Sleep"
         }
 
-        // 산책 루틴 = "Walking"
+        // 산책 타임라인 = "Walking"
         if q6 == 1 {
             return "Walking"
         }
 
-        // 카페 루틴 = "home"
+        // 카페 타임라인 = "home"
         if q6 == 2 {
             return "home"
         }

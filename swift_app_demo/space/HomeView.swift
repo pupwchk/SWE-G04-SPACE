@@ -48,7 +48,7 @@ struct HomeView: View {
 
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 12) {
-                                    RoutineWidget()
+                                    TimelineWidget()
                                     StateWidget()
                                     ToneWidget(tones: selectedTones)
                                 }

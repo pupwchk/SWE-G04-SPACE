@@ -101,9 +101,9 @@ CREATE POLICY "Users can delete their own tones"
 
 -- ========================================
 
--- 4. Routine Records Table (Optional - for future use)
--- Stores user's routine/exercise tracking data
-CREATE TABLE IF NOT EXISTS public.routine_records (
+-- 4. Timeline Records Table (Optional - for future use)
+-- Stores user's timeline/exercise tracking data
+CREATE TABLE IF NOT EXISTS public.timeline_records (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     start_time TIMESTAMP WITH TIME ZONE NOT NULL,
@@ -117,18 +117,18 @@ CREATE TABLE IF NOT EXISTS public.routine_records (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
-ALTER TABLE public.routine_records ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.timeline_records ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Users can view their own routine records"
-    ON public.routine_records FOR SELECT
+CREATE POLICY "Users can view their own timeline records"
+    ON public.timeline_records FOR SELECT
     USING (auth.uid() = user_id);
 
-CREATE POLICY "Users can insert their own routine records"
-    ON public.routine_records FOR INSERT
+CREATE POLICY "Users can insert their own timeline records"
+    ON public.timeline_records FOR INSERT
     WITH CHECK (auth.uid() = user_id);
 
-CREATE POLICY "Users can delete their own routine records"
-    ON public.routine_records FOR DELETE
+CREATE POLICY "Users can delete their own timeline records"
+    ON public.timeline_records FOR DELETE
     USING (auth.uid() = user_id);
 
 -- ========================================
@@ -165,7 +165,7 @@ CREATE POLICY "Users can delete their own call history"
 -- 6. Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_user_settings_user_id ON public.user_settings(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_tones_user_id ON public.user_tones(user_id);
-CREATE INDEX IF NOT EXISTS idx_routine_records_user_id ON public.routine_records(user_id);
+CREATE INDEX IF NOT EXISTS idx_timeline_records_user_id ON public.timeline_records(user_id);
 CREATE INDEX IF NOT EXISTS idx_call_history_user_id ON public.call_history(user_id);
 
 -- ========================================

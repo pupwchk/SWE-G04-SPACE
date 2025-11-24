@@ -1,15 +1,15 @@
 //
-//  RoutineDetailView.swift
+//  TimelineDetailView.swift
 //  space
 //
-//  Full-screen routine tracking and timeline map view
+//  Full-screen timeline tracking and timeline map view
 //
 
 import SwiftUI
 import MapKit
 
-/// Full-screen routine detail view with map and controls
-struct RoutineDetailView: View {
+/// Full-screen timeline detail view with map and controls
+struct TimelineDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var locationManager: LocationManager
     @Binding var isTracking: Bool
@@ -17,8 +17,8 @@ struct RoutineDetailView: View {
     var onStartTracking: () -> Void
     var onStopTracking: () -> Void
 
-    @StateObject private var routineManager = RoutineManager.shared
-    @State private var selectedRoutine: RoutineRecord?
+    @StateObject private var timelineManager = TimelineManager.shared
+    @State private var selectedTimeline: TimelineRecord?
     @State private var cameraPosition: MapCameraPosition = .automatic
     @State private var selectedCheckpoint: Checkpoint?
 
@@ -50,13 +50,13 @@ struct RoutineDetailView: View {
                         .padding(.horizontal, 20)
                         .padding(.bottom, 20)
 
-                    // Routine history
-                    if !routineManager.routines.isEmpty {
-                        routineHistorySection
+                    // Timeline history
+                    if !timelineManager.timelines.isEmpty {
+                        timelineHistorySection
                     }
                 }
             }
-            .navigationTitle("My Routine")
+            .navigationTitle("My Timeline")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -72,12 +72,12 @@ struct RoutineDetailView: View {
 
     private var mapView: some View {
         Map(position: $cameraPosition) {
-            if let routine = selectedRoutine {
-                // Show selected routine
-                MapPolyline(coordinates: routine.coordinates.map { $0.coordinate })
+            if let timeline = selectedTimeline {
+                // Show selected timeline
+                MapPolyline(coordinates: timeline.coordinates.map { $0.coordinate })
                     .stroke(Color(hex: "A50034"), lineWidth: 4)
 
-                if let firstCoord = routine.coordinates.first?.coordinate {
+                if let firstCoord = timeline.coordinates.first?.coordinate {
                     Annotation("Start", coordinate: firstCoord) {
                         ZStack {
                             Circle()
@@ -90,7 +90,7 @@ struct RoutineDetailView: View {
                     }
                 }
 
-                if let lastCoord = routine.coordinates.last?.coordinate {
+                if let lastCoord = timeline.coordinates.last?.coordinate {
                     Annotation("End", coordinate: lastCoord) {
                         ZStack {
                             Circle()
@@ -104,7 +104,7 @@ struct RoutineDetailView: View {
                 }
 
                 // Show checkpoints
-                ForEach(routine.checkpoints) { checkpoint in
+                ForEach(timeline.checkpoints) { checkpoint in
                     Annotation("", coordinate: checkpoint.coordinate.coordinate) {
                         CheckpointAnnotationView(
                             checkpoint: checkpoint,
@@ -174,17 +174,17 @@ struct RoutineDetailView: View {
         .onAppear {
             updateCameraPosition()
             // Load dummy data for testing
-            routineManager.loadDummyData()
+            timelineManager.loadDummyData()
         }
-        .onChange(of: selectedRoutine) { _, newValue in
-            // Clear checkpoint selection when routine changes
+        .onChange(of: selectedTimeline) { _, newValue in
+            // Clear checkpoint selection when timeline changes
             selectedCheckpoint = nil
         }
-        .onChange(of: selectedRoutine) { _, _ in
+        .onChange(of: selectedTimeline) { _, _ in
             updateCameraPosition()
         }
         .onChange(of: locationManager.location) { _, _ in
-            if isTracking && selectedRoutine == nil {
+            if isTracking && selectedTimeline == nil {
                 updateCameraPosition()
             }
         }
@@ -194,12 +194,12 @@ struct RoutineDetailView: View {
 
     private var statsView: some View {
         VStack(spacing: 16) {
-            if let routine = selectedRoutine {
-                // Selected routine stats
+            if let timeline = selectedTimeline {
+                // Selected timeline stats
                 HStack(spacing: 20) {
-                    statItem(title: "Distance", value: routine.distanceFormatted, icon: "figure.walk")
-                    statItem(title: "Duration", value: routine.durationFormatted, icon: "clock.fill")
-                    statItem(title: "Avg Speed", value: String(format: "%.1f km/h", routine.averageSpeed), icon: "speedometer")
+                    statItem(title: "Distance", value: timeline.distanceFormatted, icon: "figure.walk")
+                    statItem(title: "Duration", value: timeline.durationFormatted, icon: "clock.fill")
+                    statItem(title: "Avg Speed", value: String(format: "%.1f km/h", timeline.averageSpeed), icon: "speedometer")
                 }
             } else if isTracking {
                 // Current tracking stats
@@ -234,7 +234,7 @@ struct RoutineDetailView: View {
                 .padding(.top, 8)
             } else {
                 // Not tracking
-                Text("Start tracking to see your routine")
+                Text("Start tracking to see your timeline")
                     .font(.system(size: 14))
                     .foregroundColor(.gray)
                     .padding(.vertical, 20)
@@ -266,10 +266,10 @@ struct RoutineDetailView: View {
 
     private var controlButtons: some View {
         HStack(spacing: 12) {
-            if selectedRoutine != nil {
+            if selectedTimeline != nil {
                 // Back to tracking
                 Button(action: {
-                    selectedRoutine = nil
+                    selectedTimeline = nil
                 }) {
                     HStack {
                         Image(systemName: "arrow.left")
@@ -299,7 +299,7 @@ struct RoutineDetailView: View {
             } else {
                 // Start button
                 Button(action: {
-                    selectedRoutine = nil
+                    selectedTimeline = nil
                     onStartTracking()
                 }) {
                     HStack {
@@ -316,9 +316,9 @@ struct RoutineDetailView: View {
         }
     }
 
-    // MARK: - Routine History Section
+    // MARK: - Timeline History Section
 
-    private var routineHistorySection: some View {
+    private var timelineHistorySection: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("History")
@@ -327,9 +327,9 @@ struct RoutineDetailView: View {
 
                 Spacer()
 
-                if !routineManager.routines.isEmpty {
+                if !timelineManager.timelines.isEmpty {
                     Button(action: {
-                        routineManager.clearAllRoutines()
+                        timelineManager.clearAllTimelines()
                     }) {
                         Text("Clear All")
                             .font(.system(size: 13))
@@ -341,8 +341,8 @@ struct RoutineDetailView: View {
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
-                    ForEach(routineManager.routines) { routine in
-                        routineHistoryCard(routine: routine)
+                    ForEach(timelineManager.timelines) { timeline in
+                        timelineHistoryCard(timeline: timeline)
                     }
                 }
                 .padding(.horizontal, 20)
@@ -351,15 +351,15 @@ struct RoutineDetailView: View {
         .padding(.bottom, 20)
     }
 
-    private func routineHistoryCard(routine: RoutineRecord) -> some View {
+    private func timelineHistoryCard(timeline: TimelineRecord) -> some View {
         Button(action: {
-            selectedRoutine = routine
+            selectedTimeline = timeline
         }) {
             VStack(alignment: .leading, spacing: 8) {
                 // Mini map preview
-                if let region = routine.region {
+                if let region = timeline.region {
                     Map(position: .constant(.region(region))) {
-                        MapPolyline(coordinates: routine.coordinates.map { $0.coordinate })
+                        MapPolyline(coordinates: timeline.coordinates.map { $0.coordinate })
                             .stroke(Color(hex: "A50034"), lineWidth: 2)
                     }
                     .frame(width: 120, height: 80)
@@ -369,33 +369,33 @@ struct RoutineDetailView: View {
 
                 // Stats
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(routine.distanceFormatted)
+                    Text(timeline.distanceFormatted)
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(.black)
 
-                    Text(routine.durationFormatted)
+                    Text(timeline.durationFormatted)
                         .font(.system(size: 11))
                         .foregroundColor(.gray)
 
-                    Text(formatDate(routine.startTime))
+                    Text(formatDate(timeline.startTime))
                         .font(.system(size: 10))
                         .foregroundColor(.gray)
                 }
             }
             .padding(10)
-            .background(selectedRoutine?.id == routine.id ? Color(hex: "F3DEE5") : Color.white)
+            .background(selectedTimeline?.id == timeline.id ? Color(hex: "F3DEE5") : Color.white)
             .cornerRadius(12)
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(selectedRoutine?.id == routine.id ? Color(hex: "A50034") : Color.clear, lineWidth: 2)
+                    .stroke(selectedTimeline?.id == timeline.id ? Color(hex: "A50034") : Color.clear, lineWidth: 2)
             )
         }
         .buttonStyle(.plain)
         .contextMenu {
             Button(role: .destructive) {
-                routineManager.deleteRoutine(routine)
-                if selectedRoutine?.id == routine.id {
-                    selectedRoutine = nil
+                timelineManager.deleteTimeline(timeline)
+                if selectedTimeline?.id == timeline.id {
+                    selectedTimeline = nil
                 }
             } label: {
                 Label("Delete", systemImage: "trash")
@@ -406,7 +406,7 @@ struct RoutineDetailView: View {
     // MARK: - Helper Methods
 
     private func updateCameraPosition() {
-        if let routine = selectedRoutine, let region = routine.region {
+        if let timeline = selectedTimeline, let region = timeline.region {
             cameraPosition = .region(region)
         } else if isTracking, let lastLocation = locationManager.location {
             cameraPosition = .region(MKCoordinateRegion(
@@ -526,7 +526,7 @@ struct CheckpointBubbleView: View {
 }
 
 #Preview {
-    RoutineDetailView(
+    TimelineDetailView(
         locationManager: LocationManager(),
         isTracking: .constant(false),
         onStartTracking: {},
