@@ -119,7 +119,7 @@ struct PersonaListView: View {
                     }
                 }
 
-                // Error message
+                // Success/Error message
                 if let errorMessage = viewModel.errorMessage {
                     VStack {
                         Spacer()
@@ -127,7 +127,7 @@ struct PersonaListView: View {
                             .font(.system(size: 14))
                             .foregroundColor(.white)
                             .padding()
-                            .background(Color.red)
+                            .background(errorMessage.contains("✅") ? Color.green : Color.red)
                             .cornerRadius(12)
                             .padding()
                     }
@@ -371,10 +371,22 @@ class PersonaListViewModel: ObservableObject {
             print("✅ Saved \(selectedPersonaIds.count) selected personas")
 
             // Show success message
-            errorMessage = nil
+            errorMessage = "✅ 선택이 저장되었습니다"
+
+            // Clear success message after 2 seconds
+            Task {
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                errorMessage = nil
+            }
         } catch {
-            errorMessage = "선택 저장 실패"
+            errorMessage = "❌ 선택 저장 실패"
             print("❌ Failed to save selected personas: \(error)")
+
+            // Clear error message after 3 seconds
+            Task {
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                errorMessage = nil
+            }
         }
     }
 

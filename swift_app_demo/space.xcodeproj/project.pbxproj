@@ -8,11 +8,10 @@
 
 /* Begin PBXFileReference section */
 		AE715CBB2EB8DF470054A54F /* space.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = space.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		AE715CBE2EB8DF470054A54F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		AE715CBE2EB8DF470054A54F /* Info.plist */ = {
+		AE715CBE2EB8DF470054A54F /* Exceptions for "space" folder in "space" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
@@ -25,7 +24,7 @@
 		AE715CBD2EB8DF470054A54F /* space */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				AE715CBE2EB8DF470054A54F /* Info.plist */,
+				AE715CBE2EB8DF470054A54F /* Exceptions for "space" folder in "space" target */,
 			);
 			path = space;
 			sourceTree = "<group>";

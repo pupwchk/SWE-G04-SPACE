@@ -16,24 +16,37 @@ struct AddItemWidget: View {
 
     var body: some View {
         Button(action: {
-            action()
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                action()
+            }
         }) {
-            VStack(spacing: 0) {
+            VStack(spacing: 12) {
                 Spacer()
 
-                // Plus icon centered
-                Image(systemName: "plus")
-                    .font(.system(size: 50, weight: .thin))
-                    .foregroundColor(Color.white.opacity(0.7))
+                // Plus icon with circle background
+                ZStack {
+                    Circle()
+                        .fill(Color.white.opacity(0.3))
+                        .frame(width: 60, height: 60)
+
+                    Image(systemName: "plus")
+                        .font(.system(size: 28, weight: .medium))
+                        .foregroundColor(Color(hex: "A50034"))
+                }
+
+                Text(title)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(Color(hex: "A50034").opacity(0.8))
 
                 Spacer()
             }
             .frame(maxWidth: .infinity)
             .frame(height: 160)
             .background(
-                isPressed ? Color(hex: "E8C0CD") : Color(hex: "F3DEE5")
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(isPressed ? Color(hex: "E8C0CD") : Color.white)
+                    .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 4)
             )
-            .cornerRadius(20)
         }
         .buttonStyle(PlainButtonStyle())
         .simultaneousGesture(

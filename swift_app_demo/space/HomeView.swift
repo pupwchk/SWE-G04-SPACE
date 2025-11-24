@@ -27,34 +27,54 @@ struct HomeView: View {
     var body: some View {
         NavigationStack {
             ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 24) {
                     // Section 1: 3 Fixed Widgets (Timeline, State, Persona)
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("타임라인, 상태, 페르소나")
-                            .font(.system(size: 16, weight: .regular))
-                            .foregroundColor(.black)
-                            .padding(.horizontal, 20)
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Text("나의 현황")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundColor(.black)
+
+                            Spacer()
+                        }
+                        .padding(.horizontal, 20)
 
                         ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 12) {
+                            HStack(spacing: 16) {
                                 TimelineWidget()
                                 StateWidget()
-                                PersonaWidget()
+                                PersonaBubbleWidgetNew()
                             }
                             .padding(.horizontal, 20)
                         }
                     }
 
                     // Device section
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Add devices")
-                            .font(.system(size: 16, weight: .regular))
-                            .foregroundColor(.black)
-                            .padding(.horizontal, 20)
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Text("기기")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundColor(.black)
+
+                            Spacer()
+
+                            if hasDevices {
+                                Button(action: {
+                                    withAnimation {
+                                        hasDevices = false
+                                    }
+                                }) {
+                                    Image(systemName: "plus.circle.fill")
+                                        .font(.system(size: 22))
+                                        .foregroundColor(Color(hex: "A50034"))
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 20)
 
                         if hasDevices {
                             ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 12) {
+                                HStack(spacing: 16) {
                                     ForEach(0..<sampleDevices.count, id: \.self) { index in
                                         DeviceCard(
                                             icon: sampleDevices[index].icon,
@@ -66,7 +86,7 @@ struct HomeView: View {
                             }
                         } else {
                             AddItemWidget(
-                                title: "Add devices",
+                                title: "기기 추가",
                                 action: {
                                     handleDeviceAdd()
                                 }
@@ -76,15 +96,31 @@ struct HomeView: View {
                     }
 
                     // Appliance section
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Add home appliances")
-                            .font(.system(size: 16, weight: .regular))
-                            .foregroundColor(.black)
-                            .padding(.horizontal, 20)
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Text("가전제품")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundColor(.black)
+
+                            Spacer()
+
+                            if hasAppliances {
+                                Button(action: {
+                                    withAnimation {
+                                        hasAppliances = false
+                                    }
+                                }) {
+                                    Image(systemName: "plus.circle.fill")
+                                        .font(.system(size: 22))
+                                        .foregroundColor(Color(hex: "A50034"))
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 20)
 
                         if hasAppliances {
                             ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 12) {
+                                HStack(spacing: 16) {
                                     ForEach(0..<sampleAppliances.count, id: \.self) { index in
                                         ApplianceCard(
                                                 icon: sampleAppliances[index].icon,
@@ -99,7 +135,7 @@ struct HomeView: View {
                             }
                         } else {
                             AddItemWidget(
-                                title: "Add home appliances",
+                                title: "가전제품 추가",
                                 action: {
                                     handleApplianceAdd()
                                 }
@@ -108,9 +144,9 @@ struct HomeView: View {
                         }
                     }
 
-                    Spacer(minLength: 40)
+                    Spacer(minLength: 60)
                 }
-                .padding(.top, 8)
+                .padding(.top, 16)
             }
             .background(Color(hex: "F9F9F9"))
             .navigationTitle("Home")

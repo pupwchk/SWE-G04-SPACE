@@ -6,63 +6,100 @@
 
 import SwiftUI
 
-/// 페르소나 위젯 - 활성 페르소나를 보여주고 페르소나 리스트로 이동
+/// 페르소나 위젯 - 선택된 페르소나들을 보여주고 페르소나 리스트로 이동
 struct PersonaBubbleWidgetNew: View {
     @StateObject private var viewModel = PersonaBubbleWidgetViewModel()
     @State private var navigateToList = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(viewModel.activePersona?.nickname ?? "Choose persona")
-                .font(.system(size: 16, weight: .regular))
-                .foregroundColor(.black)
-                .padding(.horizontal, 20)
+        Button(action: {
+            navigateToList = true
+        }) {
+            ZStack {
+                // Background
+                Color(hex: "F3DEE5")
 
-            Button(action: {
-                navigateToList = true
-            }) {
-                ZStack {
-                    // Pink background
-                    RoundedRectangle(cornerRadius: 20)
-                        .fill(Color(hex: "E8C8D8"))
+                if viewModel.isLoading {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: Color(hex: "A50034")))
+                } else if let firstPersona = viewModel.selectedPersonas.first {
+                    // Show first selected persona
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("Persona")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(.black)
 
-                    if viewModel.isLoading {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: Color(hex: "A50034")))
-                    } else if let persona = viewModel.activePersona, !viewModel.adjectives.isEmpty {
-                        // Show adjective tags
-                        VStack(spacing: 8) {
-                            FlowLayout(spacing: 8) {
-                                ForEach(viewModel.adjectives) { adjective in
-                                    SelectedAdjectiveTag(text: adjective.adjectiveName)
-                                }
+                            Spacer()
+
+                            // Count badge
+                            if viewModel.selectedPersonas.count > 1 {
+                                Text("+\(viewModel.selectedPersonas.count - 1)")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundColor(Color(hex: "A50034"))
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color.white.opacity(0.8))
+                                    .cornerRadius(8)
                             }
                         }
-                        .padding(16)
-                    } else {
-                        // Empty state - prompt to create persona
-                        VStack(spacing: 12) {
-                            Image(systemName: "person.crop.circle.badge.plus")
-                                .font(.system(size: 40))
-                                .foregroundColor(Color(hex: "A50034"))
+                        .padding(.horizontal, 12)
+                        .padding(.top, 12)
 
-                            Text("페르소나를 생성하세요")
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundColor(Color(hex: "A50034"))
+                        Spacer()
+
+                        // Persona name
+                        Text(firstPersona.nickname)
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(.black)
+                            .padding(.horizontal, 12)
+
+                        // Adjectives
+                        let adjectives = viewModel.getAdjectivesFor(persona: firstPersona)
+                        if !adjectives.isEmpty {
+                            FlowLayout(spacing: 6) {
+                                ForEach(adjectives.prefix(3)) { adjective in
+                                    Text(adjective.adjectiveName)
+                                        .font(.system(size: 10))
+                                        .foregroundColor(Color(hex: "A50034"))
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(Color.white.opacity(0.8))
+                                        .cornerRadius(8)
+                                }
+                            }
+                            .padding(.horizontal, 12)
                         }
+
+                        Spacer()
+                    }
+                } else {
+                    // Empty state
+                    VStack(spacing: 8) {
+                        Image(systemName: "person.crop.circle.badge.plus")
+                            .font(.system(size: 36))
+                            .foregroundColor(Color(hex: "A50034"))
+
+                        Text("페르소나 선택")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.black)
                     }
                 }
-                .frame(height: 180)
             }
-            .buttonStyle(.plain)
-            .padding(.horizontal, 20)
-            .sheet(isPresented: $navigateToList) {
-                PersonaListView()
+            .frame(width: 160, height: 160)
+            .cornerRadius(20)
+        }
+        .buttonStyle(.plain)
+        .sheet(isPresented: $navigateToList, onDismiss: {
+            Task {
+                await viewModel.loadSelectedPersonas()
             }
+        }) {
+            PersonaListView()
         }
         .onAppear {
             Task {
-                await viewModel.loadActivePersona()
+                await viewModel.loadSelectedPersonas()
             }
         }
     }
@@ -71,31 +108,30 @@ struct PersonaBubbleWidgetNew: View {
 /// PersonaBubbleWidgetNew의 ViewModel
 @MainActor
 class PersonaBubbleWidgetViewModel: ObservableObject {
-    @Published var activePersona: Persona?
-    @Published var adjectives: [Adjective] = []
+    @Published var selectedPersonas: [Persona] = []
+    @Published var allAdjectives: [Adjective] = []
     @Published var isLoading = false
 
-    func loadActivePersona() async {
+    func loadSelectedPersonas() async {
         isLoading = true
 
         do {
-            // Load active persona ID
-            if let activePersonaId = try await SupabaseManager.shared.fetchActivePersona() {
-                // Load all personas to find the active one
-                let personas = try await SupabaseManager.shared.fetchPersonas()
-                activePersona = personas.first { $0.id == activePersonaId }
+            // Load selected personas
+            selectedPersonas = try await SupabaseManager.shared.fetchSelectedPersonas()
 
-                // Load adjectives for the active persona
-                if let persona = activePersona {
-                    let allAdjectives = try await SupabaseManager.shared.fetchAdjectives()
-                    adjectives = allAdjectives.filter { persona.adjectiveIds.contains($0.id) }
-                }
-            }
+            // Load all adjectives
+            allAdjectives = try await SupabaseManager.shared.fetchAdjectives()
+
+            print("✅ Widget loaded \(selectedPersonas.count) selected personas")
         } catch {
-            print("❌ Failed to load active persona: \(error)")
+            print("❌ Failed to load selected personas: \(error)")
         }
 
         isLoading = false
+    }
+
+    func getAdjectivesFor(persona: Persona) -> [Adjective] {
+        return allAdjectives.filter { persona.adjectiveIds.contains($0.id) }
     }
 }
 

@@ -241,11 +241,14 @@ class PersonaRepository: PersonaRepositoryProtocol {
         // Validate max 5 personas
         let limited = Array(personaIds.prefix(5))
 
-        // First, delete all existing selections
-        try? await service.delete(
+        // First, delete all existing selections and wait for it to complete
+        try await service.delete(
             table: "user_selected_personas",
             filter: "user_id=eq.\(userId)"
         )
+
+        // Small delay to ensure delete completes
+        try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
 
         // Insert new selections
         for (index, personaId) in limited.enumerated() {
