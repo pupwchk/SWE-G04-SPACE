@@ -8,6 +8,9 @@
 import Foundation
 
 /// Manager for storing and retrieving persona test results
+/// ⚠️ DEPRECATED: This is a legacy manager using UserDefaults.
+/// Consider migrating to Supabase-based Persona system (PersonaRepository, SupabaseManager)
+/// Currently used by PersonalTestView for persona test results.
 class PersonaManager: ObservableObject {
     static let shared = PersonaManager()
 

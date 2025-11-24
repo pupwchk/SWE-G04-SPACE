@@ -31,6 +31,9 @@ struct HomeView: View {
         NavigationStack {
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 16) {
+                    // Persona widget
+                    PersonaBubbleWidgetNew()
+
                     // Show ToneBubbleWidget or widgets based on tone selection
                     if selectedTones.isEmpty {
                         // Show ToneBubbleWidget when no tones selected

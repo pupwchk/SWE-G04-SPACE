@@ -530,6 +530,107 @@ class SupabaseManager: ObservableObject {
         print("✅ Tones saved successfully")
     }
 
+    // MARK: - Persona Management
+
+    /// Lazy initialization of Persona Repository
+    private lazy var personaRepository: PersonaRepository = {
+        let service = SupabaseService(
+            baseURL: supabaseURL,
+            apiKey: supabaseAnonKey,
+            tokenProvider: { [weak self] in
+                return self?.getAccessToken()
+            }
+        )
+        return PersonaRepository(service: service)
+    }()
+
+    /// Fetch all adjectives
+    func fetchAdjectives() async throws -> [Adjective] {
+        return try await personaRepository.fetchAdjectives()
+    }
+
+    /// Fetch user personas
+    func fetchPersonas() async throws -> [Persona] {
+        guard let userId = currentUser?.id else {
+            throw AuthError.notAuthenticated
+        }
+
+        return try await personaRepository.fetchPersonas(userId: userId)
+    }
+
+    /// Create a new persona
+    func createPersona(nickname: String, adjectiveIds: [String], customInstructions: String?) async throws -> Persona {
+        guard let userId = currentUser?.id else {
+            throw AuthError.notAuthenticated
+        }
+
+        // Fetch adjectives to generate final prompt
+        let adjectives = try await fetchAdjectives()
+        let finalPrompt = personaRepository.generateFinalPrompt(
+            adjectiveIds: adjectiveIds,
+            customInstructions: customInstructions,
+            adjectives: adjectives
+        )
+
+        let request = CreatePersonaRequest(
+            userId: userId,
+            nickname: nickname,
+            adjectiveIds: adjectiveIds,
+            customInstructions: customInstructions,
+            finalPrompt: finalPrompt
+        )
+
+        let persona = try await personaRepository.createPersona(request)
+        print("✅ Persona created successfully")
+        return persona
+    }
+
+    /// Update a persona
+    func updatePersona(personaId: String, nickname: String, adjectiveIds: [String], customInstructions: String?) async throws {
+        // Fetch adjectives to generate final prompt
+        let adjectives = try await fetchAdjectives()
+        let finalPrompt = personaRepository.generateFinalPrompt(
+            adjectiveIds: adjectiveIds,
+            customInstructions: customInstructions,
+            adjectives: adjectives
+        )
+
+        let request = UpdatePersonaRequest(
+            nickname: nickname,
+            adjectiveIds: adjectiveIds,
+            customInstructions: customInstructions,
+            finalPrompt: finalPrompt
+        )
+
+        try await personaRepository.updatePersona(id: personaId, request)
+        print("✅ Persona updated successfully")
+    }
+
+    /// Delete a persona
+    func deletePersona(personaId: String) async throws {
+        try await personaRepository.deletePersona(id: personaId)
+        print("✅ Persona deleted successfully")
+    }
+
+    /// Fetch active persona
+    func fetchActivePersona() async throws -> String? {
+        guard let userId = currentUser?.id else {
+            throw AuthError.notAuthenticated
+        }
+
+        return try await personaRepository.fetchActivePersona(userId: userId)
+    }
+
+    /// Set active persona
+    func setActivePersona(personaId: String?) async throws {
+        guard let userId = currentUser?.id else {
+            throw AuthError.notAuthenticated
+        }
+
+        try await personaRepository.setActivePersona(userId: userId, personaId: personaId)
+        print("✅ Active persona set successfully")
+    }
+
     /// Create user profile in database
     private func createUserProfile(userId: String, email: String, name: String, accessToken: String) async throws {
         // Create user profile

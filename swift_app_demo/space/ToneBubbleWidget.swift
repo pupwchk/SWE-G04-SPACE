@@ -113,6 +113,15 @@ struct ToneBubbleWidget: View {
     }
 }
 
+// MARK: - Bubble Data Model
+
+struct BubbleData: Identifiable {
+    let id: UUID
+    let text: String
+    var position: CGPoint
+    var duration: Double
+}
+
 #Preview {
     ToneBubbleWidget(selectedTones: .constant([]))
         .background(Color(hex: "F9F9F9"))
