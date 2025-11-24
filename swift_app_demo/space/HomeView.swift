@@ -13,7 +13,7 @@ struct HomeView: View {
 
     @State private var hasDevices = false
     @State private var hasAppliances = false
-    @State private var selectedPersonas: Set<String> = []
+    @State private var selectedTones: Set<String> = []
 
     // Sample devices data
     let sampleDevices = [
@@ -31,14 +31,14 @@ struct HomeView: View {
         NavigationStack {
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 16) {
-                    // Show PersonaBubbleWidget or widgets based on persona selection
-                    if selectedPersonas.isEmpty {
-                        // Show PersonaBubbleWidget when no personas selected
-                        PersonaBubbleWidget(selectedPersonas: $selectedPersonas)
+                    // Show ToneBubbleWidget or widgets based on tone selection
+                    if selectedTones.isEmpty {
+                        // Show ToneBubbleWidget when no tones selected
+                        ToneBubbleWidget(selectedTones: $selectedTones)
                     } else {
-                        // Show 3 widgets when personas are selected
+                        // Show 3 widgets when tones are selected
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("map + state + personal")
+                            Text("map + state + tone")
                                 .font(.system(size: 16, weight: .regular))
                                 .foregroundColor(.black)
                                 .padding(.horizontal, 20)
@@ -47,21 +47,21 @@ struct HomeView: View {
                                 HStack(spacing: 12) {
                                     RoutineWidget()
                                     StateWidget()
-                                    PersonalWidget(personas: selectedPersonas)
+                                    ToneWidget(tones: selectedTones)
                                 }
                                 .padding(.horizontal, 20)
                             }
                         }
                     }
                 }
-                .onChange(of: selectedPersonas) { _, newValue in
-                    print("HomeView selectedPersonas changed: \(newValue)")
+                .onChange(of: selectedTones) { _, newValue in
+                    print("HomeView selectedTones changed: \(newValue)")
                 }
                 .onAppear {
-                    // Load saved personas when view appears
-                    let loadedPersonas = PersonaManager.shared.selectedPersonas
-                    print("Loaded personas on appear: \(loadedPersonas)")
-                    selectedPersonas = loadedPersonas
+                    // Load saved tones when view appears
+                    let loadedTones = ToneManager.shared.selectedTones
+                    print("Loaded tones on appear: \(loadedTones)")
+                    selectedTones = loadedTones
                 }
 
                 VStack(alignment: .leading, spacing: 16) {
