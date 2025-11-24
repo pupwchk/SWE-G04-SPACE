@@ -8,11 +8,25 @@
 
 /* Begin PBXFileReference section */
 		AE715CBB2EB8DF470054A54F /* space.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = space.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		AE715CBE2EB8DF470054A54F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		AE715CBE2EB8DF470054A54F /* Info.plist */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = AE715CBA2EB8DF470054A54F /* space */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		AE715CBD2EB8DF470054A54F /* space */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				AE715CBE2EB8DF470054A54F /* Info.plist */,
+			);
 			path = space;
 			sourceTree = "<group>";
 		};
@@ -251,17 +265,9 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = N42X522L6D;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSHealthShareUsageDescription = "We need access to your health data to display your sleep, stress, and calorie information from Apple Watch.";
-				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "We need access to update your health data.";
-				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "We need your location to track your routine in the background and create a complete timeline map.";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "We need your location to track your routine and create a timeline map of your activities.";
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_FILE = space/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -282,17 +288,9 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = N42X522L6D;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSHealthShareUsageDescription = "We need access to your health data to display your sleep, stress, and calorie information from Apple Watch.";
-				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "We need access to update your health data.";
-				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "We need your location to track your routine in the background and create a complete timeline map.";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "We need your location to track your routine and create a timeline map of your activities.";
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_FILE = space/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",

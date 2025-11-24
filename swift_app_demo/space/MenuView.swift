@@ -9,9 +9,14 @@ import SwiftUI
 
 /// Menu screen - settings and user options
 struct MenuView: View {
+    @StateObject private var supabaseManager = SupabaseManager.shared
+    @State private var userProfile: UserProfile?
     @State private var showMyPage = false
     @State private var showGeneral = false
     @State private var showResetAlert = false
+    @State private var showLogoutAlert = false
+    @State private var isLoading = true
+    @Environment(\.dismiss) var dismiss
 
     var body: some View {
         NavigationStack {
@@ -44,13 +49,19 @@ struct MenuView: View {
 
                             // User info
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("소고기 웨이퍼 공격")
-                                    .font(.system(size: 18, weight: .semibold))
-                                    .foregroundColor(.black)
+                                if isLoading {
+                                    Text("로딩 중...")
+                                        .font(.system(size: 18, weight: .semibold))
+                                        .foregroundColor(.gray)
+                                } else {
+                                    Text(userProfile?.name ?? supabaseManager.currentUser?.name ?? "사용자")
+                                        .font(.system(size: 18, weight: .semibold))
+                                        .foregroundColor(.black)
 
-                                Text("softwareengineering@gmail.com")
-                                    .font(.system(size: 14, weight: .regular))
-                                    .foregroundColor(.gray)
+                                    Text(userProfile?.email ?? supabaseManager.currentUser?.email ?? "")
+                                        .font(.system(size: 14, weight: .regular))
+                                        .foregroundColor(.gray)
+                                }
                             }
 
                             Spacer()
@@ -106,6 +117,9 @@ struct MenuView: View {
             }
             .navigationTitle("Menu")
             .navigationBarTitleDisplayMode(.large)
+            .toolbarColorScheme(.light, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarBackground(Color(hex: "F9F9F9"), for: .navigationBar)
             .navigationDestination(isPresented: $showMyPage) {
                 MyPageView()
             }
@@ -119,6 +133,21 @@ struct MenuView: View {
                 }
             } message: {
                 Text("저장된 모든 페르소나가 삭제됩니다.\n처음부터 다시 시작하시겠습니까?")
+            }
+            .alert("로그아웃", isPresented: $showLogoutAlert) {
+                Button("취소", role: .cancel) { }
+                Button("로그아웃", role: .destructive) {
+                    Task {
+                        await performLogout()
+                    }
+                }
+            } message: {
+                Text("로그아웃 하시겠습니까?")
+            }
+            .onAppear {
+                Task {
+                    await loadUserProfile()
+                }
             }
         }
     }
@@ -140,13 +169,37 @@ struct MenuView: View {
     }
 
     private func handleLogout() {
-        print("Logout tapped")
-        // TODO: Implement logout logic
+        showLogoutAlert = true
     }
 
     private func handleResetPersona() {
-        PersonaManager.shared.clearPersonas()
-        print("Personas cleared successfully")
+        ToneManager.shared.clearTones()
+        print("Tones cleared successfully")
+    }
+
+    // MARK: - Data Loading
+
+    private func loadUserProfile() async {
+        isLoading = true
+        defer { isLoading = false }
+
+        do {
+            let profile = try await supabaseManager.fetchUserProfile()
+            userProfile = profile
+        } catch {
+            print("❌ Failed to load user profile: \(error.localizedDescription)")
+            // If profile fetch fails, we still show user info from currentUser
+        }
+    }
+
+    private func performLogout() async {
+        do {
+            try await supabaseManager.signOut()
+            print("✅ Logged out successfully")
+            // The app will automatically navigate to login screen via ContentView
+        } catch {
+            print("❌ Logout failed: \(error.localizedDescription)")
+        }
     }
 }
 

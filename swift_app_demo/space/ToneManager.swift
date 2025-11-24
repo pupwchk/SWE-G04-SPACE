@@ -50,6 +50,7 @@ class ToneManager: ObservableObject {
 
     private let userDefaults = UserDefaults.standard
     private let tonesKey = "savedTones"
+    private let supabaseManager = SupabaseManager.shared
 
     init() {
         loadTones()
@@ -57,12 +58,23 @@ class ToneManager: ObservableObject {
 
     // MARK: - Public Methods
 
-    /// Save tones to UserDefaults
+    /// Save tones (to both local and Supabase)
     func saveTones(_ tones: Set<String>) {
         selectedTones = tones
+
+        // Save to UserDefaults for offline access
         let tonesArray = Array(tones)
         userDefaults.set(tonesArray, forKey: tonesKey)
         userDefaults.synchronize()
+
+        // Save to Supabase
+        Task {
+            do {
+                try await supabaseManager.saveUserTones(tones)
+            } catch {
+                print("❌ Failed to save tones to Supabase: \(error.localizedDescription)")
+            }
+        }
     }
 
     /// Add a single tone
@@ -86,10 +98,32 @@ class ToneManager: ObservableObject {
         }
     }
 
-    /// Load tones from UserDefaults
+    /// Load tones from both UserDefaults and Supabase
     func loadTones() {
+        // Load from UserDefaults first (for offline support)
         if let tonesArray = userDefaults.array(forKey: tonesKey) as? [String] {
             selectedTones = Set(tonesArray)
+        }
+
+        // Try to sync with Supabase
+        Task {
+            await syncWithSupabase()
+        }
+    }
+
+    /// Sync tones with Supabase
+    func syncWithSupabase() async {
+        do {
+            let tones = try await supabaseManager.fetchUserTones()
+            await MainActor.run {
+                selectedTones = Set(tones)
+                // Update UserDefaults
+                userDefaults.set(tones, forKey: tonesKey)
+                userDefaults.synchronize()
+            }
+        } catch {
+            print("❌ Failed to sync tones from Supabase: \(error.localizedDescription)")
+            // Keep using local data if sync fails
         }
     }
 
@@ -98,6 +132,15 @@ class ToneManager: ObservableObject {
         selectedTones = []
         userDefaults.removeObject(forKey: tonesKey)
         userDefaults.synchronize()
+
+        // Clear from Supabase
+        Task {
+            do {
+                try await supabaseManager.saveUserTones([])
+            } catch {
+                print("❌ Failed to clear tones in Supabase: \(error.localizedDescription)")
+            }
+        }
     }
 
     /// Get random tone from selected tones
