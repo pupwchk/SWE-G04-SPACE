@@ -15,8 +15,6 @@ struct RoutineWidget: View {
 
     @State private var showDetailView = false
     @State private var routineStartTime: Date?
-    @State private var speedHistory: [Double] = []
-    @State private var timestampHistory: [Date] = []
 
     var body: some View {
         Button(action: handleTap) {
@@ -187,8 +185,6 @@ struct RoutineWidget: View {
 
     private func startTracking() {
         routineStartTime = Date()
-        speedHistory.removeAll()
-        timestampHistory.removeAll()
         locationManager.startTracking()
     }
 
@@ -197,13 +193,13 @@ struct RoutineWidget: View {
 
         locationManager.stopTracking()
 
-        // Create routine record
+        // Create routine record using LocationManager's history
         if let routine = routineManager.createRoutine(
             startTime: startTime,
             endTime: Date(),
             coordinates: locationManager.routeCoordinates,
-            timestamps: timestampHistory,
-            speeds: speedHistory
+            timestamps: locationManager.timestampHistory,
+            speeds: locationManager.speedHistory
         ) {
             routineManager.saveRoutine(routine)
         }

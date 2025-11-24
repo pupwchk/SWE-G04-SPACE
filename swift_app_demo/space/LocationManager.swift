@@ -30,6 +30,8 @@ class LocationManager: NSObject, ObservableObject {
     // Tracking history
     @Published var routeCoordinates: [CLLocationCoordinate2D] = []
     @Published var totalDistance: Double = 0.0 // meters
+    @Published var speedHistory: [Double] = []
+    @Published var timestampHistory: [Date] = []
 
     // MARK: - Private Properties
 
@@ -73,6 +75,8 @@ class LocationManager: NSObject, ObservableObject {
         isTracking = true
         routeCoordinates.removeAll()
         totalDistance = 0.0
+        speedHistory.removeAll()
+        timestampHistory.removeAll()
         lastLocation = nil
 
         locationManager.startUpdatingLocation()
@@ -94,6 +98,8 @@ class LocationManager: NSObject, ObservableObject {
     func resetTracking() {
         routeCoordinates.removeAll()
         totalDistance = 0.0
+        speedHistory.removeAll()
+        timestampHistory.removeAll()
         lastLocation = nil
         lastUpdateTime = nil
     }
@@ -138,6 +144,8 @@ extension LocationManager: CLLocationManagerDelegate {
         // Calculate distance if tracking
         if isTracking {
             routeCoordinates.append(newLocation.coordinate)
+            speedHistory.append(currentSpeed)
+            timestampHistory.append(newLocation.timestamp)
 
             if let previous = lastLocation {
                 let distance = newLocation.distance(from: previous)
