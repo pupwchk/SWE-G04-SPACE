@@ -1,0 +1,470 @@
+%%{init: {'er': { 'layoutDirection': 'TB', 'useMaxWidth': true }}}%%
+erDiagram
+  User ||--|| UserPhone  : "owns 1"
+  User ||--|| UserDevice : "owns 1"
+  User ||--o{ Place      : "defines"
+  User ||--o{ TimeSlot   : "has per-hour"
+  TimeSlot ||--o{ Place : "matched at hour"
+  TimeSlot ||--o{ WeatherObservation  : "nx, ny, time"
+  User ||--o{ SleepSession : "has per-action"
+  User ||--o{ WorkoutSession : "has per-action"
+  User ||--o{ HealthHourly : "has per-hour"
+  User ||--o{ Appliance : "owns"
+  User ||--o{ Character : "has"
+  Appliance ||--|| AirConditionerConfig : "has config"
+  Appliance ||--|| TvConfig : "has config"
+  Appliance ||--|| AirPurifierConfig : "has config"
+  Appliance ||--|| LightConfig : "has config"
+  Appliance ||--|| HumidifierConfig : "has config"
+  %% WeatherObservation은 복합키로 캐시되고 TimeSlot이 (nx,ny,ts_hour,provider)로 조회
+
+  User {
+    uuid id PK
+    %%-- 사용자 고유 ID (UUIDv4)
+    text email
+    %%-- 사용자 이메일 (로그인/계정 식별용)
+    timestamptz created_at
+    %%-- 계정 생성 시각 (UTC)
+    timestamptz deleted_at
+    %%-- 계정 삭제/비활성화 시각 (nullable)
+  }
+
+  UserPhone {
+    uuid id PK
+    %%-- 휴대폰 정보 레코드 ID (UUIDv4)
+    uuid user_id FK
+    %%-- 사용자 ID (User.id 참조)
+    text e164_number
+    %%-- 국제 표준 전화번호 (E.164 형식, 예: +821012345678)
+    text country_code
+    %%-- 국가 코드 (예: KR, JP, US)
+    text platform
+    %%-- 운영체제 종류 (ios | android)
+    text model_name
+    %%-- 기기 모델명 (예: iPhone 15 Pro, Galaxy S24)
+    text display_name
+    %%-- 사용자가 지정한 기기 이름 (예: 도겸이의 아이폰)
+    text os_version
+    %%-- 운영체제 버전 (예: iOS 17.2)
+    text device_id_hash
+    %%-- 디바이스 식별자 해시 (광고 ID 또는 벤더 ID 해시)
+    text push_token
+    %%-- 푸시 알림 토큰 (APNs / FCM)
+    boolean is_verified
+    %%-- 전화번호 인증 여부 (true/false)
+    timestamptz registered_at
+    %%-- 기기 등록 시각 (UTC)
+    timestamptz last_seen_at
+    %%-- 마지막 동기화 시각 (UTC)
+    %% UNIQUE(user_id)  -- 1인 1폰
+  }
+
+
+  UserDevice {
+    uuid id PK
+    %%-- 웨어러블(워치 등) 정보 레코드 ID (UUIDv4)
+    uuid user_id FK
+    %%-- 사용자 ID (User.id 참조)
+    text kind
+    %%-- 기기 종류 (예: apple_watch, fitbit)
+    text platform
+    %%-- 기기 운영체제 (예: watchOS, wearOS)
+    text model_name
+    %%-- 기기 모델명 (예: Apple Watch Series 9)
+    text display_name
+    %%-- 사용자가 지정한 기기 이름 (예: 도겸이의 워치)
+    text os_version
+    %%-- 운영체제 버전 (예: watchOS 10.2)
+    text serial_hash
+    %%-- 시리얼 넘버 해시 (기기 고유 식별자)
+    timestamptz registered_at
+    %%-- 웨어러블 등록 시각 (UTC)
+    timestamptz last_seen_at
+    %%-- 마지막 동기화 시각 (UTC)
+    %% UNIQUE(user_id)  -- 1인 1워치
+  } 
+
+  Place {
+    uuid id PK
+    %%-- 장소 레코드 고유 ID (UUIDv4)
+    uuid user_id FK
+    %%-- 사용자 ID (User.id 참조)
+    text label
+    %%-- 사용자가 지정한 장소 이름 (예: 집, 학교, 헬스장)
+    text category
+    %%-- 장소 분류 태그 (예: home, office, gym)
+    double center_lat
+    %%-- 장소 중심 위도 (decimal degrees)
+    double center_lon
+    %%-- 장소 중심 경도 (decimal degrees)
+    double radius_m
+    %%-- 장소 반경 (미터 단위, 기본 30~50m)
+    int visits_count
+    %%-- 누적 방문 횟수
+    timestamptz first_seen
+    %%-- 최초 방문 시각 (UTC)
+    timestamptz last_seen
+    %%-- 최근 방문 시각 (UTC)
+  }
+
+  TimeSlot {
+    uuid id PK
+    %%-- 1시간 단위 타임 슬롯 고유 ID (UUIDv4)
+    uuid user_id FK
+    %%-- 사용자 ID (User.id 참조)
+    timestamptz ts_hour
+    %%-- 정각(UTC 기준) 타임스탬프 — ex) 2025-11-03 12:00:00
+    double latitude
+    %%-- 해당 시간대의 대표 위도 (°)
+    double longitude
+    %%-- 해당 시간대의 대표 경도 (°)
+    double altitude
+    %%-- 고도 (m)
+    double horizontal_accuracy
+    %%-- 수평 정확도 (±m)
+    double vertical_accuracy
+    %%-- 수직 정확도 (±m)
+    uuid place_id FK
+    %%-- 매칭된 장소 ID (Place.id, 없을 경우 NULL)
+    int grid_nx
+    %%-- 기상청 격자 X 좌표 (nx)
+    int grid_ny
+    %%-- 기상청 격자 Y 좌표 (ny)
+    text weather_provider
+    %%-- 날씨 데이터 제공자 (예: 'KMA', 'OpenWeather')
+    text status
+    %%-- 데이터 처리 상태 (MISSING | PARTIAL | COMPLETE)
+    %% UNIQUE(user_id, ts_hour)
+    %% INDEX(grid_nx, grid_ny, ts_hour, weather_provider)
+  }
+
+  WeatherObservation {
+    int nx
+    %%-- 기상청 격자 X 좌표 (nx)
+    int ny
+    %%-- 기상청 격자 Y 좌표 (ny)
+    timestamptz as_of
+    %%-- 관측 기준 시각 (UTC)
+    text provider
+    %%-- 데이터 제공 기관 ('KMA', 'OpenWeatherMap' 등)
+    text condition_code
+    %%-- 날씨 상태 코드 (예: 'SKY_A03' → 구름많음)
+    text precip_type
+    %%-- 강수 형태 (none | rain | snow | sleet)
+    double temp_c
+    %%-- 기온 (°C)
+    double humidity_pct
+    %%-- 상대 습도 (%)
+    double wind_speed_mps
+    %%-- 풍속 (m/s)
+    double pm10
+    %%-- 미세먼지 (PM10, µg/m³)
+    double pm2_5
+    %%-- 초미세먼지 (PM2.5, µg/m³)
+    jsonb raw_json
+    %%-- 원시 API 응답(JSON) — 상세 날씨/풍향 등 전체 저장
+    %% UNIQUE(nx, ny, as_of, provider)
+  }
+
+    SleepSession {
+        uuid id PK
+        uuid user_id FK
+        timestamptz start_at       
+        %%-- 수면 시작 시각
+        timestamptz end_at         
+        %%-- 수면 종료 시각
+        double in_bed_hr           
+        %%-- 침대에 누워있던 총 시간(hr)
+        double asleep_hr           
+        %%-- 실제 수면 시간(hr)
+        double awake_hr            
+        %%-- 깨어있던 총 시간(hr)
+    double core_hr             
+    %%-- 코어 수면 시간(hr, watchOS9+)
+    double deep_hr             
+    %%-- 깊은 수면 시간(hr, watchOS9+)
+    double rem_hr              
+    %%-- 렘수면 시간(hr, watchOS9+)
+    double respiratory_rate    
+    %%-- 수면 중 평균 호흡수(count/min, Series8+)
+    double heart_rate_avg      
+    %%-- 수면 중 평균 심박수(bpm)
+    double efficiency          
+    %%-- 수면 효율(0~1 또는 %)
+    text source                
+    %%-- 수집 출처(e.g. "AppleHealthKit")
+    text device_model          
+    %%-- 예: "Apple Watch Series 9"
+    text os_version            
+    %%-- 예: "watchOS 10.2"
+    %% jsonb meta                 
+    %%-- 기타 메타데이터 (timezone, sync_id 등)
+    %% INDEX(user_id, start_at, end_at)
+  }
+
+  WorkoutSession {
+    uuid id PK
+    uuid user_id FK
+    timestamptz start_at           
+    %%-- 운동 시작 시각
+    timestamptz end_at             
+    %%-- 운동 종료 시각
+    text workout_type              
+    %%-- running / cycling / strength / walking ...
+    int step_count                 
+    %%-- 걸음 수 (steps)
+    double distance_km             
+    %%-- 이동 거리 (km)
+    int flights_climbed            
+    %%-- 오른 층수 (count)
+    double active_energy_kcal      
+    %%-- 활동 칼로리(kcal)
+    double basal_energy_kcal       
+    %%-- 기초 대사량(kcal)
+    double exercise_min            
+    %%-- 운동 시간(분)
+    double stand_hr                
+    %%-- 서 있었던 총 시간(시간)
+    int stand_hours                
+    %%-- 서 있던 시간대 수(회)
+    double walking_speed_kmh       
+    %%-- 평균 걷기 속도(km/h, Series4+)
+    double step_length_cm          
+    %%-- 걸음 길이(cm, Series4+)
+    double walking_asymmetry_pct   
+    %%-- 걸음 비대칭성(%)
+    double double_support_pct      
+    %%-- 양발 지지 시간(%)
+    double stair_speed_up_dps      
+    %%-- 계단 오르기 속도(층/초)
+    double stair_speed_down_dps    
+    %%-- 계단 내리기 속도(층/초)
+    double avg_hr                  
+    %%-- 평균 심박수(bpm)
+    text source                    
+    %%-- 데이터 출처 ("AppleHealthKit")
+    text device_model              
+    %%-- "Apple Watch Series 9"
+    text os_version                
+    %%-- "watchOS 10.2"
+    jsonb meta                     
+    %%-- 기타 부가정보 (lap, gps route id 등)
+    %% INDEX(user_id, start_at, end_at)
+  }
+
+  HealthHourly {
+    uuid id PK
+    uuid user_id FK
+    timestamptz ts_hour          
+    %%-- 정각(UTC)
+    double heart_rate_bpm        
+    %%-- 심박수
+    double resting_hr_bpm        
+    %%-- 안정 시 심박수
+    double walking_hr_avg_bpm    
+    %%-- 걷기 평균 심박수
+    double hrv_sdnn_ms           
+    %%-- 심박변이도
+    double vo2_max               
+    %%-- 최대 산소 섭취량
+    double spo2_pct              
+    %%-- 혈중 산소포화도
+    double ecg_index             
+    %%-- 심전도 지표(심전도 파일 ID나 스코어)
+    boolean irregular_rhythm     
+    %%-- 불규칙 박동 알림 (true=감지)
+    double respiratory_rate_cpm  
+    %%-- 호흡수 (count/min)
+    double oxygen_saturation_pct 
+    %%-- 혈중 산소 포화도 (중복 가능)
+    double env_audio_db          
+    %%-- 환경 소음 노출 (dB)
+    double headphone_audio_db    
+    %%-- 헤드폰 소음 노출 (dB)
+    double env_sound_level_db    
+    %%-- 환경 소음 수준 (dB)
+    double wrist_temp_c          
+    %%-- 손목 온도 (°C)
+    double mindful_min           
+    %%-- 명상/마음챙김 시간 (분)
+    double daylight_min          
+    %%-- 야외 햇빛 노출 시간 (분)
+    text source                  
+    %%-- "AppleHealthKit"
+    text device_model            
+    %%-- 예: "Apple Watch Series 9"
+    text os_version              
+    %%-- 예: "watchOS 10.2"
+    timestamptz synced_at        
+    %%  -- 데이터 동기화 시각
+    %% UNIQUE(user_id, ts_hour)
+    %% INDEX(user_id, ts_hour)
+}
+
+
+Appliance {
+  uuid id PK
+  %%-- 가전 고유 ID
+  uuid user_id FK
+  %%-- 사용자 ID (User.id 참조)
+  text appliance_code
+  %%-- 가전 종류 코드
+  text display_name
+  %%-- 사용자가 붙인 이름
+  uuid place_id FK
+  %%-- 가전이 설치된 장소 id
+    text vendor
+  %%-- 제조사 (예: "Samsung", "LG")
+  text model_name
+  %%-- 모델명 (예: "AF18B1234", "OLED65C3")
+  text external_device_id
+  %%-- 외부 플랫폼 상의 디바이스 ID (예: SmartThings ID, IR-브릿지 내 ID 등)
+  text connection_type
+  %%-- 연결 방식 (wifi | zigbee | ir | bluetooth ...)
+  text status
+  %%-- ONLINE | OFFLINE | ERROR | UNKNOWN (현재 상태)
+  timestamptz registered_at
+  %%-- 가전 등록 시각
+  timestamptz last_seen_at
+  %%-- 마지막 상태 업데이트/통신 시각
+  %% INDEX(user_id, appliance_code)
+  %% INDEX(user_id, place_id)
+}
+
+AirConditionerConfig {
+  uuid id PK
+  uuid appliance_id FK
+  %%-- Appliance.id, appliance_code = 'AC'
+  %% UNIQUE(appliance_id)
+
+  text power_state
+  %%-- ON | OFF
+
+  text mode
+  %%-- cool | heat | dry | fan | auto ...
+
+  double target_temp_c
+  %%-- 목표 온도 (°C)
+
+  text fan_speed
+  %%-- low | mid | high | auto ...
+
+  text swing_mode
+  %%-- none | vertical | horizontal | both
+
+  double target_humidity_pct
+  %%-- (옵션) 제습/가습 겸용 에어컨일 경우
+
+  timestamptz updated_at
+  %%-- 마지막 설정 변경 시각
+}
+
+TvConfig {
+  uuid id PK
+  uuid appliance_id FK
+  %%-- Appliance.id, appliance_code = 'TV'
+  %% UNIQUE(appliance_id)
+
+  text power_state
+  %%-- ON | OFF
+
+  int volume
+  %%-- 0~100 같은 정수 볼륨
+
+  int channel
+  %%-- 채널 번호
+
+  text input_source
+  %%-- HDMI1 / HDMI2 / TV / APP_NETFLIX ...
+
+  int brightness
+  int contrast
+  int color
+  %%-- 필요하면 추가
+
+  timestamptz updated_at
+}
+
+AirPurifierConfig {
+  uuid id PK
+  uuid appliance_id FK
+  %%-- Appliance.id, appliance_code = 'AIR_PURIFIER'
+  %% UNIQUE(appliance_id)
+
+  text power_state
+  %%-- ON | OFF
+
+  text mode
+  %%-- auto | sleep | turbo ...
+
+  text fan_speed
+  %%-- low | mid | high | auto
+
+  boolean ionizer_on
+  %%-- 이온 기능 on/off
+
+  int target_pm10
+  int target_pm2_5
+  %%-- (선택) 목표 청정 수준
+
+  timestamptz updated_at
+}
+
+LightConfig {
+  uuid id PK
+  uuid appliance_id FK
+  %%-- Appliance.id, appliance_code = 'LIGHT'
+  %% UNIQUE(appliance_id)
+
+  text power_state
+  %%-- ON | OFF
+
+  int brightness_pct
+  %%-- 0~100 (%)
+
+  int color_temperature_k
+  %%-- 2700K ~ 6500K (전구색 ~ 주광색)
+
+  text color_hex
+  %%-- RGB 조명일 경우 (#RRGGBB)
+
+  text scene
+  %%-- "reading", "relax", "movie" 같은 프리셋 태그
+
+  timestamptz updated_at
+}
+
+HumidifierConfig {
+  uuid id PK
+  uuid appliance_id FK
+  %%-- Appliance.id, appliance_code = 'HUMIDIFIER'
+  %% UNIQUE(appliance_id)
+
+  text power_state
+  %%-- ON | OFF
+
+  text mode
+  %%-- auto | sleep | turbo ...
+
+  int mist_level
+  %%-- 분무 세기 단계 (1~3 등)
+
+  int target_humidity_pct
+  %%-- 목표 습도 (%)
+
+  boolean warm_mist
+  %%-- 온습 기능 여부
+
+  timestamptz updated_at
+}
+Character {
+    uuid id PK
+    %%-- 캐릭터 고유 ID (UUIDv4)
+    uuid user_id FK
+    %%-- 사용자 ID (User.id 참조)
+    text nickname
+    %%-- 캐릭터 닉네임
+    text persona
+    %%-- 캐릭터 페르소나/성격 묘사
+    %% UNIQUE(user_id, nickname)  -- 동일 사용자 내에서 닉네임 중복 불가
+}
