@@ -11,6 +11,10 @@ import Combine
 
 /// GPS tracking manager for routine recording
 class LocationManager: NSObject, ObservableObject {
+    // MARK: - Singleton
+
+    static let shared = LocationManager()
+
     // MARK: - Published Properties
 
     @Published var location: CLLocation?
@@ -29,9 +33,11 @@ class LocationManager: NSObject, ObservableObject {
 
     // Tracking history
     @Published var routeCoordinates: [CLLocationCoordinate2D] = []
+    @Published var coordinates: [CLLocationCoordinate2D] = [] // Alias for WatchConnectivity compatibility
     @Published var totalDistance: Double = 0.0 // meters
     @Published var speedHistory: [Double] = []
     @Published var timestampHistory: [Date] = []
+    @Published var timestamps: [Date] = [] // Alias for WatchConnectivity compatibility
 
     // MARK: - Private Properties
 

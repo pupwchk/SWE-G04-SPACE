@@ -100,6 +100,13 @@ class SupabaseManager: ObservableObject {
                     self.isAuthenticated = true
                 }
 
+                // Send authentication status to Watch
+                WatchConnectivityManager.shared.sendAuthenticationStatus(
+                    isAuthenticated: true,
+                    userId: user.id,
+                    userEmail: user.email
+                )
+
                 return user
             } else if let userId = authResponse.id, let userEmail = authResponse.email {
                 // Email confirmation required - no session yet
@@ -214,6 +221,13 @@ class SupabaseManager: ObservableObject {
                 print("✅ isAuthenticated set to true")
             }
 
+            // Send authentication status to Watch
+            WatchConnectivityManager.shared.sendAuthenticationStatus(
+                isAuthenticated: true,
+                userId: user.id,
+                userEmail: user.email
+            )
+
             print("✅ Returning user: \(user.email)")
             return user
         } catch let error as AuthError {
@@ -256,6 +270,13 @@ class SupabaseManager: ObservableObject {
             self.currentUser = nil
             self.isAuthenticated = false
         }
+
+        // Send authentication status to Watch
+        WatchConnectivityManager.shared.sendAuthenticationStatus(
+            isAuthenticated: false,
+            userId: nil,
+            userEmail: nil
+        )
     }
 
     // MARK: - Database Operations
@@ -727,6 +748,13 @@ class SupabaseManager: ObservableObject {
                 currentUser = user
                 isAuthenticated = true
             }
+
+            // Send authentication status to Watch
+            WatchConnectivityManager.shared.sendAuthenticationStatus(
+                isAuthenticated: true,
+                userId: user.id,
+                userEmail: user.email
+            )
 
             print("✅ Session validated, user: \(user.email)")
         } catch {

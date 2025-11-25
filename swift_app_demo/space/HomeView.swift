@@ -10,6 +10,8 @@ import SwiftUI
 /// Home screen - main dashboard view
 struct HomeView: View {
     @State private var hasAppliances = false
+    @StateObject private var deviceManager = DeviceManager.shared
+    @StateObject private var connectivityManager = WatchConnectivityManager.shared
 
     // Sample appliances data (keeping for smart home appliances)
     let sampleAppliances = [
@@ -53,12 +55,34 @@ struct HomeView: View {
                         }
                         .padding(.horizontal, 20)
 
-                        // Devices will be dynamically shown when connected
-                        // This section will be implemented in Phase 8
-                        Text("기기 연결 기능은 Phase 8에서 구현됩니다")
-                            .font(.system(size: 14))
-                            .foregroundColor(.gray)
+                        // Connected devices
+                        if deviceManager.connectedDevices.isEmpty {
+                            // No devices connected
+                            VStack(spacing: 8) {
+                                Image(systemName: "applewatch.slash")
+                                    .font(.system(size: 32))
+                                    .foregroundColor(.gray.opacity(0.5))
+
+                                Text("연결된 기기 없음")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.gray)
+
+                                Text("Watch 앱을 실행하면 자동으로 표시됩니다")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.gray.opacity(0.7))
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 24)
                             .padding(.horizontal, 20)
+                        } else {
+                            // Show connected devices
+                            VStack(spacing: 12) {
+                                ForEach(deviceManager.connectedDevices) { device in
+                                    deviceCard(device: device)
+                                }
+                            }
+                            .padding(.horizontal, 20)
+                        }
                     }
 
                     // Appliance section
@@ -117,6 +141,77 @@ struct HomeView: View {
             .background(Color(hex: "F9F9F9"))
             .navigationTitle("Home")
             .navigationBarTitleDisplayMode(.large)
+            .onAppear {
+                // Refresh device list when view appears
+                deviceManager.refresh()
+            }
+        }
+    }
+
+    // MARK: - Device Card
+
+    private func deviceCard(device: ConnectedDevice) -> some View {
+        HStack(spacing: 12) {
+            // Device icon
+            Image(systemName: device.type.icon)
+                .font(.system(size: 24))
+                .foregroundColor(device.isConnected ? Color(hex: "A50034") : .gray)
+                .frame(width: 40, height: 40)
+                .background(device.isConnected ? Color(hex: "A50034").opacity(0.1) : Color.gray.opacity(0.1))
+                .cornerRadius(8)
+
+            // Device info
+            VStack(alignment: .leading, spacing: 2) {
+                Text(device.name)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.black)
+
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(device.isConnected ? Color.green : Color.gray)
+                        .frame(width: 6, height: 6)
+
+                    Text(device.isConnected ? "연결됨" : "연결 끊김")
+                        .font(.system(size: 11))
+                        .foregroundColor(.gray)
+                }
+            }
+
+            Spacer()
+
+            // Battery indicator
+            if let batteryLevel = device.batteryLevel {
+                HStack(spacing: 4) {
+                    Image(systemName: batteryIcon(for: batteryLevel))
+                        .font(.system(size: 16))
+                        .foregroundColor(Color(hex: device.batteryColor))
+
+                    Text(device.batteryLevelFormatted)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(Color(hex: device.batteryColor))
+                }
+            } else {
+                // No battery data
+                Image(systemName: "battery.100")
+                    .font(.system(size: 16))
+                    .foregroundColor(.gray.opacity(0.5))
+            }
+        }
+        .padding(12)
+        .background(Color.white)
+        .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
+    }
+
+    private func batteryIcon(for level: Int) -> String {
+        if level > 75 {
+            return "battery.100"
+        } else if level > 50 {
+            return "battery.75"
+        } else if level > 25 {
+            return "battery.50"
+        } else {
+            return "battery.25"
         }
     }
 

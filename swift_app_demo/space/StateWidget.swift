@@ -34,38 +34,72 @@ struct StateWidget: View {
                 .padding(.bottom, 8)
 
                 // Metrics
-                VStack(spacing: 8) {
-                    // Sleep
-                    healthMetricRow(
-                        icon: "moon.fill",
-                        label: "수면",
-                        value: String(format: "%.1f시간", healthManager.sleepHours),
-                        color: .blue
-                    )
+                VStack(spacing: 6) {
+                    // Heart Rate (Real-time from Watch)
+                    if healthManager.currentHeartRate > 0 {
+                        healthMetricRow(
+                            icon: "heart.fill",
+                            label: "심박수",
+                            value: "\(Int(healthManager.currentHeartRate)) bpm",
+                            color: .red
+                        )
 
-                    Divider()
-                        .background(Color.gray.opacity(0.3))
-                        .padding(.horizontal, 8)
+                        Divider()
+                            .background(Color.gray.opacity(0.3))
+                            .padding(.horizontal, 8)
+                    }
 
-                    // Stress
-                    healthMetricRow(
-                        icon: "brain.fill",
-                        label: "스트레스",
-                        value: "\(healthManager.stressLevel)%",
-                        color: stressColor(for: healthManager.stressLevel)
-                    )
+                    // Active Calories (Real-time)
+                    if healthManager.currentCalories > 0 {
+                        healthMetricRow(
+                            icon: "flame.fill",
+                            label: "활동 칼로리",
+                            value: String(format: "%.0f kcal", healthManager.currentCalories),
+                            color: .orange
+                        )
 
-                    Divider()
-                        .background(Color.gray.opacity(0.3))
-                        .padding(.horizontal, 8)
+                        Divider()
+                            .background(Color.gray.opacity(0.3))
+                            .padding(.horizontal, 8)
+                    }
 
-                    // Calories
-                    healthMetricRow(
-                        icon: "flame.fill",
-                        label: "칼로리",
-                        value: String(format: "%.0f", healthManager.caloriesBurned),
-                        color: .orange
-                    )
+                    // Steps (Real-time)
+                    if healthManager.currentSteps > 0 {
+                        healthMetricRow(
+                            icon: "figure.walk",
+                            label: "걸음 수",
+                            value: "\(healthManager.currentSteps)",
+                            color: .green
+                        )
+
+                        Divider()
+                            .background(Color.gray.opacity(0.3))
+                            .padding(.horizontal, 8)
+                    }
+
+                    // Stress (Daily)
+                    if healthManager.stressLevel > 0 {
+                        healthMetricRow(
+                            icon: "brain.fill",
+                            label: "스트레스",
+                            value: "\(healthManager.stressLevel)%",
+                            color: stressColor(for: healthManager.stressLevel)
+                        )
+                    }
+
+                    // Fallback if no real-time data
+                    if healthManager.currentHeartRate == 0 && healthManager.currentCalories == 0 && healthManager.currentSteps == 0 {
+                        VStack(spacing: 4) {
+                            Image(systemName: "applewatch")
+                                .font(.system(size: 24))
+                                .foregroundColor(.gray.opacity(0.5))
+
+                            Text("Watch에서 추적 시작")
+                                .font(.system(size: 10))
+                                .foregroundColor(.gray)
+                        }
+                        .frame(maxHeight: .infinity)
+                    }
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)

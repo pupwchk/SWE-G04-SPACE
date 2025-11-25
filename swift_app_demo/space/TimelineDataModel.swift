@@ -179,6 +179,12 @@ struct Checkpoint: Identifiable, Codable, Equatable {
     let note: String?
     let timestamp: Date
 
+    // Health data from Watch (Phase 7)
+    let heartRate: Double?  // bpm
+    let calories: Double?   // kcal
+    let steps: Int?         // steps
+    let distance: Double?   // meters
+
     init(
         id: UUID = UUID(),
         coordinate: CoordinateData,
@@ -186,7 +192,11 @@ struct Checkpoint: Identifiable, Codable, Equatable {
         stayDuration: TimeInterval,
         stressChange: StressChange,
         note: String? = nil,
-        timestamp: Date = Date()
+        timestamp: Date = Date(),
+        heartRate: Double? = nil,
+        calories: Double? = nil,
+        steps: Int? = nil,
+        distance: Double? = nil
     ) {
         self.id = id
         self.coordinate = coordinate
@@ -195,6 +205,10 @@ struct Checkpoint: Identifiable, Codable, Equatable {
         self.stressChange = stressChange
         self.note = note
         self.timestamp = timestamp
+        self.heartRate = heartRate
+        self.calories = calories
+        self.steps = steps
+        self.distance = distance
     }
 
     var stayDurationFormatted: String {
@@ -319,6 +333,147 @@ class TimelineManager: ObservableObject {
             saveToUserDefaults()
             print("🗑️ Checkpoint removed")
         }
+    }
+
+    // MARK: - Automatic Checkpoint Generation (Phase 7)
+
+    /// Automatically generate checkpoints based on GPS and health data
+    /// Called when tracking stops on Watch
+    func generateCheckpoints(
+        coordinates: [CLLocationCoordinate2D],
+        timestamps: [Date],
+        healthData: [(heartRate: Double?, calories: Double?, steps: Int?, distance: Double?)]
+    ) -> [Checkpoint] {
+        guard coordinates.count >= 2 else { return [] }
+
+        var checkpoints: [Checkpoint] = []
+
+        // Strategy 1: Create checkpoints at significant stops (velocity < 0.5 km/h for > 30 seconds)
+        var currentStopStart: Int?
+        var currentStopDuration: TimeInterval = 0
+
+        for i in 1..<coordinates.count {
+            let loc1 = CLLocation(latitude: coordinates[i - 1].latitude, longitude: coordinates[i - 1].longitude)
+            let loc2 = CLLocation(latitude: coordinates[i].latitude, longitude: coordinates[i].longitude)
+
+            let distance = loc2.distance(from: loc1) // meters
+            let timeInterval = timestamps[i].timeIntervalSince(timestamps[i - 1])
+            let speed = timeInterval > 0 ? (distance / timeInterval) * 3.6 : 0 // km/h
+
+            // Detect stop
+            if speed < 0.5 {
+                if currentStopStart == nil {
+                    currentStopStart = i
+                    currentStopDuration = 0
+                }
+                currentStopDuration += timeInterval
+            } else {
+                // Moving again, check if we had a significant stop
+                if let stopStart = currentStopStart, currentStopDuration >= 30 {
+                    // Create checkpoint for this stop
+                    let checkpoint = createCheckpointAt(
+                        index: stopStart,
+                        coordinates: coordinates,
+                        timestamps: timestamps,
+                        healthData: healthData,
+                        stayDuration: currentStopDuration
+                    )
+                    checkpoints.append(checkpoint)
+                }
+
+                currentStopStart = nil
+                currentStopDuration = 0
+            }
+        }
+
+        // Check for final stop
+        if let stopStart = currentStopStart, currentStopDuration >= 30 {
+            let checkpoint = createCheckpointAt(
+                index: stopStart,
+                coordinates: coordinates,
+                timestamps: timestamps,
+                healthData: healthData,
+                stayDuration: currentStopDuration
+            )
+            checkpoints.append(checkpoint)
+        }
+
+        print("📍 Auto-generated \(checkpoints.count) checkpoint(s)")
+        return checkpoints
+    }
+
+    /// Create a checkpoint at a specific index with health data
+    private func createCheckpointAt(
+        index: Int,
+        coordinates: [CLLocationCoordinate2D],
+        timestamps: [Date],
+        healthData: [(heartRate: Double?, calories: Double?, steps: Int?, distance: Double?)],
+        stayDuration: TimeInterval
+    ) -> Checkpoint {
+        let coordinate = CoordinateData(
+            coordinate: coordinates[index],
+            timestamp: timestamps[index]
+        )
+
+        // Get health data for this point (if available)
+        let health = index < healthData.count ? healthData[index] : (nil, nil, nil, nil)
+
+        // Determine mood based on heart rate (simple heuristic)
+        let mood: CheckpointMood
+        if let hr = health.0 {  // health.0 = heartRate
+            if hr < 60 {
+                mood = .happy // Resting, relaxed
+            } else if hr < 80 {
+                mood = .neutral // Normal
+            } else if hr < 100 {
+                mood = .happy // Active, energized
+            } else {
+                mood = .neutral // High activity
+            }
+        } else {
+            mood = .neutral // Default if no heart rate data
+        }
+
+        // Determine stress change based on heart rate variability (placeholder)
+        // In a real implementation, this would use actual HRV data
+        let stressChange: StressChange = .unchanged
+
+        return Checkpoint(
+            coordinate: coordinate,
+            mood: mood,
+            stayDuration: stayDuration,
+            stressChange: stressChange,
+            note: nil,
+            timestamp: timestamps[index],
+            heartRate: health.0,  // health.0 = heartRate
+            calories: health.1,   // health.1 = calories
+            steps: health.2,      // health.2 = steps
+            distance: health.3    // health.3 = distance
+        )
+    }
+
+    /// Create a manual checkpoint with current health data
+    func createManualCheckpoint(
+        coordinate: CLLocationCoordinate2D,
+        timestamp: Date,
+        mood: CheckpointMood,
+        note: String? = nil
+    ) -> Checkpoint {
+        // Get current health data from HealthKitManager
+        let healthManager = HealthKitManager.shared
+
+        return Checkpoint(
+            coordinate: CoordinateData(coordinate: coordinate, timestamp: timestamp),
+            mood: mood,
+            stayDuration: 0, // Manual checkpoint, no stay duration
+            stressChange: .unchanged,
+            note: note,
+            timestamp: timestamp,
+            heartRate: healthManager.currentHeartRate > 0 ? healthManager.currentHeartRate : nil,
+            calories: healthManager.currentCalories > 0 ? healthManager.currentCalories : nil,
+            steps: healthManager.currentSteps > 0 ? healthManager.currentSteps : nil,
+            distance: healthManager.currentDistance > 0 ? healthManager.currentDistance : nil
+        )
     }
 
 }
