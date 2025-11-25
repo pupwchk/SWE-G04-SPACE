@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct ContentView: View {
+    @StateObject private var supabaseManager = SupabaseManager.shared
     @State private var showSplash = true
     @State private var isLoggedIn = false
 
@@ -19,11 +20,17 @@ struct ContentView: View {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
                         withAnimation {
                             showSplash = false
+                            // Check authentication status
+                            isLoggedIn = supabaseManager.isAuthenticated
                         }
                     }
                 }
-        } else if isLoggedIn {
+        } else if isLoggedIn || supabaseManager.isAuthenticated {
             MainTabView()
+                .onChange(of: supabaseManager.isAuthenticated) { oldValue, newValue in
+                    // Update login state when authentication changes
+                    isLoggedIn = newValue
+                }
         } else {
             LoginView(isLoggedIn: $isLoggedIn)
         }

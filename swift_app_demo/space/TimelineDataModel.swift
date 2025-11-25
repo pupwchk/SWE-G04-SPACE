@@ -1,16 +1,16 @@
 //
-//  RoutineDataModel.swift
+//  TimelineDataModel.swift
 //  space
 //
-//  Data model for routine tracking
+//  Data model for timeline tracking
 //
 
 import Foundation
 import CoreLocation
 import MapKit
 
-/// Single routine record
-struct RoutineRecord: Identifiable, Codable, Equatable {
+/// Single timeline record
+struct TimelineRecord: Identifiable, Codable, Equatable {
     let id: UUID
     let startTime: Date
     let endTime: Date
@@ -179,6 +179,12 @@ struct Checkpoint: Identifiable, Codable, Equatable {
     let note: String?
     let timestamp: Date
 
+    // Health data from Watch (Phase 7)
+    let heartRate: Double?  // bpm
+    let calories: Double?   // kcal
+    let steps: Int?         // steps
+    let distance: Double?   // meters
+
     init(
         id: UUID = UUID(),
         coordinate: CoordinateData,
@@ -186,7 +192,11 @@ struct Checkpoint: Identifiable, Codable, Equatable {
         stayDuration: TimeInterval,
         stressChange: StressChange,
         note: String? = nil,
-        timestamp: Date = Date()
+        timestamp: Date = Date(),
+        heartRate: Double? = nil,
+        calories: Double? = nil,
+        steps: Int? = nil,
+        distance: Double? = nil
     ) {
         self.id = id
         self.coordinate = coordinate
@@ -195,6 +205,10 @@ struct Checkpoint: Identifiable, Codable, Equatable {
         self.stressChange = stressChange
         self.note = note
         self.timestamp = timestamp
+        self.heartRate = heartRate
+        self.calories = calories
+        self.steps = steps
+        self.distance = distance
     }
 
     var stayDurationFormatted: String {
@@ -209,65 +223,65 @@ struct Checkpoint: Identifiable, Codable, Equatable {
     }
 }
 
-/// Manager for routine records
-class RoutineManager: ObservableObject {
-    static let shared = RoutineManager()
+/// Manager for timeline records
+class TimelineManager: ObservableObject {
+    static let shared = TimelineManager()
 
-    @Published var routines: [RoutineRecord] = []
-    @Published var currentRoutine: RoutineRecord?
+    @Published var timelines: [TimelineRecord] = []
+    @Published var currentTimeline: TimelineRecord?
 
-    private let userDefaultsKey = "saved_routines"
+    private let userDefaultsKey = "saved_timelines"
 
     init() {
-        loadRoutines()
+        loadTimelines()
     }
 
     // MARK: - CRUD Operations
 
-    func saveRoutine(_ routine: RoutineRecord) {
-        routines.insert(routine, at: 0) // Add to beginning
+    func saveTimeline(_ timeline: TimelineRecord) {
+        timelines.insert(timeline, at: 0) // Add to beginning
         saveToUserDefaults()
-        print("✅ Routine saved: \(routine.distanceFormatted), \(routine.durationFormatted)")
+        print("✅ Timeline saved: \(timeline.distanceFormatted), \(timeline.durationFormatted)")
     }
 
-    func deleteRoutine(_ routine: RoutineRecord) {
-        routines.removeAll { $0.id == routine.id }
+    func deleteTimeline(_ timeline: TimelineRecord) {
+        timelines.removeAll { $0.id == timeline.id }
         saveToUserDefaults()
-        print("🗑️ Routine deleted")
+        print("🗑️ Timeline deleted")
     }
 
-    func clearAllRoutines() {
-        routines.removeAll()
+    func clearAllTimelines() {
+        timelines.removeAll()
         saveToUserDefaults()
-        print("🗑️ All routines cleared")
+        print("🗑️ All timelines cleared")
     }
 
     // MARK: - Persistence
 
     private func saveToUserDefaults() {
-        if let encoded = try? JSONEncoder().encode(routines) {
+        if let encoded = try? JSONEncoder().encode(timelines) {
             UserDefaults.standard.set(encoded, forKey: userDefaultsKey)
         }
     }
 
-    private func loadRoutines() {
+    private func loadTimelines() {
         if let data = UserDefaults.standard.data(forKey: userDefaultsKey),
-           let decoded = try? JSONDecoder().decode([RoutineRecord].self, from: data) {
-            routines = decoded
-            print("📂 Loaded \(routines.count) routine(s)")
+           let decoded = try? JSONDecoder().decode([TimelineRecord].self, from: data) {
+            timelines = decoded
+            print("📂 Loaded \(timelines.count) timeline(s)")
         }
     }
 
-    // MARK: - Create Routine from Location Data
+    // MARK: - Create Timeline from Location Data
 
-    func createRoutine(
+    func createTimeline(
         startTime: Date,
         endTime: Date,
         coordinates: [CLLocationCoordinate2D],
         timestamps: [Date],
         speeds: [Double],
         checkpoints: [Checkpoint] = []
-    ) -> RoutineRecord? {
+    ) -> TimelineRecord? {
         guard !coordinates.isEmpty else { return nil }
 
         // Convert coordinates
@@ -290,7 +304,7 @@ class RoutineManager: ObservableObject {
 
         let duration = endTime.timeIntervalSince(startTime)
 
-        return RoutineRecord(
+        return TimelineRecord(
             id: UUID(),
             startTime: startTime,
             endTime: endTime,
@@ -305,88 +319,161 @@ class RoutineManager: ObservableObject {
 
     // MARK: - Checkpoint Management
 
-    func addCheckpoint(to routineId: UUID, checkpoint: Checkpoint) {
-        if let index = routines.firstIndex(where: { $0.id == routineId }) {
-            routines[index].checkpoints.append(checkpoint)
+    func addCheckpoint(to timelineId: UUID, checkpoint: Checkpoint) {
+        if let index = timelines.firstIndex(where: { $0.id == timelineId }) {
+            timelines[index].checkpoints.append(checkpoint)
             saveToUserDefaults()
             print("📍 Checkpoint added: \(checkpoint.mood.emoji)")
         }
     }
 
-    func removeCheckpoint(from routineId: UUID, checkpointId: UUID) {
-        if let index = routines.firstIndex(where: { $0.id == routineId }) {
-            routines[index].checkpoints.removeAll { $0.id == checkpointId }
+    func removeCheckpoint(from timelineId: UUID, checkpointId: UUID) {
+        if let index = timelines.firstIndex(where: { $0.id == timelineId }) {
+            timelines[index].checkpoints.removeAll { $0.id == checkpointId }
             saveToUserDefaults()
             print("🗑️ Checkpoint removed")
         }
     }
 
-    // MARK: - Dummy Data for Testing
+    // MARK: - Automatic Checkpoint Generation (Phase 7)
 
-    func loadDummyData() {
-        guard routines.isEmpty else { return }
+    /// Automatically generate checkpoints based on GPS and health data
+    /// Called when tracking stops on Watch
+    func generateCheckpoints(
+        coordinates: [CLLocationCoordinate2D],
+        timestamps: [Date],
+        healthData: [(heartRate: Double?, calories: Double?, steps: Int?, distance: Double?)]
+    ) -> [Checkpoint] {
+        guard coordinates.count >= 2 else { return [] }
 
-        // Seoul area sample coordinates (Gangnam)
-        let baseLatitude = 37.5012
-        let baseLongitude = 127.0396
+        var checkpoints: [Checkpoint] = []
 
-        let startTime = Date().addingTimeInterval(-3600) // 1 hour ago
-        let coordinates: [CoordinateData] = (0..<20).map { i in
-            CoordinateData(
-                coordinate: CLLocationCoordinate2D(
-                    latitude: baseLatitude + Double(i) * 0.001,
-                    longitude: baseLongitude + Double(i) * 0.0005
-                ),
-                timestamp: startTime.addingTimeInterval(Double(i) * 180) // every 3 minutes
-            )
+        // Strategy 1: Create checkpoints at significant stops (velocity < 0.5 km/h for > 30 seconds)
+        var currentStopStart: Int?
+        var currentStopDuration: TimeInterval = 0
+
+        for i in 1..<coordinates.count {
+            let loc1 = CLLocation(latitude: coordinates[i - 1].latitude, longitude: coordinates[i - 1].longitude)
+            let loc2 = CLLocation(latitude: coordinates[i].latitude, longitude: coordinates[i].longitude)
+
+            let distance = loc2.distance(from: loc1) // meters
+            let timeInterval = timestamps[i].timeIntervalSince(timestamps[i - 1])
+            let speed = timeInterval > 0 ? (distance / timeInterval) * 3.6 : 0 // km/h
+
+            // Detect stop
+            if speed < 0.5 {
+                if currentStopStart == nil {
+                    currentStopStart = i
+                    currentStopDuration = 0
+                }
+                currentStopDuration += timeInterval
+            } else {
+                // Moving again, check if we had a significant stop
+                if let stopStart = currentStopStart, currentStopDuration >= 30 {
+                    // Create checkpoint for this stop
+                    let checkpoint = createCheckpointAt(
+                        index: stopStart,
+                        coordinates: coordinates,
+                        timestamps: timestamps,
+                        healthData: healthData,
+                        stayDuration: currentStopDuration
+                    )
+                    checkpoints.append(checkpoint)
+                }
+
+                currentStopStart = nil
+                currentStopDuration = 0
+            }
         }
 
-        // Sample checkpoints
-        let checkpoints: [Checkpoint] = [
-            Checkpoint(
-                coordinate: coordinates[3],
-                mood: .happy,
-                stayDuration: 600, // 10 minutes
-                stressChange: .decreased,
-                note: "Coffee break"
-            ),
-            Checkpoint(
-                coordinate: coordinates[8],
-                mood: .neutral,
-                stayDuration: 300, // 5 minutes
-                stressChange: .unchanged,
-                note: nil
-            ),
-            Checkpoint(
-                coordinate: coordinates[14],
-                mood: .veryHappy,
-                stayDuration: 1200, // 20 minutes
-                stressChange: .decreased,
-                note: "Lunch at restaurant"
-            ),
-            Checkpoint(
-                coordinate: coordinates[18],
-                mood: .sad,
-                stayDuration: 180, // 3 minutes
-                stressChange: .increased,
-                note: "Stuck in traffic"
+        // Check for final stop
+        if let stopStart = currentStopStart, currentStopDuration >= 30 {
+            let checkpoint = createCheckpointAt(
+                index: stopStart,
+                coordinates: coordinates,
+                timestamps: timestamps,
+                healthData: healthData,
+                stayDuration: currentStopDuration
             )
-        ]
+            checkpoints.append(checkpoint)
+        }
 
-        let dummyRoutine = RoutineRecord(
-            id: UUID(),
-            startTime: startTime,
-            endTime: Date(),
-            coordinates: coordinates,
-            totalDistance: 2500, // 2.5 km
-            averageSpeed: 4.5,
-            maxSpeed: 6.2,
-            duration: 3600, // 1 hour
-            checkpoints: checkpoints
+        print("📍 Auto-generated \(checkpoints.count) checkpoint(s)")
+        return checkpoints
+    }
+
+    /// Create a checkpoint at a specific index with health data
+    private func createCheckpointAt(
+        index: Int,
+        coordinates: [CLLocationCoordinate2D],
+        timestamps: [Date],
+        healthData: [(heartRate: Double?, calories: Double?, steps: Int?, distance: Double?)],
+        stayDuration: TimeInterval
+    ) -> Checkpoint {
+        let coordinate = CoordinateData(
+            coordinate: coordinates[index],
+            timestamp: timestamps[index]
         )
 
-        routines.append(dummyRoutine)
-        saveToUserDefaults()
-        print("📂 Dummy data loaded with \(checkpoints.count) checkpoints")
+        // Get health data for this point (if available)
+        let health = index < healthData.count ? healthData[index] : (nil, nil, nil, nil)
+
+        // Determine mood based on heart rate (simple heuristic)
+        let mood: CheckpointMood
+        if let hr = health.0 {  // health.0 = heartRate
+            if hr < 60 {
+                mood = .happy // Resting, relaxed
+            } else if hr < 80 {
+                mood = .neutral // Normal
+            } else if hr < 100 {
+                mood = .happy // Active, energized
+            } else {
+                mood = .neutral // High activity
+            }
+        } else {
+            mood = .neutral // Default if no heart rate data
+        }
+
+        // Determine stress change based on heart rate variability (placeholder)
+        // In a real implementation, this would use actual HRV data
+        let stressChange: StressChange = .unchanged
+
+        return Checkpoint(
+            coordinate: coordinate,
+            mood: mood,
+            stayDuration: stayDuration,
+            stressChange: stressChange,
+            note: nil,
+            timestamp: timestamps[index],
+            heartRate: health.0,  // health.0 = heartRate
+            calories: health.1,   // health.1 = calories
+            steps: health.2,      // health.2 = steps
+            distance: health.3    // health.3 = distance
+        )
     }
+
+    /// Create a manual checkpoint with current health data
+    func createManualCheckpoint(
+        coordinate: CLLocationCoordinate2D,
+        timestamp: Date,
+        mood: CheckpointMood,
+        note: String? = nil
+    ) -> Checkpoint {
+        // Get current health data from HealthKitManager
+        let healthManager = HealthKitManager.shared
+
+        return Checkpoint(
+            coordinate: CoordinateData(coordinate: coordinate, timestamp: timestamp),
+            mood: mood,
+            stayDuration: 0, // Manual checkpoint, no stay duration
+            stressChange: .unchanged,
+            note: note,
+            timestamp: timestamp,
+            heartRate: healthManager.currentHeartRate > 0 ? healthManager.currentHeartRate : nil,
+            calories: healthManager.currentCalories > 0 ? healthManager.currentCalories : nil,
+            steps: healthManager.currentSteps > 0 ? healthManager.currentSteps : nil,
+            distance: healthManager.currentDistance > 0 ? healthManager.currentDistance : nil
+        )
+    }
+
 }

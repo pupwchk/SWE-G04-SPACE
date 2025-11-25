@@ -1,5 +1,5 @@
 //
-//  RoutineWidget.swift
+//  TimelineWidget.swift
 //  space
 //
 //  Created by 임동현 on 11/6/25.
@@ -8,22 +8,22 @@
 import SwiftUI
 import MapKit
 
-/// Routine tracking widget with GPS functionality
-struct RoutineWidget: View {
+/// Timeline tracking widget with GPS functionality
+struct TimelineWidget: View {
     @StateObject private var locationManager = LocationManager()
-    @StateObject private var routineManager = RoutineManager.shared
+    @StateObject private var timelineManager = TimelineManager.shared
 
     @State private var showDetailView = false
-    @State private var routineStartTime: Date?
+    @State private var timelineStartTime: Date?
 
     var body: some View {
         Button(action: handleTap) {
             ZStack {
                 Color(hex: "F3DEE5")
 
-                if let latestRoutine = routineManager.routines.first {
-                    // Show latest routine as mini map
-                    routineMiniMapView(routine: latestRoutine)
+                if let latestTimeline = timelineManager.timelines.first {
+                    // Show latest timeline as mini map
+                    timelineMiniMapView(timeline: latestTimeline)
                 } else if locationManager.isTracking {
                     // Show tracking in progress
                     trackingView
@@ -37,7 +37,7 @@ struct RoutineWidget: View {
         }
         .buttonStyle(.plain)
         .sheet(isPresented: $showDetailView) {
-            RoutineDetailView(
+            TimelineDetailView(
                 locationManager: locationManager,
                 isTracking: $locationManager.isTracking,
                 onStartTracking: startTracking,
@@ -54,7 +54,7 @@ struct RoutineWidget: View {
                 .font(.system(size: 36))
                 .foregroundColor(Color(hex: "A50034"))
 
-            Text("Record my routine")
+            Text("타임라인 기록하기")
                 .font(.system(size: 14, weight: .medium))
                 .foregroundColor(.black)
         }
@@ -105,17 +105,17 @@ struct RoutineWidget: View {
         }
     }
 
-    // MARK: - Routine Mini Map View
+    // MARK: - Timeline Mini Map View
 
-    private func routineMiniMapView(routine: RoutineRecord) -> some View {
+    private func timelineMiniMapView(timeline: TimelineRecord) -> some View {
         VStack(spacing: 0) {
             // Mini map
-            if let region = routine.region {
+            if let region = timeline.region {
                 Map(position: .constant(.region(region))) {
-                    MapPolyline(coordinates: routine.coordinates.map { $0.coordinate })
+                    MapPolyline(coordinates: timeline.coordinates.map { $0.coordinate })
                         .stroke(Color(hex: "A50034"), lineWidth: 3)
 
-                    if let firstCoord = routine.coordinates.first?.coordinate {
+                    if let firstCoord = timeline.coordinates.first?.coordinate {
                         Annotation("", coordinate: firstCoord) {
                             Circle()
                                 .fill(Color.green)
@@ -124,7 +124,7 @@ struct RoutineWidget: View {
                         }
                     }
 
-                    if let lastCoord = routine.coordinates.last?.coordinate {
+                    if let lastCoord = timeline.coordinates.last?.coordinate {
                         Annotation("", coordinate: lastCoord) {
                             Circle()
                                 .fill(Color(hex: "A50034"))
@@ -139,11 +139,11 @@ struct RoutineWidget: View {
 
             // Stats overlay
             VStack(spacing: 2) {
-                Text(routine.distanceFormatted)
+                Text(timeline.distanceFormatted)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.black)
 
-                Text(routine.durationFormatted)
+                Text(timeline.durationFormatted)
                     .font(.system(size: 11, weight: .regular))
                     .foregroundColor(.gray)
             }
@@ -174,42 +174,42 @@ struct RoutineWidget: View {
         if locationManager.isTracking {
             // If tracking, show detail view
             showDetailView = true
-        } else if routineManager.routines.isEmpty {
-            // If no routines, start tracking
+        } else if timelineManager.timelines.isEmpty {
+            // If no timelines, start tracking
             startTracking()
         } else {
-            // If has routines, show detail view
+            // If has timelines, show detail view
             showDetailView = true
         }
     }
 
     private func startTracking() {
-        routineStartTime = Date()
+        timelineStartTime = Date()
         locationManager.startTracking()
     }
 
     private func stopTracking() {
-        guard let startTime = routineStartTime else { return }
+        guard let startTime = timelineStartTime else { return }
 
         locationManager.stopTracking()
 
-        // Create routine record using LocationManager's history
-        if let routine = routineManager.createRoutine(
+        // Create timeline record using LocationManager's history
+        if let timeline = timelineManager.createTimeline(
             startTime: startTime,
             endTime: Date(),
             coordinates: locationManager.routeCoordinates,
             timestamps: locationManager.timestampHistory,
             speeds: locationManager.speedHistory
         ) {
-            routineManager.saveRoutine(routine)
+            timelineManager.saveTimeline(timeline)
         }
 
         locationManager.resetTracking()
-        routineStartTime = nil
+        timelineStartTime = nil
     }
 }
 
 #Preview {
-    RoutineWidget()
+    TimelineWidget()
         .background(Color(hex: "F9F9F9"))
 }

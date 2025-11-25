@@ -13,7 +13,6 @@ struct HomeView: View {
 
     @State private var hasDevices = false
     @State private var hasAppliances = false
-    @State private var selectedPersonas: Set<String> = []
 
     // Sample devices data
     let sampleDevices = [
@@ -31,38 +30,22 @@ struct HomeView: View {
         NavigationStack {
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 16) {
-                    // Show PersonaBubbleWidget or widgets based on persona selection
-                    if selectedPersonas.isEmpty {
-                        // Show PersonaBubbleWidget when no personas selected
-                        PersonaBubbleWidget(selectedPersonas: $selectedPersonas)
-                    } else {
-                        // Show 3 widgets when personas are selected
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("map + state + personal")
-                                .font(.system(size: 16, weight: .regular))
-                                .foregroundColor(.black)
-                                .padding(.horizontal, 20)
+                    // Section 1: 3 Fixed Widgets (Timeline, State, Persona)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("타임라인, 상태, 페르소나")
+                            .font(.system(size: 16, weight: .regular))
+                            .foregroundColor(.black)
+                            .padding(.horizontal, 20)
 
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 12) {
-                                    RoutineWidget()
-                                    StateWidget()
-                                    PersonalWidget(personas: selectedPersonas)
-                                }
-                                .padding(.horizontal, 20)
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 12) {
+                                TimelineWidget()
+                                StateWidget()
+                                PersonaWidget()
                             }
+                            .padding(.horizontal, 20)
                         }
                     }
-                }
-                .onChange(of: selectedPersonas) { _, newValue in
-                    print("HomeView selectedPersonas changed: \(newValue)")
-                }
-                .onAppear {
-                    // Load saved personas when view appears
-                    let loadedPersonas = PersonaManager.shared.selectedPersonas
-                    print("Loaded personas on appear: \(loadedPersonas)")
-                    selectedPersonas = loadedPersonas
-                }
 
                 VStack(alignment: .leading, spacing: 16) {
 

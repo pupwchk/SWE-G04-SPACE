@@ -74,11 +74,11 @@ struct SignUpView: View {
         VStack(alignment: .leading, spacing: 18) {
             // Title and subtitle
             VStack(alignment: .leading, spacing: 4) {
-                Text("Sign up")
+                Text("회원가입")
                     .font(.system(size: 26, weight: .bold, design: .default))
                     .foregroundColor(.black)
 
-                Text("Create an account to get started")
+                Text("시작하기 위해 계정을 만드세요")
                     .font(.system(size: 14, weight: .regular))
                     .foregroundColor(Color.gray.opacity(0.8))
             }
@@ -86,11 +86,11 @@ struct SignUpView: View {
 
             // Name field
             VStack(alignment: .leading, spacing: 6) {
-                Text("Name")
+                Text("이름")
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(Color.gray.opacity(0.8))
 
-                TextField("Your name", text: $name)
+                TextField("이름을 입력하세요", text: $name)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 14)
                     .background(Color.white)
@@ -106,7 +106,7 @@ struct SignUpView: View {
 
             // Email field
             VStack(alignment: .leading, spacing: 6) {
-                Text("Email Address")
+                Text("이메일 주소")
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(Color.gray.opacity(0.8))
 
@@ -127,18 +127,18 @@ struct SignUpView: View {
 
             // Password field
             VStack(alignment: .leading, spacing: 6) {
-                Text("Password")
+                Text("비밀번호")
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(Color.gray.opacity(0.8))
 
                 HStack {
                     if showPassword {
-                        TextField("Create a password", text: $password)
+                        TextField("비밀번호를 만드세요", text: $password)
                             .autocapitalization(.none)
                             .disableAutocorrection(true)
                             .textContentType(.newPassword)
                     } else {
-                        SecureField("Create a password", text: $password)
+                        SecureField("비밀번호를 만드세요", text: $password)
                             .autocapitalization(.none)
                             .textContentType(.newPassword)
                     }
@@ -163,18 +163,18 @@ struct SignUpView: View {
 
             // Confirm Password field
             VStack(alignment: .leading, spacing: 6) {
-                Text("Confirm Password")
+                Text("비밀번호 확인")
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(Color.gray.opacity(0.8))
 
                 HStack {
                     if showConfirmPassword {
-                        TextField("Confirm password", text: $confirmPassword)
+                        TextField("비밀번호를 확인하세요", text: $confirmPassword)
                             .autocapitalization(.none)
                             .disableAutocorrection(true)
                             .textContentType(.newPassword)
                     } else {
-                        SecureField("Confirm password", text: $confirmPassword)
+                        SecureField("비밀번호를 확인하세요", text: $confirmPassword)
                             .autocapitalization(.none)
                             .textContentType(.newPassword)
                     }
@@ -199,7 +199,7 @@ struct SignUpView: View {
 
             // Password validation hints
             if !password.isEmpty && password.count < 6 {
-                Text("Password must be at least 6 characters")
+                Text("비밀번호는 최소 6자 이상이어야 합니다")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(.orange)
                     .padding(.horizontal, 8)
@@ -211,7 +211,7 @@ struct SignUpView: View {
 
             // Password match validation
             if !confirmPassword.isEmpty && password != confirmPassword {
-                Text("Passwords do not match")
+                Text("비밀번호가 일치하지 않습니다")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(.red)
                     .padding(.horizontal, 8)
@@ -238,7 +238,7 @@ struct SignUpView: View {
                 HStack(spacing: 8) {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundColor(.green)
-                    Text("Account created successfully!")
+                    Text("계정이 성공적으로 생성되었습니다!")
                         .font(.system(size: 13, weight: .medium))
                         .foregroundColor(.green)
                 }
@@ -261,35 +261,31 @@ struct SignUpView: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 3) {
-                        Text("I've read and agree with the")
+                        Text("다음을 읽고 동의합니다:")
                             .font(.system(size: 12))
                             .foregroundColor(Color.gray.opacity(0.8))
 
                         Button(action: {
                             // Handle terms and conditions
                         }) {
-                            Text("Terms and Conditions")
+                            Text("이용약관")
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundColor(.blue)
                         }
                     }
 
                     HStack(spacing: 3) {
-                        Text("and the")
+                        Text("및")
                             .font(.system(size: 12))
                             .foregroundColor(Color.gray.opacity(0.8))
 
                         Button(action: {
                             // Handle privacy policy
                         }) {
-                            Text("Privacy Policy")
+                            Text("개인정보 처리방침")
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundColor(.blue)
                         }
-
-                        Text(".")
-                            .font(.system(size: 12))
-                            .foregroundColor(Color.gray.opacity(0.8))
                     }
                 }
             }
@@ -306,7 +302,7 @@ struct SignUpView: View {
                             .progressViewStyle(CircularProgressViewStyle(tint: .white))
                             .scaleEffect(0.8)
                     }
-                    Text(isLoading ? "계정 생성 중..." : "Sign up")
+                    Text(isLoading ? "계정 생성 중..." : "회원가입")
                         .font(.system(size: 17, weight: .bold))
                         .foregroundColor(.white)
                 }
@@ -320,14 +316,14 @@ struct SignUpView: View {
 
             // Already have account link
             HStack(spacing: 4) {
-                Text("Already have an account?")
+                Text("이미 계정이 있으신가요?")
                     .font(.system(size: 13))
                     .foregroundColor(.gray)
 
                 Button(action: {
                     dismiss()
                 }) {
-                    Text("Sign in")
+                    Text("로그인")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(Color(hex: "A50034"))
                 }

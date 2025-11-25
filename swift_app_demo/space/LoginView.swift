@@ -72,14 +72,14 @@ struct LoginView: View {
     private var loginCard: some View {
         VStack(alignment: .leading, spacing: 18) {
             // Title
-            Text("Welcome to HARU")
+            Text("HARU에 오신 것을 환영합니다")
                 .font(.system(size: 26, weight: .bold, design: .default))
                 .foregroundColor(.black)
                 .padding(.bottom, 4)
 
             // Email field
             VStack(alignment: .leading, spacing: 6) {
-                Text("Email Address")
+                Text("이메일 주소")
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(Color.gray.opacity(0.8))
 
@@ -100,11 +100,11 @@ struct LoginView: View {
 
             // Password field
             VStack(alignment: .leading, spacing: 6) {
-                Text("Password")
+                Text("비밀번호")
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(Color.gray.opacity(0.8))
 
-                SecureField("Enter your password", text: $password)
+                SecureField("비밀번호를 입력하세요", text: $password)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 14)
                     .background(Color.white)
@@ -122,7 +122,7 @@ struct LoginView: View {
                 Button(action: {
                     // Handle forgot password
                 }) {
-                    Text("Forgot password?")
+                    Text("비밀번호를 잊으셨나요?")
                         .font(.system(size: 13, weight: .medium))
                         .foregroundColor(.blue)
                 }
@@ -188,14 +188,14 @@ struct LoginView: View {
 
             // Register link
             HStack(spacing: 4) {
-                Text("Not a member?")
+                Text("계정이 없으신가요?")
                     .font(.system(size: 13))
                     .foregroundColor(.gray)
 
                 Button(action: {
                     showSignUp = true
                 }) {
-                    Text("Register now")
+                    Text("회원가입")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(Color(hex: "A50034"))
                 }
@@ -219,7 +219,7 @@ struct LoginView: View {
                     .fill(Color.gray.opacity(0.25))
                     .frame(height: 1)
 
-                Text("Or continue with")
+                Text("또는 다음으로 계속하기")
                     .font(.system(size: 13, weight: .regular))
                     .foregroundColor(Color.gray.opacity(0.7))
 

@@ -10,7 +10,6 @@ import SwiftUI
 struct PhoneCallView: View {
     @Environment(\.dismiss) var dismiss
     @StateObject private var callHistoryManager = CallHistoryManager.shared
-    @StateObject private var toneManager = ToneManager.shared
 
     @State private var callDuration: TimeInterval = 0
     @State private var timer: Timer?
@@ -19,13 +18,6 @@ struct PhoneCallView: View {
     @State private var showEndCallConfirmation = false
 
     let contactName: String
-
-    private var currentTone: String {
-        if let tone = toneManager.getRandomTone() {
-            return tone
-        }
-        return "기본"
-    }
 
     var body: some View {
         ZStack {
@@ -60,22 +52,6 @@ struct PhoneCallView: View {
                     Text(contactName)
                         .font(.system(size: 32, weight: .semibold))
                         .foregroundColor(.white)
-
-                    // Current tone indicator
-                    HStack(spacing: 6) {
-                        Image(systemName: "bubble.left.and.bubble.right.fill")
-                            .font(.system(size: 12))
-
-                        Text("\(currentTone) 말투")
-                            .font(.system(size: 14, weight: .medium))
-                    }
-                    .foregroundColor(.white.opacity(0.8))
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 6)
-                    .background(
-                        Capsule()
-                            .fill(Color.white.opacity(0.2))
-                    )
 
                     // Call duration
                     Text(formattedDuration)

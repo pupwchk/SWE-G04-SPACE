@@ -90,10 +90,22 @@ class SupabaseManager: ObservableObject {
                 // Create user profile in database
                 try await createUserProfile(userId: userObj.id, email: userObj.email, name: name, accessToken: session.accessToken)
 
+                // Register user with FastAPI backend
+                Task {
+                    await FastAPIService.shared.registerUser(email: userObj.email)
+                }
+
                 await MainActor.run {
                     self.currentUser = user
                     self.isAuthenticated = true
                 }
+
+                // Send authentication status to Watch
+                WatchConnectivityManager.shared.sendAuthenticationStatus(
+                    isAuthenticated: true,
+                    userId: user.id,
+                    userEmail: user.email
+                )
 
                 return user
             } else if let userId = authResponse.id, let userEmail = authResponse.email {
@@ -198,11 +210,23 @@ class SupabaseManager: ObservableObject {
 
             print("✅ About to set authenticated state")
 
+            // Register user with FastAPI backend (or ensure they exist)
+            Task {
+                await FastAPIService.shared.registerUser(email: userObj.email)
+            }
+
             await MainActor.run {
                 self.currentUser = user
                 self.isAuthenticated = true
                 print("✅ isAuthenticated set to true")
             }
+
+            // Send authentication status to Watch
+            WatchConnectivityManager.shared.sendAuthenticationStatus(
+                isAuthenticated: true,
+                userId: user.id,
+                userEmail: user.email
+            )
 
             print("✅ Returning user: \(user.email)")
             return user
@@ -246,28 +270,89 @@ class SupabaseManager: ObservableObject {
             self.currentUser = nil
             self.isAuthenticated = false
         }
+
+        // Send authentication status to Watch
+        WatchConnectivityManager.shared.sendAuthenticationStatus(
+            isAuthenticated: false,
+            userId: nil,
+            userEmail: nil
+        )
     }
 
     // MARK: - Database Operations
 
-    /// Create user profile in database
-    private func createUserProfile(userId: String, email: String, name: String, accessToken: String) async throws {
-        guard let url = URL(string: "\(supabaseURL)/rest/v1/user_profiles") else {
+    // MARK: - Profile Management
+
+    /// Fetch user profile from database
+    func fetchUserProfile() async throws -> UserProfile {
+        guard let accessToken = getAccessToken() else {
+            throw AuthError.notAuthenticated
+        }
+
+        guard let userId = currentUser?.id else {
+            throw AuthError.notAuthenticated
+        }
+
+        guard let url = URL(string: "\(supabaseURL)/rest/v1/user_profiles?id=eq.\(userId)&select=*") else {
             throw AuthError.invalidURL
         }
 
         var request = URLRequest(url: url)
-        request.httpMethod = "POST"
+        request.httpMethod = "GET"
+        request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw AuthError.invalidResponse
+        }
+
+        if httpResponse.statusCode != 200 {
+            if let responseString = String(data: data, encoding: .utf8) {
+                print("❌ Fetch profile failed: \(responseString)")
+            }
+            throw AuthError.serverError("Failed to fetch profile")
+        }
+
+        let profiles = try JSONDecoder().decode([UserProfile].self, from: data)
+        guard let profile = profiles.first else {
+            throw AuthError.serverError("Profile not found")
+        }
+
+        return profile
+    }
+
+    /// Update user profile
+    func updateUserProfile(name: String?, birthday: String?, avatarUrl: String?) async throws {
+        guard let accessToken = getAccessToken() else {
+            throw AuthError.notAuthenticated
+        }
+
+        guard let userId = currentUser?.id else {
+            throw AuthError.notAuthenticated
+        }
+
+        guard let url = URL(string: "\(supabaseURL)/rest/v1/user_profiles?id=eq.\(userId)") else {
+            throw AuthError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "PATCH"
         request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("return=minimal", forHTTPHeaderField: "Prefer")
 
-        let body: [String: String] = [
-            "id": userId,
-            "email": email,
-            "name": name
-        ]
+        var body: [String: Any] = [:]
+        if let name = name {
+            body["name"] = name
+        }
+        if let birthday = birthday {
+            body["birthday"] = birthday
+        }
+        if let avatarUrl = avatarUrl {
+            body["avatar_url"] = avatarUrl
+        }
 
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
@@ -277,14 +362,314 @@ class SupabaseManager: ObservableObject {
             throw AuthError.invalidResponse
         }
 
-        if httpResponse.statusCode != 201 {
+        if httpResponse.statusCode != 200 && httpResponse.statusCode != 204 {
             if let responseString = String(data: data, encoding: .utf8) {
+                print("❌ Update profile failed: \(responseString)")
+            }
+            throw AuthError.serverError("Failed to update profile")
+        }
+
+        print("✅ Profile updated successfully")
+    }
+
+    // MARK: - Settings Management
+
+    /// Fetch user settings
+    func fetchUserSettings() async throws -> UserSettings {
+        guard let accessToken = getAccessToken() else {
+            throw AuthError.notAuthenticated
+        }
+
+        guard let userId = currentUser?.id else {
+            throw AuthError.notAuthenticated
+        }
+
+        guard let url = URL(string: "\(supabaseURL)/rest/v1/user_settings?user_id=eq.\(userId)&select=*") else {
+            throw AuthError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw AuthError.invalidResponse
+        }
+
+        if httpResponse.statusCode != 200 {
+            if let responseString = String(data: data, encoding: .utf8) {
+                print("❌ Fetch settings failed: \(responseString)")
+            }
+            throw AuthError.serverError("Failed to fetch settings")
+        }
+
+        let settings = try JSONDecoder().decode([UserSettings].self, from: data)
+        guard let userSettings = settings.first else {
+            // Return default settings if not found
+            return UserSettings.default(userId: userId)
+        }
+
+        return userSettings
+    }
+
+    /// Update user settings
+    func updateUserSettings(_ settings: UserSettings) async throws {
+        guard let accessToken = getAccessToken() else {
+            throw AuthError.notAuthenticated
+        }
+
+        guard let userId = currentUser?.id else {
+            throw AuthError.notAuthenticated
+        }
+
+        guard let url = URL(string: "\(supabaseURL)/rest/v1/user_settings?user_id=eq.\(userId)") else {
+            throw AuthError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "PATCH"
+        request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let encoder = JSONEncoder()
+        encoder.keyEncodingStrategy = .convertToSnakeCase
+        request.httpBody = try encoder.encode(settings)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw AuthError.invalidResponse
+        }
+
+        if httpResponse.statusCode != 200 && httpResponse.statusCode != 204 {
+            if let responseString = String(data: data, encoding: .utf8) {
+                print("❌ Update settings failed: \(responseString)")
+            }
+            throw AuthError.serverError("Failed to update settings")
+        }
+
+        print("✅ Settings updated successfully")
+    }
+
+    // MARK: - Persona Management
+
+    /// Lazy initialization of Persona Repository
+    private lazy var personaRepository: PersonaRepository = {
+        let service = SupabaseService(
+            baseURL: supabaseURL,
+            apiKey: supabaseAnonKey,
+            tokenProvider: { [weak self] in
+                return self?.getAccessToken()
+            }
+        )
+        return PersonaRepository(service: service)
+    }()
+
+    /// Fetch all adjectives
+    func fetchAdjectives() async throws -> [Adjective] {
+        return try await personaRepository.fetchAdjectives()
+    }
+
+    /// Fetch user personas
+    func fetchPersonas() async throws -> [Persona] {
+        guard let userId = currentUser?.id else {
+            throw AuthError.notAuthenticated
+        }
+
+        return try await personaRepository.fetchPersonas(userId: userId)
+    }
+
+    /// Create a new persona
+    func createPersona(nickname: String, adjectiveIds: [String], customInstructions: String?) async throws -> Persona {
+        guard let userId = currentUser?.id else {
+            throw AuthError.notAuthenticated
+        }
+
+        // Fetch adjectives to generate final prompt
+        let adjectives = try await fetchAdjectives()
+        let finalPrompt = personaRepository.generateFinalPrompt(
+            adjectiveIds: adjectiveIds,
+            customInstructions: customInstructions,
+            adjectives: adjectives
+        )
+
+        let request = CreatePersonaRequest(
+            userId: userId,
+            nickname: nickname,
+            adjectiveIds: adjectiveIds,
+            customInstructions: customInstructions,
+            finalPrompt: finalPrompt
+        )
+
+        let persona = try await personaRepository.createPersona(request)
+        print("✅ Persona created successfully")
+        return persona
+    }
+
+    /// Update a persona
+    func updatePersona(personaId: String, nickname: String, adjectiveIds: [String], customInstructions: String?) async throws {
+        // Fetch adjectives to generate final prompt
+        let adjectives = try await fetchAdjectives()
+        let finalPrompt = personaRepository.generateFinalPrompt(
+            adjectiveIds: adjectiveIds,
+            customInstructions: customInstructions,
+            adjectives: adjectives
+        )
+
+        let request = UpdatePersonaRequest(
+            nickname: nickname,
+            adjectiveIds: adjectiveIds,
+            customInstructions: customInstructions,
+            finalPrompt: finalPrompt
+        )
+
+        try await personaRepository.updatePersona(id: personaId, request)
+        print("✅ Persona updated successfully")
+    }
+
+    /// Delete a persona
+    func deletePersona(personaId: String) async throws {
+        try await personaRepository.deletePersona(id: personaId)
+        print("✅ Persona deleted successfully")
+    }
+
+    /// Fetch active persona
+    func fetchActivePersona() async throws -> String? {
+        guard let userId = currentUser?.id else {
+            throw AuthError.notAuthenticated
+        }
+
+        return try await personaRepository.fetchActivePersona(userId: userId)
+    }
+
+    /// Set active persona
+    func setActivePersona(personaId: String?) async throws {
+        guard let userId = currentUser?.id else {
+            throw AuthError.notAuthenticated
+        }
+
+        try await personaRepository.setActivePersona(userId: userId, personaId: personaId)
+        print("✅ Active persona set successfully")
+    }
+
+    // MARK: - Multi-Persona Selection
+
+    /// Fetch selected personas (up to 5)
+    func fetchSelectedPersonas() async throws -> [Persona] {
+        guard let userId = currentUser?.id else {
+            throw AuthError.notAuthenticated
+        }
+
+        return try await personaRepository.fetchSelectedPersonas(userId: userId)
+    }
+
+    /// Add a selected persona
+    func addSelectedPersona(personaId: String, order: Int) async throws {
+        guard let userId = currentUser?.id else {
+            throw AuthError.notAuthenticated
+        }
+
+        try await personaRepository.addSelectedPersona(userId: userId, personaId: personaId, order: order)
+        print("✅ Persona selected successfully")
+    }
+
+    /// Remove a selected persona
+    func removeSelectedPersona(personaId: String) async throws {
+        guard let userId = currentUser?.id else {
+            throw AuthError.notAuthenticated
+        }
+
+        try await personaRepository.removeSelectedPersona(userId: userId, personaId: personaId)
+        print("✅ Persona unselected successfully")
+    }
+
+    /// Set selected personas (replaces all existing selections, max 5)
+    func setSelectedPersonas(personaIds: [String]) async throws {
+        guard let userId = currentUser?.id else {
+            throw AuthError.notAuthenticated
+        }
+
+        try await personaRepository.setSelectedPersonas(userId: userId, personaIds: personaIds)
+        print("✅ Selected personas updated successfully")
+    }
+
+    /// Create user profile in database
+    private func createUserProfile(userId: String, email: String, name: String, accessToken: String) async throws {
+        // Create user profile
+        guard let profileUrl = URL(string: "\(supabaseURL)/rest/v1/user_profiles") else {
+            throw AuthError.invalidURL
+        }
+
+        var profileRequest = URLRequest(url: profileUrl)
+        profileRequest.httpMethod = "POST"
+        profileRequest.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
+        profileRequest.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        profileRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        profileRequest.setValue("return=minimal", forHTTPHeaderField: "Prefer")
+
+        let profileBody: [String: String] = [
+            "id": userId,
+            "email": email,
+            "name": name
+        ]
+
+        profileRequest.httpBody = try JSONSerialization.data(withJSONObject: profileBody)
+
+        let (profileData, profileResponse) = try await URLSession.shared.data(for: profileRequest)
+
+        guard let httpProfileResponse = profileResponse as? HTTPURLResponse else {
+            throw AuthError.invalidResponse
+        }
+
+        if httpProfileResponse.statusCode != 201 {
+            if let responseString = String(data: profileData, encoding: .utf8) {
                 print("❌ Profile creation failed: \(responseString)")
             }
-            // Don't throw error - profile creation is optional
             print("⚠️ Warning: Could not create user profile")
         } else {
             print("✅ User profile created successfully")
+        }
+
+        // Create default user settings
+        guard let settingsUrl = URL(string: "\(supabaseURL)/rest/v1/user_settings") else {
+            return
+        }
+
+        var settingsRequest = URLRequest(url: settingsUrl)
+        settingsRequest.httpMethod = "POST"
+        settingsRequest.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
+        settingsRequest.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        settingsRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        settingsRequest.setValue("return=minimal", forHTTPHeaderField: "Prefer")
+
+        let settingsBody: [String: Any] = [
+            "user_id": userId,
+            "notification_method": "push",
+            "haru_notification_enabled": true,
+            "font_size": "medium",
+            "emergency_call_enabled": true,
+            "call_summary_enabled": true
+        ]
+
+        settingsRequest.httpBody = try JSONSerialization.data(withJSONObject: settingsBody)
+
+        let (settingsData, settingsResponse) = try await URLSession.shared.data(for: settingsRequest)
+
+        guard let httpSettingsResponse = settingsResponse as? HTTPURLResponse else {
+            return
+        }
+
+        if httpSettingsResponse.statusCode != 201 {
+            if let responseString = String(data: settingsData, encoding: .utf8) {
+                print("❌ Settings creation failed: \(responseString)")
+            }
+            print("⚠️ Warning: Could not create user settings")
+        } else {
+            print("✅ User settings created successfully")
         }
     }
 
@@ -311,10 +696,70 @@ class SupabaseManager: ObservableObject {
     private func checkSession() {
         if let accessToken = getAccessToken(),
            !accessToken.isEmpty {
-            // TODO: Validate token and fetch user profile
+            // Set authenticated to true
             isAuthenticated = true
+
+            // Try to fetch user info from token
+            Task {
+                await validateSessionAndFetchUser(accessToken: accessToken)
+            }
         } else {
             isAuthenticated = false
+        }
+    }
+
+    private func validateSessionAndFetchUser(accessToken: String) async {
+        guard let url = URL(string: "\(supabaseURL)/auth/v1/user") else {
+            return
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse,
+                  httpResponse.statusCode == 200 else {
+                // Token is invalid, clear session
+                await MainActor.run {
+                    clearSession()
+                    isAuthenticated = false
+                }
+                return
+            }
+
+            let userObj = try JSONDecoder().decode(SupabaseUser.self, from: data)
+
+            let user = User(
+                id: userObj.id,
+                email: userObj.email,
+                name: userObj.userMetadata?.name ?? ""
+            )
+
+            // Ensure user exists in FastAPI backend
+            Task {
+                await FastAPIService.shared.registerUser(email: userObj.email)
+            }
+
+            await MainActor.run {
+                currentUser = user
+                isAuthenticated = true
+            }
+
+            // Send authentication status to Watch
+            WatchConnectivityManager.shared.sendAuthenticationStatus(
+                isAuthenticated: true,
+                userId: user.id,
+                userEmail: user.email
+            )
+
+            print("✅ Session validated, user: \(user.email)")
+        } catch {
+            print("❌ Session validation failed: \(error.localizedDescription)")
+            // Keep authentication state but log the error
         }
     }
 }
@@ -325,6 +770,57 @@ struct User: Codable, Identifiable {
     let id: String
     let email: String
     let name: String
+}
+
+struct UserProfile: Codable {
+    let id: String
+    let email: String
+    let name: String?
+    let birthday: String?
+    let avatarUrl: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case email
+        case name
+        case birthday
+        case avatarUrl = "avatar_url"
+    }
+}
+
+struct UserSettings: Codable {
+    let userId: String
+    let notificationMethod: String?
+    let doNotDisturbStart: String?
+    let doNotDisturbEnd: String?
+    let haruNotificationEnabled: Bool?
+    let fontSize: String?
+    let emergencyCallEnabled: Bool?
+    let callSummaryEnabled: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case userId = "user_id"
+        case notificationMethod = "notification_method"
+        case doNotDisturbStart = "do_not_disturb_start"
+        case doNotDisturbEnd = "do_not_disturb_end"
+        case haruNotificationEnabled = "haru_notification_enabled"
+        case fontSize = "font_size"
+        case emergencyCallEnabled = "emergency_call_enabled"
+        case callSummaryEnabled = "call_summary_enabled"
+    }
+
+    static func `default`(userId: String) -> UserSettings {
+        return UserSettings(
+            userId: userId,
+            notificationMethod: "push",
+            doNotDisturbStart: nil,
+            doNotDisturbEnd: nil,
+            haruNotificationEnabled: true,
+            fontSize: "medium",
+            emergencyCallEnabled: true,
+            callSummaryEnabled: true
+        )
+    }
 }
 
 struct AuthResponse: Codable {

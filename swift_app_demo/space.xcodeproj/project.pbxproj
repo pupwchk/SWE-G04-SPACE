@@ -7,18 +7,44 @@
 	objects = {
 
 /* Begin PBXFileReference section */
+		AE21B5252ED54B2000839646 /* space Watch App Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "space Watch App Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		AE715CBB2EB8DF470054A54F /* space.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = space.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		AE715CBE2EB8DF470054A54F /* Exceptions for "space" folder in "space" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = AE715CBA2EB8DF470054A54F /* space */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		AE21B5262ED54B2000839646 /* space Watch App Watch App */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "space Watch App Watch App";
+			sourceTree = "<group>";
+		};
 		AE715CBD2EB8DF470054A54F /* space */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				AE715CBE2EB8DF470054A54F /* Exceptions for "space" folder in "space" target */,
+			);
 			path = space;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		AE21B5222ED54B2000839646 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		AE715CB82EB8DF470054A54F /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -33,6 +59,7 @@
 			isa = PBXGroup;
 			children = (
 				AE715CBD2EB8DF470054A54F /* space */,
+				AE21B5262ED54B2000839646 /* space Watch App Watch App */,
 				AE715CBC2EB8DF470054A54F /* Products */,
 			);
 			sourceTree = "<group>";
@@ -41,6 +68,7 @@
 			isa = PBXGroup;
 			children = (
 				AE715CBB2EB8DF470054A54F /* space.app */,
+				AE21B5252ED54B2000839646 /* space Watch App Watch App.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -48,6 +76,28 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		AE21B5242ED54B2000839646 /* space Watch App Watch App */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AE21B52F2ED54B2200839646 /* Build configuration list for PBXNativeTarget "space Watch App Watch App" */;
+			buildPhases = (
+				AE21B5212ED54B2000839646 /* Sources */,
+				AE21B5222ED54B2000839646 /* Frameworks */,
+				AE21B5232ED54B2000839646 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				AE21B5262ED54B2000839646 /* space Watch App Watch App */,
+			);
+			name = "space Watch App Watch App";
+			packageProductDependencies = (
+			);
+			productName = "space Watch App Watch App";
+			productReference = AE21B5252ED54B2000839646 /* space Watch App Watch App.app */;
+			productType = "com.apple.product-type.application";
+		};
 		AE715CBA2EB8DF470054A54F /* space */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = AE715CC62EB8DF480054A54F /* Build configuration list for PBXNativeTarget "space" */;
@@ -80,6 +130,9 @@
 				LastSwiftUpdateCheck = 1640;
 				LastUpgradeCheck = 1640;
 				TargetAttributes = {
+					AE21B5242ED54B2000839646 = {
+						CreatedOnToolsVersion = 16.4;
+					};
 					AE715CBA2EB8DF470054A54F = {
 						CreatedOnToolsVersion = 16.4;
 					};
@@ -100,11 +153,19 @@
 			projectRoot = "";
 			targets = (
 				AE715CBA2EB8DF470054A54F /* space */,
+				AE21B5242ED54B2000839646 /* space Watch App Watch App */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		AE21B5232ED54B2000839646 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		AE715CB92EB8DF470054A54F /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -115,6 +176,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		AE21B5212ED54B2000839646 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		AE715CB72EB8DF470054A54F /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -125,6 +193,74 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
+		AE21B52D2ED54B2200839646 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "space Watch App Watch App/space Watch App Watch App.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = N42X522L6D;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "space-Watch-App-Watch-App-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "space Watch App";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "운동 중 건강 데이터를 수집하여 iPhone 앱과 동기화합니다.\n운동 중 건강 데이터를 수집하여 iPhone 앱과 동기화합니다.\n";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "운동 데이터를 Health 앱에 저장합니다.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "타임라인 추적을 위해 위치 정보가 필요합니다.";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = .watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 11.5;
+			};
+			name = Debug;
+		};
+		AE21B52E2ED54B2200839646 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "space Watch App Watch App/space Watch App Watch App.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = N42X522L6D;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "space-Watch-App-Watch-App-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "space Watch App";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "운동 중 건강 데이터를 수집하여 iPhone 앱과 동기화합니다.\n운동 중 건강 데이터를 수집하여 iPhone 앱과 동기화합니다.\n";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "운동 데이터를 Health 앱에 저장합니다.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "타임라인 추적을 위해 위치 정보가 필요합니다.";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = .watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 11.5;
+			};
+			name = Release;
+		};
 		AE715CC42EB8DF480054A54F /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -249,19 +385,12 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = space/space.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = N42X522L6D;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSHealthShareUsageDescription = "We need access to your health data to display your sleep, stress, and calorie information from Apple Watch.";
-				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "We need access to update your health data.";
-				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "We need your location to track your routine in the background and create a complete timeline map.";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "We need your location to track your routine and create a timeline map of your activities.";
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_FILE = space/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -280,19 +409,12 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = space/space.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = N42X522L6D;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSHealthShareUsageDescription = "We need access to your health data to display your sleep, stress, and calorie information from Apple Watch.";
-				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "We need access to update your health data.";
-				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "We need your location to track your routine in the background and create a complete timeline map.";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "We need your location to track your routine and create a timeline map of your activities.";
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_FILE = space/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -309,6 +431,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		AE21B52F2ED54B2200839646 /* Build configuration list for PBXNativeTarget "space Watch App Watch App" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AE21B52D2ED54B2200839646 /* Debug */,
+				AE21B52E2ED54B2200839646 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		AE715CB62EB8DF470054A54F /* Build configuration list for PBXProject "space" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

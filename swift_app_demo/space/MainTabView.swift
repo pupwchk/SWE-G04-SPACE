@@ -14,10 +14,10 @@ struct MainTabView: View {
     var body: some View {
         TabView(selection: $selectedTab) {
             // Home Tab
-            HomeView(selectedTab: $selectedTab)
+            HomeView()
                 .tabItem {
                     Image(systemName: "house.fill")
-                    Text("Home")
+                    Text("홈")
                 }
                 .tag(0)
 
@@ -25,7 +25,7 @@ struct MainTabView: View {
             ApplianceView()
                 .tabItem {
                     Image(systemName: "refrigerator")
-                    Text("Appliance")
+                    Text("가전제품")
                 }
                 .tag(1)
 
@@ -33,7 +33,7 @@ struct MainTabView: View {
             ChatView()
                 .tabItem {
                     Image(systemName: "message.fill")
-                    Text("Chat")
+                    Text("채팅")
                 }
                 .tag(2)
 
@@ -41,7 +41,7 @@ struct MainTabView: View {
             MenuView()
                 .tabItem {
                     Image(systemName: "line.3.horizontal")
-                    Text("Menu")
+                    Text("메뉴")
                 }
                 .tag(3)
         }

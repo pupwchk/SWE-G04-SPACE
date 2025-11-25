@@ -32,7 +32,7 @@ struct ChatView: View {
                     })
                 }
             }
-            .navigationTitle("chat")
+            .navigationTitle("채팅")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 if selectedMode != nil {
@@ -138,37 +138,11 @@ struct TextChatView: View {
         Message(text: "우유랑 빵 좀 부탁드려요", isFromUser: true, timestamp: Date().addingTimeInterval(-3500))
     ]
     @State private var messageText = ""
-    @StateObject private var toneManager = ToneManager.shared
 
     let onBack: () -> Void
 
-    private var currentTone: String {
-        if let tone = toneManager.getRandomTone() {
-            return tone
-        }
-        return "말투 선택 안함"
-    }
-
     var body: some View {
         VStack(spacing: 0) {
-            // Current tone indicator
-            HStack {
-                Image(systemName: "bubble.left.and.bubble.right.fill")
-                    .font(.system(size: 14))
-                    .foregroundColor(Color(hex: "A50034"))
-
-                Text("현재 말투: \(currentTone)")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(.black.opacity(0.7))
-
-                Spacer()
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background(Color(hex: "F9F9F9"))
-
-            Divider()
-
             // Messages
             ScrollView {
                 VStack(spacing: 12) {

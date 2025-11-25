@@ -24,6 +24,13 @@ class HealthKitManager: ObservableObject {
     @Published var stressLevel: Int = 0 // 0-100
     @Published var caloriesBurned: Double = 0.0 // kcal
 
+    // Real-time metrics (from Watch or live queries)
+    @Published var currentHeartRate: Double = 0.0 // bpm
+    @Published var currentCalories: Double = 0.0 // kcal (active calories)
+    @Published var currentSteps: Int = 0 // steps
+    @Published var currentDistance: Double = 0.0 // meters
+    @Published var currentActiveMinutes: Int = 0 // minutes
+
     // Historical data (last 7 days)
     @Published var weeklySleepData: [DailyHealthData] = []
     @Published var weeklyStressData: [DailyHealthData] = []
@@ -32,24 +39,17 @@ class HealthKitManager: ObservableObject {
     // MARK: - Private Properties
 
     private let healthStore = HKHealthStore()
-    private var isSimulator: Bool {
-        #if targetEnvironment(simulator)
-        return true
-        #else
-        return false
-        #endif
-    }
+
+    // Observer queries for real-time updates
+    private var heartRateObserver: HKObserverQuery?
+    private var caloriesObserver: HKObserverQuery?
+    private var stepsObserver: HKObserverQuery?
+    private var distanceObserver: HKObserverQuery?
 
     // MARK: - Initialization
 
     init() {
         checkAvailability()
-
-        // Use dummy data for simulator
-        if isSimulator {
-            print("📱 Running on simulator - using dummy health data")
-            loadDummyData()
-        }
     }
 
     // MARK: - Availability Check
@@ -95,8 +95,6 @@ class HealthKitManager: ObservableObject {
     // MARK: - Fetch Real Data (for actual device)
 
     func fetchTodayHealthData() {
-        guard !isSimulator else { return }
-
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
         let tomorrow = calendar.date(byAdding: .day, value: 1, to: today)!
@@ -107,8 +105,6 @@ class HealthKitManager: ObservableObject {
     }
 
     func fetchWeeklyHealthData() {
-        guard !isSimulator else { return }
-
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
         let weekAgo = calendar.date(byAdding: .day, value: -7, to: today)!
@@ -201,74 +197,363 @@ class HealthKitManager: ObservableObject {
     }
 
     private func fetchWeeklySleep(from startDate: Date, to endDate: Date) {
-        // Similar implementation for weekly data
-        // For brevity, using dummy data in this implementation
+        guard let sleepType = HKObjectType.categoryType(forIdentifier: .sleepAnalysis) else { return }
+
+        let calendar = Calendar.current
+        var anchorComponents = calendar.dateComponents([.day, .month, .year], from: Date())
+        anchorComponents.hour = 0
+        guard let anchorDate = calendar.date(from: anchorComponents) else { return }
+
+        let interval = DateComponents(day: 1)
+
+        let query = HKStatisticsCollectionQuery(
+            quantityType: sleepType as! HKQuantityType,
+            quantitySamplePredicate: nil,
+            options: [],
+            anchorDate: anchorDate,
+            intervalComponents: interval
+        )
+
+        query.initialResultsHandler = { _, results, error in
+            guard let results = results, error == nil else {
+                print("❌ Weekly sleep fetch error: \(error?.localizedDescription ?? "Unknown")")
+                return
+            }
+
+            var weeklyData: [DailyHealthData] = []
+            results.enumerateStatistics(from: startDate, to: startDate) { statistics, _ in
+                // Process sleep samples for each day
+                let predicate = HKQuery.predicateForSamples(withStart: statistics.startDate, end: statistics.endDate, options: .strictStartDate)
+
+                let dayQuery = HKSampleQuery(sampleType: sleepType, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, samples, _ in
+                    guard let samples = samples as? [HKCategorySample] else { return }
+
+                    var totalSleepSeconds: TimeInterval = 0
+                    for sample in samples {
+                        if sample.value == HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue ||
+                           sample.value == HKCategoryValueSleepAnalysis.asleepCore.rawValue ||
+                           sample.value == HKCategoryValueSleepAnalysis.asleepDeep.rawValue ||
+                           sample.value == HKCategoryValueSleepAnalysis.asleepREM.rawValue {
+                            totalSleepSeconds += sample.endDate.timeIntervalSince(sample.startDate)
+                        }
+                    }
+
+                    let sleepHours = totalSleepSeconds / 3600.0
+                    weeklyData.append(DailyHealthData(date: statistics.startDate, value: sleepHours, unit: "h"))
+                }
+
+                self.healthStore.execute(dayQuery)
+            }
+
+            DispatchQueue.main.async {
+                self.weeklySleepData = weeklyData.sorted { $0.date < $1.date }
+                print("😴 Weekly sleep data loaded: \(weeklyData.count) days")
+            }
+        }
+
+        healthStore.execute(query)
     }
 
     private func fetchWeeklyCalories(from startDate: Date, to endDate: Date) {
-        // Similar implementation for weekly data
+        guard let caloriesType = HKObjectType.quantityType(forIdentifier: .activeEnergyBurned) else { return }
+
+        let calendar = Calendar.current
+        var anchorComponents = calendar.dateComponents([.day, .month, .year], from: Date())
+        anchorComponents.hour = 0
+        guard let anchorDate = calendar.date(from: anchorComponents) else { return }
+
+        let interval = DateComponents(day: 1)
+
+        let query = HKStatisticsCollectionQuery(
+            quantityType: caloriesType,
+            quantitySamplePredicate: nil,
+            options: .cumulativeSum,
+            anchorDate: anchorDate,
+            intervalComponents: interval
+        )
+
+        query.initialResultsHandler = { _, results, error in
+            guard let results = results, error == nil else {
+                print("❌ Weekly calories fetch error: \(error?.localizedDescription ?? "Unknown")")
+                return
+            }
+
+            var weeklyData: [DailyHealthData] = []
+            results.enumerateStatistics(from: startDate, to: endDate) { statistics, _ in
+                if let sum = statistics.sumQuantity() {
+                    let calories = sum.doubleValue(for: .kilocalorie())
+                    weeklyData.append(DailyHealthData(date: statistics.startDate, value: calories, unit: "kcal"))
+                }
+            }
+
+            DispatchQueue.main.async {
+                self.weeklyCaloriesData = weeklyData.sorted { $0.date < $1.date }
+                print("🔥 Weekly calories data loaded: \(weeklyData.count) days")
+            }
+        }
+
+        healthStore.execute(query)
     }
 
     private func fetchWeeklyStress(from startDate: Date, to endDate: Date) {
-        // Similar implementation for weekly data
+        guard let hrvType = HKObjectType.quantityType(forIdentifier: .heartRateVariabilitySDNN) else { return }
+
+        let calendar = Calendar.current
+        var anchorComponents = calendar.dateComponents([.day, .month, .year], from: Date())
+        anchorComponents.hour = 0
+        guard let anchorDate = calendar.date(from: anchorComponents) else { return }
+
+        let interval = DateComponents(day: 1)
+
+        let query = HKStatisticsCollectionQuery(
+            quantityType: hrvType,
+            quantitySamplePredicate: nil,
+            options: .discreteAverage,
+            anchorDate: anchorDate,
+            intervalComponents: interval
+        )
+
+        query.initialResultsHandler = { _, results, error in
+            guard let results = results, error == nil else {
+                print("❌ Weekly stress fetch error: \(error?.localizedDescription ?? "Unknown")")
+                return
+            }
+
+            var weeklyData: [DailyHealthData] = []
+            results.enumerateStatistics(from: startDate, to: endDate) { statistics, _ in
+                if let average = statistics.averageQuantity() {
+                    let hrvValue = average.doubleValue(for: HKUnit.secondUnit(with: .milli))
+                    let stressLevel = max(0, min(100, 100 - hrvValue))
+                    weeklyData.append(DailyHealthData(date: statistics.startDate, value: stressLevel, unit: "%"))
+                }
+            }
+
+            DispatchQueue.main.async {
+                self.weeklyStressData = weeklyData.sorted { $0.date < $1.date }
+                print("😰 Weekly stress data loaded: \(weeklyData.count) days")
+            }
+        }
+
+        healthStore.execute(query)
     }
 
-    // MARK: - Dummy Data (for simulator)
+    // MARK: - Real-time Observer Queries
 
-    private func loadDummyData() {
-        // Today's dummy data
-        sleepHours = Double.random(in: 6.5...8.5)
-        stressLevel = Int.random(in: 20...65)
-        caloriesBurned = Double.random(in: 350...650)
+    /// Start observing real-time health data changes
+    func startRealtimeObservers() {
+        guard isAvailable else {
+            print("❌ HealthKit not available for observers")
+            return
+        }
 
-        // Weekly dummy data
-        weeklySleepData = generateWeeklyDummyData(range: 6.0...9.0, unit: "h")
-        weeklyStressData = generateWeeklyDummyData(range: 15...70, unit: "%")
-        weeklyCaloriesData = generateWeeklyDummyData(range: 300...700, unit: "kcal")
+        startHeartRateObserver()
+        startCaloriesObserver()
+        startStepsObserver()
+        startDistanceObserver()
 
-        print("""
-        📊 Dummy Health Data Loaded:
-        - Sleep: \(String(format: "%.1f", sleepHours)) hours
-        - Stress: \(stressLevel)%
-        - Calories: \(String(format: "%.0f", caloriesBurned)) kcal
-        """)
+        print("✅ Real-time health observers started")
+    }
 
-        // Auto-refresh every 30 seconds for demo purposes
-        Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
-            self?.refreshDummyData()
+    /// Stop all real-time observers
+    func stopRealtimeObservers() {
+        if let observer = heartRateObserver {
+            healthStore.stop(observer)
+        }
+        if let observer = caloriesObserver {
+            healthStore.stop(observer)
+        }
+        if let observer = stepsObserver {
+            healthStore.stop(observer)
+        }
+        if let observer = distanceObserver {
+            healthStore.stop(observer)
+        }
+
+        print("🛑 Real-time health observers stopped")
+    }
+
+    private func startHeartRateObserver() {
+        guard let heartRateType = HKObjectType.quantityType(forIdentifier: .heartRate) else { return }
+
+        let query = HKObserverQuery(sampleType: heartRateType, predicate: nil) { [weak self] _, completionHandler, error in
+            if let error = error {
+                print("❌ Heart rate observer error: \(error.localizedDescription)")
+                completionHandler()
+                return
+            }
+
+            // Fetch latest heart rate
+            self?.fetchLatestHeartRate()
+            completionHandler()
+        }
+
+        heartRateObserver = query
+        healthStore.execute(query)
+
+        // Enable background delivery for heart rate
+        healthStore.enableBackgroundDelivery(for: heartRateType, frequency: .immediate) { success, error in
+            if success {
+                print("✅ Heart rate background delivery enabled")
+            } else {
+                print("❌ Heart rate background delivery failed: \(error?.localizedDescription ?? "Unknown")")
+            }
         }
     }
 
-    private func refreshDummyData() {
-        withAnimation {
-            sleepHours = Double.random(in: 6.5...8.5)
-            stressLevel = Int.random(in: 20...65)
-            caloriesBurned = Double.random(in: 350...650)
+    private func startCaloriesObserver() {
+        guard let caloriesType = HKObjectType.quantityType(forIdentifier: .activeEnergyBurned) else { return }
+
+        let query = HKObserverQuery(sampleType: caloriesType, predicate: nil) { [weak self] _, completionHandler, error in
+            if let error = error {
+                print("❌ Calories observer error: \(error.localizedDescription)")
+                completionHandler()
+                return
+            }
+
+            // Fetch latest calories
+            self?.fetchLatestCalories()
+            completionHandler()
         }
 
-        print("🔄 Dummy data refreshed")
+        caloriesObserver = query
+        healthStore.execute(query)
+
+        healthStore.enableBackgroundDelivery(for: caloriesType, frequency: .immediate) { success, error in
+            if success {
+                print("✅ Calories background delivery enabled")
+            }
+        }
     }
 
-    private func generateWeeklyDummyData(range: ClosedRange<Double>, unit: String) -> [DailyHealthData] {
-        let calendar = Calendar.current
-        let today = Date()
+    private func startStepsObserver() {
+        guard let stepsType = HKObjectType.quantityType(forIdentifier: .stepCount) else { return }
 
-        return (0..<7).map { daysAgo in
-            let date = calendar.date(byAdding: .day, value: -daysAgo, to: today)!
-            let value = Double.random(in: range)
-            return DailyHealthData(date: date, value: value, unit: unit)
-        }.reversed()
+        let query = HKObserverQuery(sampleType: stepsType, predicate: nil) { [weak self] _, completionHandler, error in
+            if let error = error {
+                print("❌ Steps observer error: \(error.localizedDescription)")
+                completionHandler()
+                return
+            }
+
+            self?.fetchLatestSteps()
+            completionHandler()
+        }
+
+        stepsObserver = query
+        healthStore.execute(query)
+
+        healthStore.enableBackgroundDelivery(for: stepsType, frequency: .immediate) { success, error in
+            if success {
+                print("✅ Steps background delivery enabled")
+            }
+        }
     }
 
-    private func generateWeeklyDummyData(range: ClosedRange<Int>, unit: String) -> [DailyHealthData] {
-        let calendar = Calendar.current
-        let today = Date()
+    private func startDistanceObserver() {
+        guard let distanceType = HKObjectType.quantityType(forIdentifier: .distanceWalkingRunning) else { return }
 
-        return (0..<7).map { daysAgo in
-            let date = calendar.date(byAdding: .day, value: -daysAgo, to: today)!
-            let value = Double(Int.random(in: range))
-            return DailyHealthData(date: date, value: value, unit: unit)
-        }.reversed()
+        let query = HKObserverQuery(sampleType: distanceType, predicate: nil) { [weak self] _, completionHandler, error in
+            if let error = error {
+                print("❌ Distance observer error: \(error.localizedDescription)")
+                completionHandler()
+                return
+            }
+
+            self?.fetchLatestDistance()
+            completionHandler()
+        }
+
+        distanceObserver = query
+        healthStore.execute(query)
+
+        healthStore.enableBackgroundDelivery(for: distanceType, frequency: .immediate) { success, error in
+            if success {
+                print("✅ Distance background delivery enabled")
+            }
+        }
+    }
+
+    // MARK: - Fetch Latest Real-time Data
+
+    private func fetchLatestHeartRate() {
+        guard let heartRateType = HKObjectType.quantityType(forIdentifier: .heartRate) else { return }
+
+        let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)
+        let query = HKSampleQuery(sampleType: heartRateType, predicate: nil, limit: 1, sortDescriptors: [sortDescriptor]) { _, samples, error in
+            guard let sample = samples?.first as? HKQuantitySample else { return }
+
+            let heartRate = sample.quantity.doubleValue(for: HKUnit(from: "count/min"))
+
+            DispatchQueue.main.async {
+                self.currentHeartRate = heartRate
+                print("❤️ Real-time heart rate: \(Int(heartRate)) bpm")
+            }
+        }
+
+        healthStore.execute(query)
+    }
+
+    private func fetchLatestCalories() {
+        guard let caloriesType = HKObjectType.quantityType(forIdentifier: .activeEnergyBurned) else { return }
+
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let predicate = HKQuery.predicateForSamples(withStart: today, end: Date(), options: .strictStartDate)
+
+        let query = HKStatisticsQuery(quantityType: caloriesType, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, error in
+            guard let sum = result?.sumQuantity() else { return }
+
+            let calories = sum.doubleValue(for: .kilocalorie())
+
+            DispatchQueue.main.async {
+                self.currentCalories = calories
+                print("🔥 Real-time calories: \(Int(calories)) kcal")
+            }
+        }
+
+        healthStore.execute(query)
+    }
+
+    private func fetchLatestSteps() {
+        guard let stepsType = HKObjectType.quantityType(forIdentifier: .stepCount) else { return }
+
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let predicate = HKQuery.predicateForSamples(withStart: today, end: Date(), options: .strictStartDate)
+
+        let query = HKStatisticsQuery(quantityType: stepsType, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, error in
+            guard let sum = result?.sumQuantity() else { return }
+
+            let steps = Int(sum.doubleValue(for: .count()))
+
+            DispatchQueue.main.async {
+                self.currentSteps = steps
+                print("👟 Real-time steps: \(steps)")
+            }
+        }
+
+        healthStore.execute(query)
+    }
+
+    private func fetchLatestDistance() {
+        guard let distanceType = HKObjectType.quantityType(forIdentifier: .distanceWalkingRunning) else { return }
+
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let predicate = HKQuery.predicateForSamples(withStart: today, end: Date(), options: .strictStartDate)
+
+        let query = HKStatisticsQuery(quantityType: distanceType, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, error in
+            guard let sum = result?.sumQuantity() else { return }
+
+            let distance = sum.doubleValue(for: .meter())
+
+            DispatchQueue.main.async {
+                self.currentDistance = distance
+                print("🏃 Real-time distance: \(String(format: "%.2f", distance / 1000)) km")
+            }
+        }
+
+        healthStore.execute(query)
     }
 }
 
