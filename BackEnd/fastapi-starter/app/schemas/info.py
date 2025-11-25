@@ -172,6 +172,9 @@ class CharacterCreate(CharacterBase):
     # 만약 클라이언트가 uuid를 생성해서 보내고 싶으면:
     # id: UUID 추가하면 됨.
 
+class CharacterUpdate(BaseModel):
+    nickname: Optional[str] = None
+    persona: Optional[str] = None
 
 class Character(CharacterBase):
     id: UUID
