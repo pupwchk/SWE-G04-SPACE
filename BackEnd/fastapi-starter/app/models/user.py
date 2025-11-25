@@ -54,6 +54,12 @@ class User(Base):
         uselist=False,
         cascade="all, delete-orphan",
     )
+    
+    characters = relationship(
+        "Character",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
 
 
 class UserPhone(Base):
