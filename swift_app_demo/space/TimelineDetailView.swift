@@ -173,8 +173,6 @@ struct TimelineDetailView: View {
         }
         .onAppear {
             updateCameraPosition()
-            // Load dummy data for testing
-            timelineManager.loadDummyData()
         }
         .onChange(of: selectedTimeline) { _, newValue in
             // Clear checkpoint selection when timeline changes

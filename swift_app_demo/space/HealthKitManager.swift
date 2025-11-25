@@ -32,24 +32,11 @@ class HealthKitManager: ObservableObject {
     // MARK: - Private Properties
 
     private let healthStore = HKHealthStore()
-    private var isSimulator: Bool {
-        #if targetEnvironment(simulator)
-        return true
-        #else
-        return false
-        #endif
-    }
 
     // MARK: - Initialization
 
     init() {
         checkAvailability()
-
-        // Use dummy data for simulator
-        if isSimulator {
-            print("📱 Running on simulator - using dummy health data")
-            loadDummyData()
-        }
     }
 
     // MARK: - Availability Check
@@ -95,8 +82,6 @@ class HealthKitManager: ObservableObject {
     // MARK: - Fetch Real Data (for actual device)
 
     func fetchTodayHealthData() {
-        guard !isSimulator else { return }
-
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
         let tomorrow = calendar.date(byAdding: .day, value: 1, to: today)!
@@ -107,8 +92,6 @@ class HealthKitManager: ObservableObject {
     }
 
     func fetchWeeklyHealthData() {
-        guard !isSimulator else { return }
-
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
         let weekAgo = calendar.date(byAdding: .day, value: -7, to: today)!
@@ -201,74 +184,144 @@ class HealthKitManager: ObservableObject {
     }
 
     private func fetchWeeklySleep(from startDate: Date, to endDate: Date) {
-        // Similar implementation for weekly data
-        // For brevity, using dummy data in this implementation
+        guard let sleepType = HKObjectType.categoryType(forIdentifier: .sleepAnalysis) else { return }
+
+        let calendar = Calendar.current
+        var anchorComponents = calendar.dateComponents([.day, .month, .year], from: Date())
+        anchorComponents.hour = 0
+        guard let anchorDate = calendar.date(from: anchorComponents) else { return }
+
+        let interval = DateComponents(day: 1)
+
+        let query = HKStatisticsCollectionQuery(
+            quantityType: sleepType as! HKQuantityType,
+            quantitySamplePredicate: nil,
+            options: [],
+            anchorDate: anchorDate,
+            intervalComponents: interval
+        )
+
+        query.initialResultsHandler = { _, results, error in
+            guard let results = results, error == nil else {
+                print("❌ Weekly sleep fetch error: \(error?.localizedDescription ?? "Unknown")")
+                return
+            }
+
+            var weeklyData: [DailyHealthData] = []
+            results.enumerateStatistics(from: startDate, to: startDate) { statistics, _ in
+                // Process sleep samples for each day
+                let predicate = HKQuery.predicateForSamples(withStart: statistics.startDate, end: statistics.endDate, options: .strictStartDate)
+
+                let dayQuery = HKSampleQuery(sampleType: sleepType, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, samples, _ in
+                    guard let samples = samples as? [HKCategorySample] else { return }
+
+                    var totalSleepSeconds: TimeInterval = 0
+                    for sample in samples {
+                        if sample.value == HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue ||
+                           sample.value == HKCategoryValueSleepAnalysis.asleepCore.rawValue ||
+                           sample.value == HKCategoryValueSleepAnalysis.asleepDeep.rawValue ||
+                           sample.value == HKCategoryValueSleepAnalysis.asleepREM.rawValue {
+                            totalSleepSeconds += sample.endDate.timeIntervalSince(sample.startDate)
+                        }
+                    }
+
+                    let sleepHours = totalSleepSeconds / 3600.0
+                    weeklyData.append(DailyHealthData(date: statistics.startDate, value: sleepHours, unit: "h"))
+                }
+
+                self.healthStore.execute(dayQuery)
+            }
+
+            DispatchQueue.main.async {
+                self.weeklySleepData = weeklyData.sorted { $0.date < $1.date }
+                print("😴 Weekly sleep data loaded: \(weeklyData.count) days")
+            }
+        }
+
+        healthStore.execute(query)
     }
 
     private func fetchWeeklyCalories(from startDate: Date, to endDate: Date) {
-        // Similar implementation for weekly data
+        guard let caloriesType = HKObjectType.quantityType(forIdentifier: .activeEnergyBurned) else { return }
+
+        let calendar = Calendar.current
+        var anchorComponents = calendar.dateComponents([.day, .month, .year], from: Date())
+        anchorComponents.hour = 0
+        guard let anchorDate = calendar.date(from: anchorComponents) else { return }
+
+        let interval = DateComponents(day: 1)
+
+        let query = HKStatisticsCollectionQuery(
+            quantityType: caloriesType,
+            quantitySamplePredicate: nil,
+            options: .cumulativeSum,
+            anchorDate: anchorDate,
+            intervalComponents: interval
+        )
+
+        query.initialResultsHandler = { _, results, error in
+            guard let results = results, error == nil else {
+                print("❌ Weekly calories fetch error: \(error?.localizedDescription ?? "Unknown")")
+                return
+            }
+
+            var weeklyData: [DailyHealthData] = []
+            results.enumerateStatistics(from: startDate, to: endDate) { statistics, _ in
+                if let sum = statistics.sumQuantity() {
+                    let calories = sum.doubleValue(for: .kilocalorie())
+                    weeklyData.append(DailyHealthData(date: statistics.startDate, value: calories, unit: "kcal"))
+                }
+            }
+
+            DispatchQueue.main.async {
+                self.weeklyCaloriesData = weeklyData.sorted { $0.date < $1.date }
+                print("🔥 Weekly calories data loaded: \(weeklyData.count) days")
+            }
+        }
+
+        healthStore.execute(query)
     }
 
     private func fetchWeeklyStress(from startDate: Date, to endDate: Date) {
-        // Similar implementation for weekly data
-    }
+        guard let hrvType = HKObjectType.quantityType(forIdentifier: .heartRateVariabilitySDNN) else { return }
 
-    // MARK: - Dummy Data (for simulator)
-
-    private func loadDummyData() {
-        // Today's dummy data
-        sleepHours = Double.random(in: 6.5...8.5)
-        stressLevel = Int.random(in: 20...65)
-        caloriesBurned = Double.random(in: 350...650)
-
-        // Weekly dummy data
-        weeklySleepData = generateWeeklyDummyData(range: 6.0...9.0, unit: "h")
-        weeklyStressData = generateWeeklyDummyData(range: 15...70, unit: "%")
-        weeklyCaloriesData = generateWeeklyDummyData(range: 300...700, unit: "kcal")
-
-        print("""
-        📊 Dummy Health Data Loaded:
-        - Sleep: \(String(format: "%.1f", sleepHours)) hours
-        - Stress: \(stressLevel)%
-        - Calories: \(String(format: "%.0f", caloriesBurned)) kcal
-        """)
-
-        // Auto-refresh every 30 seconds for demo purposes
-        Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
-            self?.refreshDummyData()
-        }
-    }
-
-    private func refreshDummyData() {
-        withAnimation {
-            sleepHours = Double.random(in: 6.5...8.5)
-            stressLevel = Int.random(in: 20...65)
-            caloriesBurned = Double.random(in: 350...650)
-        }
-
-        print("🔄 Dummy data refreshed")
-    }
-
-    private func generateWeeklyDummyData(range: ClosedRange<Double>, unit: String) -> [DailyHealthData] {
         let calendar = Calendar.current
-        let today = Date()
+        var anchorComponents = calendar.dateComponents([.day, .month, .year], from: Date())
+        anchorComponents.hour = 0
+        guard let anchorDate = calendar.date(from: anchorComponents) else { return }
 
-        return (0..<7).map { daysAgo in
-            let date = calendar.date(byAdding: .day, value: -daysAgo, to: today)!
-            let value = Double.random(in: range)
-            return DailyHealthData(date: date, value: value, unit: unit)
-        }.reversed()
-    }
+        let interval = DateComponents(day: 1)
 
-    private func generateWeeklyDummyData(range: ClosedRange<Int>, unit: String) -> [DailyHealthData] {
-        let calendar = Calendar.current
-        let today = Date()
+        let query = HKStatisticsCollectionQuery(
+            quantityType: hrvType,
+            quantitySamplePredicate: nil,
+            options: .discreteAverage,
+            anchorDate: anchorDate,
+            intervalComponents: interval
+        )
 
-        return (0..<7).map { daysAgo in
-            let date = calendar.date(byAdding: .day, value: -daysAgo, to: today)!
-            let value = Double(Int.random(in: range))
-            return DailyHealthData(date: date, value: value, unit: unit)
-        }.reversed()
+        query.initialResultsHandler = { _, results, error in
+            guard let results = results, error == nil else {
+                print("❌ Weekly stress fetch error: \(error?.localizedDescription ?? "Unknown")")
+                return
+            }
+
+            var weeklyData: [DailyHealthData] = []
+            results.enumerateStatistics(from: startDate, to: endDate) { statistics, _ in
+                if let average = statistics.averageQuantity() {
+                    let hrvValue = average.doubleValue(for: HKUnit.secondUnit(with: .milli))
+                    let stressLevel = max(0, min(100, 100 - hrvValue))
+                    weeklyData.append(DailyHealthData(date: statistics.startDate, value: stressLevel, unit: "%"))
+                }
+            }
+
+            DispatchQueue.main.async {
+                self.weeklyStressData = weeklyData.sorted { $0.date < $1.date }
+                print("😰 Weekly stress data loaded: \(weeklyData.count) days")
+            }
+        }
+
+        healthStore.execute(query)
     }
 }
 

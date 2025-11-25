@@ -9,16 +9,9 @@ import SwiftUI
 
 /// Home screen - main dashboard view
 struct HomeView: View {
-    @State private var hasDevices = false
     @State private var hasAppliances = false
 
-    // Sample devices data
-    let sampleDevices = [
-        (icon: "applewatch", modelName: "Apple Watch"),
-        (icon: "airpodspro", modelName: "AirPods Pro")
-    ]
-
-    // Sample appliances data
+    // Sample appliances data (keeping for smart home appliances)
     let sampleAppliances = [
         (icon: "refrigerator.fill", title: "주방", subtitle: "냉장고", status: "동작 중"),
         (icon: "dishwasher.fill", title: "거실", subtitle: "청소기", status: "오프라인")
@@ -49,7 +42,7 @@ struct HomeView: View {
                         }
                     }
 
-                    // Device section
+                    // Device section - will be populated by WatchConnectivityManager and AudioDeviceManager
                     VStack(alignment: .leading, spacing: 12) {
                         HStack {
                             Text("기기")
@@ -57,42 +50,15 @@ struct HomeView: View {
                                 .foregroundColor(.black)
 
                             Spacer()
-
-                            if hasDevices {
-                                Button(action: {
-                                    withAnimation {
-                                        hasDevices = false
-                                    }
-                                }) {
-                                    Image(systemName: "plus.circle.fill")
-                                        .font(.system(size: 22))
-                                        .foregroundColor(Color(hex: "A50034"))
-                                }
-                            }
                         }
                         .padding(.horizontal, 20)
 
-                        if hasDevices {
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 16) {
-                                    ForEach(0..<sampleDevices.count, id: \.self) { index in
-                                        DeviceCard(
-                                            icon: sampleDevices[index].icon,
-                                            modelName: sampleDevices[index].modelName
-                                        )
-                                    }
-                                }
-                                .padding(.horizontal, 20)
-                            }
-                        } else {
-                            AddItemWidget(
-                                title: "기기 추가",
-                                action: {
-                                    handleDeviceAdd()
-                                }
-                            )
+                        // Devices will be dynamically shown when connected
+                        // This section will be implemented in Phase 8
+                        Text("기기 연결 기능은 Phase 8에서 구현됩니다")
+                            .font(.system(size: 14))
+                            .foregroundColor(.gray)
                             .padding(.horizontal, 20)
-                        }
                     }
 
                     // Appliance section
@@ -155,14 +121,6 @@ struct HomeView: View {
     }
 
     // MARK: - Actions
-
-    private func handleDeviceAdd() {
-        // Simulate adding devices
-        withAnimation {
-            hasDevices = true
-        }
-        print("Device add tapped")
-    }
 
     private func handleApplianceAdd() {
         // Simulate adding appliances
