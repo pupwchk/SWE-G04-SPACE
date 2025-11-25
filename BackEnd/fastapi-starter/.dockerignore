@@ -1,0 +1,54 @@
+# -------------------------
+# Project Local Data
+# -------------------------
+data/
+logs/
+tmp/
+*.sqlite3
+
+# -------------------------
+# Python cache / build files
+# -------------------------
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pdb
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.cache/
+
+# -------------------------
+# Virtual environments
+# -------------------------
+venv/
+env/
+.venv/
+poetry.lock  # Optional: remove if you want deterministic builds
+
+# -------------------------
+# Docker / Git / OS files
+# -------------------------
+Dockerfile~
+docker-compose.yml~
+.git/
+.gitignore
+.gitattributes
+.env
+.env.*
+*.swp
+*.swo
+.DS_Store
+
+# -------------------------
+# Node (if front-end exists)
+# -------------------------
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# -------------------------
+# Alembic migrations cache
+# -------------------------
+alembic.ini~

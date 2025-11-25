@@ -55,6 +55,8 @@ class User(Base):
         cascade="all, delete-orphan",
     )
     
+    # 1 : N 관계
+    
     characters = relationship(
         "Character",
         back_populates="user",
