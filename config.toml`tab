@@ -1,0 +1,10 @@
+model = "gpt-5.1-codex-max"
+model_reasoning_effort = "high"
+[projects."/Users/imdonghyeon/Desktop/Kople_game 복사본"]
+trust_level = "trusted"
+
+[projects."/Users/imdonghyeon/perch_care"]
+trust_level = "trusted"
+
+[projects."/Users/imdonghyeon/SWE-G04-SPACE"]
+trust_level = "trusted"

@@ -107,6 +107,11 @@ class SupabaseManager: ObservableObject {
                     userEmail: user.email
                 )
 
+                // Load tagged locations for proximity detection
+                Task {
+                    await TaggedLocationManager.shared.loadTaggedLocations()
+                }
+
                 return user
             } else if let userId = authResponse.id, let userEmail = authResponse.email {
                 // Email confirmation required - no session yet
@@ -114,7 +119,7 @@ class SupabaseManager: ObservableObject {
                 print("✉️ User ID: \(userId), Email: \(userEmail)")
 
                 // For development: just show success message without requiring confirmation
-                let user = User(
+                _ = User(
                     id: userId,
                     email: userEmail,
                     name: authResponse.userMetadata?.name ?? name
@@ -227,6 +232,11 @@ class SupabaseManager: ObservableObject {
                 userId: user.id,
                 userEmail: user.email
             )
+
+            // Load tagged locations for proximity detection
+            Task {
+                await TaggedLocationManager.shared.loadTaggedLocations()
+            }
 
             print("✅ Returning user: \(user.email)")
             return user
@@ -682,7 +692,7 @@ class SupabaseManager: ObservableObject {
         UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "token_created_at")
     }
 
-    private func getAccessToken() -> String? {
+    func getAccessToken() -> String? {
         return UserDefaults.standard.string(forKey: "access_token")
     }
 
@@ -755,6 +765,11 @@ class SupabaseManager: ObservableObject {
                 userId: user.id,
                 userEmail: user.email
             )
+
+            // Load tagged locations for proximity detection
+            Task {
+                await TaggedLocationManager.shared.loadTaggedLocations()
+            }
 
             print("✅ Session validated, user: \(user.email)")
         } catch {

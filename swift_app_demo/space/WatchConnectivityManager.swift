@@ -511,11 +511,13 @@ extension WatchConnectivityManager: WCSessionDelegate {
                 }
 
                 // Generate checkpoints automatically
-                let checkpoints = timelineManager.generateCheckpoints(
-                    coordinates: locationManager.routeCoordinates,
-                    timestamps: locationManager.timestampHistory,
-                    healthData: locationManager.healthDataHistory
-                )
+                let checkpoints = !locationManager.liveCheckpoints.isEmpty
+                    ? locationManager.liveCheckpoints
+                    : timelineManager.generateCheckpoints(
+                        coordinates: locationManager.routeCoordinates,
+                        timestamps: locationManager.timestampHistory,
+                        healthData: locationManager.healthDataHistory
+                    )
 
                 // Create timeline record using LocationManager's history
                 if let timeline = timelineManager.createTimeline(

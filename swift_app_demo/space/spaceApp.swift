@@ -30,6 +30,11 @@ struct HaruApp: App {
         } else {
             print("⚠️ HealthKit not available on this device")
         }
+
+        // Request notification permission for location proximity alerts
+        let locationManager = LocationManager.shared
+        locationManager.requestNotificationPermission()
+        print("📱 Requested notification permission for location alerts")
     }
 
     var body: some Scene {

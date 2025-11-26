@@ -90,7 +90,7 @@ class DeviceManager: ObservableObject {
     // MARK: - Apple Watch Detection
 
     private func getWatchDevice() -> ConnectedDevice? {
-        let connectivity = WatchConnectivityManager.shared
+        _ = WatchConnectivityManager.shared
 
         guard WCSession.isSupported(),
               let session = WCSession.default as WCSession?,

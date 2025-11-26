@@ -194,12 +194,14 @@ struct TimelineWidget: View {
 
         locationManager.stopTracking()
 
-        // Generate checkpoints automatically
-        let checkpoints = timelineManager.generateCheckpoints(
-            coordinates: locationManager.routeCoordinates,
-            timestamps: locationManager.timestampHistory,
-            healthData: locationManager.healthDataHistory
-        )
+        // Prefer live checkpoints; fall back to automatic generation if none were created
+        let checkpoints = !locationManager.liveCheckpoints.isEmpty
+            ? locationManager.liveCheckpoints
+            : timelineManager.generateCheckpoints(
+                coordinates: locationManager.routeCoordinates,
+                timestamps: locationManager.timestampHistory,
+                healthData: locationManager.healthDataHistory
+            )
 
         // Create timeline record using LocationManager's history
         if let timeline = timelineManager.createTimeline(

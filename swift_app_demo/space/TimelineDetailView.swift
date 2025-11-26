@@ -18,6 +18,7 @@ struct TimelineDetailView: View {
     var onStopTracking: () -> Void
 
     @StateObject private var timelineManager = TimelineManager.shared
+    @StateObject private var tagManager = TaggedLocationManager.shared
     @State private var selectedTimeline: TimelineRecord?
     @State private var cameraPosition: MapCameraPosition = .automatic
     @State private var selectedCheckpoint: Checkpoint?
@@ -126,6 +127,25 @@ struct TimelineDetailView: View {
                 MapPolyline(coordinates: locationManager.routeCoordinates)
                     .stroke(Color(hex: "A50034"), lineWidth: 4)
 
+                // Live checkpoints while recording
+                ForEach(locationManager.liveCheckpoints) { checkpoint in
+                    Annotation("", coordinate: checkpoint.coordinate.coordinate) {
+                        CheckpointAnnotationView(
+                            checkpoint: checkpoint,
+                            isSelected: selectedCheckpoint?.id == checkpoint.id,
+                            onTap: {
+                                withAnimation(.spring(response: 0.3)) {
+                                    if selectedCheckpoint?.id == checkpoint.id {
+                                        selectedCheckpoint = nil
+                                    } else {
+                                        selectedCheckpoint = checkpoint
+                                    }
+                                }
+                            }
+                        )
+                    }
+                }
+
                 if let lastCoord = locationManager.routeCoordinates.last {
                     Annotation("", coordinate: lastCoord) {
                         ZStack {
@@ -148,22 +168,19 @@ struct TimelineDetailView: View {
                         }
                     }
                 }
-            } else if let location = locationManager.location {
-                // Show current location
-                Annotation("", coordinate: location.coordinate) {
-                    ZStack {
-                        Circle()
-                            .fill(Color.blue)
-                            .frame(width: 20, height: 20)
-                        Circle()
-                            .stroke(Color.white, lineWidth: 3)
-                            .frame(width: 20, height: 20)
-                    }
-                }
             }
 
-            // User location
-            UserAnnotation()
+            // User location (use system annotation when not actively tracking)
+            if !isTracking {
+                UserAnnotation()
+            }
+
+            // Tagged locations (home, dormitory, etc.)
+            ForEach(tagManager.taggedLocations) { taggedLocation in
+                Annotation(taggedLocation.displayName, coordinate: taggedLocation.coordinate) {
+                    TaggedLocationAnnotationView(taggedLocation: taggedLocation)
+                }
+            }
         }
         .mapStyle(.standard(elevation: .realistic))
         .mapControls {
@@ -173,6 +190,9 @@ struct TimelineDetailView: View {
         }
         .onAppear {
             updateCameraPosition()
+            Task {
+                await tagManager.loadTaggedLocations()
+            }
         }
         .onChange(of: selectedTimeline) { _, newValue in
             // Clear checkpoint selection when timeline changes
@@ -426,6 +446,47 @@ struct TimelineDetailView: View {
     }
 }
 
+// MARK: - Tagged Location Annotation View
+
+struct TaggedLocationAnnotationView: View {
+    let taggedLocation: TaggedLocation
+
+    var body: some View {
+        VStack(spacing: 4) {
+            ZStack {
+                // Outer glow for home locations
+                if taggedLocation.isHome {
+                    Circle()
+                        .fill(Color(hex: "A50034").opacity(0.2))
+                        .frame(width: 50, height: 50)
+                }
+
+                // Background circle
+                Circle()
+                    .fill(Color.white)
+                    .frame(width: 40, height: 40)
+                    .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
+
+                // Icon
+                Text(taggedLocation.tag.icon)
+                    .font(.system(size: 24))
+            }
+
+            // Label (only for home locations)
+            if taggedLocation.isHome {
+                Text(taggedLocation.displayName)
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color(hex: "A50034"))
+                    .cornerRadius(8)
+                    .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
+            }
+        }
+    }
+}
+
 // MARK: - Checkpoint Annotation View
 
 struct CheckpointAnnotationView: View {
@@ -469,6 +530,9 @@ struct CheckpointAnnotationView: View {
 
 struct CheckpointBubbleView: View {
     let checkpoint: Checkpoint
+    @StateObject private var tagManager = TaggedLocationManager.shared
+    @State private var showLocationTagSheet = false
+    @State private var existingTag: TaggedLocation?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -588,6 +652,41 @@ struct CheckpointBubbleView: View {
                     .foregroundColor(.gray)
                     .lineLimit(2)
             }
+
+            // Tagged location if exists
+            if let tag = existingTag {
+                Divider()
+                HStack(spacing: 6) {
+                    Text(tag.tag.icon)
+                        .font(.system(size: 14))
+                    Text(tag.displayName)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(Color(hex: "A50034"))
+                }
+                .padding(6)
+                .background(Color(hex: "F3DEE5"))
+                .cornerRadius(8)
+            }
+
+            // Add location tag button
+            Divider()
+            Button(action: {
+                showLocationTagSheet = true
+            }) {
+                HStack(spacing: 6) {
+                    Image(systemName: existingTag == nil ? "tag.fill" : "tag")
+                        .font(.system(size: 11))
+                        .foregroundColor(Color(hex: "A50034"))
+                    Text(existingTag == nil ? "위치 태그 추가" : "태그 수정")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(Color(hex: "A50034"))
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .background(Color(hex: "F3DEE5"))
+                .cornerRadius(8)
+            }
+            .buttonStyle(.plain)
         }
         .padding(12)
         .background(
@@ -597,9 +696,28 @@ struct CheckpointBubbleView: View {
         )
         .frame(minWidth: 160)
         .offset(y: -8)
+        .onAppear {
+            checkExistingTag()
+        }
+        .sheet(isPresented: $showLocationTagSheet) {
+            LocationTagSheet(checkpoint: checkpoint) {
+                // Reload tags after adding
+                Task {
+                    await tagManager.loadTaggedLocations()
+                    checkExistingTag()
+                }
+            }
+        }
     }
 
     // MARK: - Helper Methods
+
+    private func checkExistingTag() {
+        existingTag = tagManager.findTaggedLocation(
+            near: checkpoint.coordinate.coordinate,
+            within: 50  // 50 meters tolerance
+        )
+    }
 
     private func distanceFormatted(_ meters: Double) -> String {
         if meters >= 1000 {
