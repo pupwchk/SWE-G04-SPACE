@@ -184,6 +184,8 @@ struct Checkpoint: Identifiable, Codable, Equatable {
     let calories: Double?   // kcal
     let steps: Int?         // steps
     let distance: Double?   // meters
+    let hrv: Double?        // ms (Heart Rate Variability)
+    let stressLevel: Int?   // 0-100 (calculated from HRV)
 
     init(
         id: UUID = UUID(),
@@ -196,7 +198,9 @@ struct Checkpoint: Identifiable, Codable, Equatable {
         heartRate: Double? = nil,
         calories: Double? = nil,
         steps: Int? = nil,
-        distance: Double? = nil
+        distance: Double? = nil,
+        hrv: Double? = nil,
+        stressLevel: Int? = nil
     ) {
         self.id = id
         self.coordinate = coordinate
@@ -209,6 +213,8 @@ struct Checkpoint: Identifiable, Codable, Equatable {
         self.calories = calories
         self.steps = steps
         self.distance = distance
+        self.hrv = hrv
+        self.stressLevel = stressLevel
     }
 
     var stayDurationFormatted: String {
@@ -376,7 +382,8 @@ class TimelineManager: ObservableObject {
                         coordinates: coordinates,
                         timestamps: timestamps,
                         healthData: healthData,
-                        stayDuration: currentStopDuration
+                        stayDuration: currentStopDuration,
+                        previousCheckpoint: checkpoints.last
                     )
                     checkpoints.append(checkpoint)
                 }
@@ -393,7 +400,8 @@ class TimelineManager: ObservableObject {
                 coordinates: coordinates,
                 timestamps: timestamps,
                 healthData: healthData,
-                stayDuration: currentStopDuration
+                stayDuration: currentStopDuration,
+                previousCheckpoint: checkpoints.last
             )
             checkpoints.append(checkpoint)
         }
@@ -408,7 +416,8 @@ class TimelineManager: ObservableObject {
         coordinates: [CLLocationCoordinate2D],
         timestamps: [Date],
         healthData: [(heartRate: Double?, calories: Double?, steps: Int?, distance: Double?)],
-        stayDuration: TimeInterval
+        stayDuration: TimeInterval,
+        previousCheckpoint: Checkpoint? = nil
     ) -> Checkpoint {
         let coordinate = CoordinateData(
             coordinate: coordinates[index],
@@ -434,9 +443,25 @@ class TimelineManager: ObservableObject {
             mood = .neutral // Default if no heart rate data
         }
 
-        // Determine stress change based on heart rate variability (placeholder)
-        // In a real implementation, this would use actual HRV data
-        let stressChange: StressChange = .unchanged
+        // Get current HRV and stress level from HealthKitManager
+        let healthManager = HealthKitManager.shared
+        let currentStressLevel = healthManager.stressLevel
+        let currentHRV = healthManager.currentHRV
+
+        // Determine stress change by comparing with previous checkpoint
+        let stressChange: StressChange
+        if let previousStress = previousCheckpoint?.stressLevel {
+            let stressDiff = currentStressLevel - previousStress
+            if stressDiff > 10 {  // Increased by more than 10%
+                stressChange = .increased
+            } else if stressDiff < -10 {  // Decreased by more than 10%
+                stressChange = .decreased
+            } else {
+                stressChange = .unchanged
+            }
+        } else {
+            stressChange = .unchanged  // No previous checkpoint to compare
+        }
 
         return Checkpoint(
             coordinate: coordinate,
@@ -448,7 +473,9 @@ class TimelineManager: ObservableObject {
             heartRate: health.0,  // health.0 = heartRate
             calories: health.1,   // health.1 = calories
             steps: health.2,      // health.2 = steps
-            distance: health.3    // health.3 = distance
+            distance: health.3,   // health.3 = distance
+            hrv: currentHRV > 0 ? currentHRV : nil,
+            stressLevel: currentStressLevel > 0 ? currentStressLevel : nil
         )
     }
 
@@ -461,18 +488,37 @@ class TimelineManager: ObservableObject {
     ) -> Checkpoint {
         // Get current health data from HealthKitManager
         let healthManager = HealthKitManager.shared
+        let currentStressLevel = healthManager.stressLevel
+        let currentHRV = healthManager.currentHRV
+
+        // Determine stress change by comparing with previous checkpoint
+        let stressChange: StressChange
+        if let previousStress = currentTimeline?.checkpoints.last?.stressLevel {
+            let stressDiff = currentStressLevel - previousStress
+            if stressDiff > 10 {  // Increased by more than 10%
+                stressChange = .increased
+            } else if stressDiff < -10 {  // Decreased by more than 10%
+                stressChange = .decreased
+            } else {
+                stressChange = .unchanged
+            }
+        } else {
+            stressChange = .unchanged  // No previous checkpoint to compare
+        }
 
         return Checkpoint(
             coordinate: CoordinateData(coordinate: coordinate, timestamp: timestamp),
             mood: mood,
             stayDuration: 0, // Manual checkpoint, no stay duration
-            stressChange: .unchanged,
+            stressChange: stressChange,
             note: note,
             timestamp: timestamp,
             heartRate: healthManager.currentHeartRate > 0 ? healthManager.currentHeartRate : nil,
             calories: healthManager.currentCalories > 0 ? healthManager.currentCalories : nil,
             steps: healthManager.currentSteps > 0 ? healthManager.currentSteps : nil,
-            distance: healthManager.currentDistance > 0 ? healthManager.currentDistance : nil
+            distance: healthManager.currentDistance > 0 ? healthManager.currentDistance : nil,
+            hrv: currentHRV > 0 ? currentHRV : nil,
+            stressLevel: currentStressLevel > 0 ? currentStressLevel : nil
         )
     }
 

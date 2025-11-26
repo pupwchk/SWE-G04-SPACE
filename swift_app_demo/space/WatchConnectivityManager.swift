@@ -291,21 +291,62 @@ extension WatchConnectivityManager: WCSessionDelegate {
             return Date(timeIntervalSince1970: timestamp)
         }
 
-        // Update LocationManager with Watch coordinates
+        // Parse health data from coordinates
+        let healthData: [(heartRate: Double?, calories: Double?, steps: Int?, distance: Double?)] = coordinates.map { coordDict in
+            (
+                heartRate: coordDict["heartRate"] as? Double,
+                calories: coordDict["calories"] as? Double,
+                steps: coordDict["steps"] as? Int,
+                distance: coordDict["healthDistance"] as? Double
+            )
+        }
+
+        // Calculate speeds from consecutive coordinates
+        var speeds: [Double] = []
+        for i in 1..<locationCoordinates.count {
+            if i < timestamps.count {
+                let loc1 = CLLocation(latitude: locationCoordinates[i - 1].latitude, longitude: locationCoordinates[i - 1].longitude)
+                let loc2 = CLLocation(latitude: locationCoordinates[i].latitude, longitude: locationCoordinates[i].longitude)
+
+                let distance = loc2.distance(from: loc1) // meters
+                let timeInterval = timestamps[i].timeIntervalSince(timestamps[i - 1])
+                let speed = timeInterval > 0 ? (distance / timeInterval) * 3.6 : 0 // km/h
+
+                speeds.append(speed)
+            }
+        }
+        // First point has no previous point, so use 0 or the first calculated speed
+        if !speeds.isEmpty {
+            speeds.insert(speeds.first ?? 0, at: 0)
+        }
+
+        // Update LocationManager with Watch coordinates and health data
         DispatchQueue.main.async {
             let locationManager = LocationManager.shared
 
-            // Add coordinates to existing route
+            // Add coordinates to BOTH arrays (coordinates and routeCoordinates)
             for coordinate in locationCoordinates {
                 locationManager.coordinates.append(coordinate)
+                locationManager.routeCoordinates.append(coordinate)
             }
 
-            // Add timestamps
+            // Add timestamps to BOTH arrays (timestamps and timestampHistory)
             for timestamp in timestamps {
                 locationManager.timestamps.append(timestamp)
+                locationManager.timestampHistory.append(timestamp)
             }
 
-            print("✅ Added \(locationCoordinates.count) coordinates from Watch to LocationManager")
+            // Add speeds to speedHistory
+            for speed in speeds {
+                locationManager.speedHistory.append(speed)
+            }
+
+            // Add health data
+            for health in healthData {
+                locationManager.healthDataHistory.append(health)
+            }
+
+            print("✅ Added \(locationCoordinates.count) coordinates with health data from Watch to LocationManager (both arrays)")
         }
     }
 
@@ -371,8 +412,67 @@ extension WatchConnectivityManager: WCSessionDelegate {
 
         print("📍 Checkpoint received from Watch")
 
-        // TODO: Add checkpoint to current timeline
-        // This will be implemented in Phase 7
+        // Parse checkpoint data according to documentation format
+        guard let coordDict = checkpointData["coordinate"] as? [String: Any],
+              let latitude = coordDict["latitude"] as? Double,
+              let longitude = coordDict["longitude"] as? Double,
+              let timestamp = coordDict["timestamp"] as? TimeInterval,
+              let moodString = checkpointData["mood"] as? String,
+              let mood = CheckpointMood(rawValue: moodString),
+              let stayDuration = checkpointData["stayDuration"] as? TimeInterval,
+              let stressChangeString = checkpointData["stressChange"] as? String,
+              let stressChange = StressChange(rawValue: stressChangeString) else {
+            print("⚠️ Failed to parse checkpoint data")
+            return
+        }
+
+        // Optional fields
+        let note = checkpointData["note"] as? String
+        let heartRate = checkpointData["heartRate"] as? Double
+        let calories = checkpointData["calories"] as? Double
+        let steps = checkpointData["steps"] as? Int
+        let distance = checkpointData["distance"] as? Double
+        let hrv = checkpointData["hrv"] as? Double
+        let stressLevel = checkpointData["stressLevel"] as? Int
+
+        // Create CoordinateData
+        let coordinate = CoordinateData(
+            coordinate: CLLocationCoordinate2D(latitude: latitude, longitude: longitude),
+            timestamp: Date(timeIntervalSince1970: timestamp)
+        )
+
+        // Create Checkpoint
+        let checkpoint = Checkpoint(
+            coordinate: coordinate,
+            mood: mood,
+            stayDuration: stayDuration,
+            stressChange: stressChange,
+            note: note,
+            timestamp: Date(timeIntervalSince1970: timestamp),
+            heartRate: heartRate,
+            calories: calories,
+            steps: steps,
+            distance: distance,
+            hrv: hrv,
+            stressLevel: stressLevel
+        )
+
+        // Add checkpoint to the current timeline or queue it for next timeline
+        DispatchQueue.main.async {
+            let timelineManager = TimelineManager.shared
+
+            if let currentTimeline = timelineManager.currentTimeline {
+                // Add to existing current timeline
+                timelineManager.addCheckpoint(to: currentTimeline.id, checkpoint: checkpoint)
+                print("✅ Checkpoint added to current timeline from Watch")
+            } else if let latestTimeline = timelineManager.timelines.first {
+                // Add to the most recent timeline if no current timeline
+                timelineManager.addCheckpoint(to: latestTimeline.id, checkpoint: checkpoint)
+                print("✅ Checkpoint added to latest timeline from Watch")
+            } else {
+                print("⚠️ No timeline available to add checkpoint")
+            }
+        }
     }
 
     private func handleTrackingStatus(_ message: [String: Any]) {
@@ -383,8 +483,59 @@ extension WatchConnectivityManager: WCSessionDelegate {
 
         print("🏃 Tracking status from Watch: \(isTracking ? "Started" : "Stopped")")
 
-        // TODO: Update LocationManager tracking status
-        // This will be implemented in Phase 4
+        // Update iPhone's LocationManager to reflect Watch tracking state
+        DispatchQueue.main.async {
+            let locationManager = LocationManager.shared
+            let timelineManager = TimelineManager.shared
+
+            if isTracking {
+                // Watch started tracking - start iPhone GPS to mirror Watch state
+                if !locationManager.isTracking {
+                    locationManager.startTracking()
+                    print("✅ iPhone GPS started to mirror Watch tracking")
+                }
+            } else {
+                // Watch stopped tracking - create and save timeline
+                guard let startTime = locationManager.timelineStartTime else {
+                    print("⚠️ No timeline start time recorded, skipping timeline save")
+                    if locationManager.isTracking {
+                        locationManager.stopTracking()
+                    }
+                    return
+                }
+
+                // Stop iPhone GPS
+                if locationManager.isTracking {
+                    locationManager.stopTracking()
+                    print("✅ iPhone GPS stopped to mirror Watch tracking")
+                }
+
+                // Generate checkpoints automatically
+                let checkpoints = timelineManager.generateCheckpoints(
+                    coordinates: locationManager.routeCoordinates,
+                    timestamps: locationManager.timestampHistory,
+                    healthData: locationManager.healthDataHistory
+                )
+
+                // Create timeline record using LocationManager's history
+                if let timeline = timelineManager.createTimeline(
+                    startTime: startTime,
+                    endTime: Date(),
+                    coordinates: locationManager.routeCoordinates,
+                    timestamps: locationManager.timestampHistory,
+                    speeds: locationManager.speedHistory,
+                    checkpoints: checkpoints
+                ) {
+                    timelineManager.saveTimeline(timeline)
+                    print("✅ Timeline saved from Watch session with \(checkpoints.count) checkpoint(s)")
+                } else {
+                    print("⚠️ Failed to create timeline from Watch session")
+                }
+
+                // Reset tracking data
+                locationManager.resetTracking()
+            }
+        }
     }
 
     // MARK: - Watch Status

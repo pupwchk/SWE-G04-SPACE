@@ -39,6 +39,12 @@ class LocationManager: NSObject, ObservableObject {
     @Published var timestampHistory: [Date] = []
     @Published var timestamps: [Date] = [] // Alias for WatchConnectivity compatibility
 
+    // Health data history (synchronized with GPS data)
+    @Published var healthDataHistory: [(heartRate: Double?, calories: Double?, steps: Int?, distance: Double?)] = []
+
+    // Timeline tracking
+    @Published var timelineStartTime: Date?
+
     // MARK: - Private Properties
 
     private let locationManager = CLLocationManager()
@@ -79,6 +85,7 @@ class LocationManager: NSObject, ObservableObject {
         }
 
         isTracking = true
+        timelineStartTime = Date()
         routeCoordinates.removeAll()
         totalDistance = 0.0
         speedHistory.removeAll()
@@ -88,7 +95,7 @@ class LocationManager: NSObject, ObservableObject {
         locationManager.startUpdatingLocation()
         locationManager.startUpdatingHeading()
 
-        print("🟢 GPS tracking started")
+        print("🟢 GPS tracking started at \(timelineStartTime!)")
     }
 
     /// Stop tracking GPS
@@ -106,8 +113,10 @@ class LocationManager: NSObject, ObservableObject {
         totalDistance = 0.0
         speedHistory.removeAll()
         timestampHistory.removeAll()
+        healthDataHistory.removeAll()
         lastLocation = nil
         lastUpdateTime = nil
+        timelineStartTime = nil
     }
 }
 
@@ -152,6 +161,16 @@ extension LocationManager: CLLocationManagerDelegate {
             routeCoordinates.append(newLocation.coordinate)
             speedHistory.append(currentSpeed)
             timestampHistory.append(newLocation.timestamp)
+
+            // Collect current health data from HealthKitManager
+            let healthManager = HealthKitManager.shared
+            let healthData = (
+                heartRate: healthManager.currentHeartRate > 0 ? healthManager.currentHeartRate : nil,
+                calories: healthManager.currentCalories > 0 ? healthManager.currentCalories : nil,
+                steps: healthManager.currentSteps > 0 ? healthManager.currentSteps : nil,
+                distance: healthManager.currentDistance > 0 ? healthManager.currentDistance : nil
+            )
+            healthDataHistory.append(healthData)
 
             if let previous = lastLocation {
                 let distance = newLocation.distance(from: previous)

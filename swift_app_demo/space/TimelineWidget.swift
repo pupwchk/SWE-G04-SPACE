@@ -10,11 +10,10 @@ import MapKit
 
 /// Timeline tracking widget with GPS functionality
 struct TimelineWidget: View {
-    @StateObject private var locationManager = LocationManager()
+    @StateObject private var locationManager = LocationManager.shared
     @StateObject private var timelineManager = TimelineManager.shared
 
     @State private var showDetailView = false
-    @State private var timelineStartTime: Date?
 
     var body: some View {
         Button(action: handleTap) {
@@ -184,14 +183,23 @@ struct TimelineWidget: View {
     }
 
     private func startTracking() {
-        timelineStartTime = Date()
         locationManager.startTracking()
     }
 
     private func stopTracking() {
-        guard let startTime = timelineStartTime else { return }
+        guard let startTime = locationManager.timelineStartTime else {
+            print("⚠️ No timeline start time recorded")
+            return
+        }
 
         locationManager.stopTracking()
+
+        // Generate checkpoints automatically
+        let checkpoints = timelineManager.generateCheckpoints(
+            coordinates: locationManager.routeCoordinates,
+            timestamps: locationManager.timestampHistory,
+            healthData: locationManager.healthDataHistory
+        )
 
         // Create timeline record using LocationManager's history
         if let timeline = timelineManager.createTimeline(
@@ -199,13 +207,14 @@ struct TimelineWidget: View {
             endTime: Date(),
             coordinates: locationManager.routeCoordinates,
             timestamps: locationManager.timestampHistory,
-            speeds: locationManager.speedHistory
+            speeds: locationManager.speedHistory,
+            checkpoints: checkpoints
         ) {
             timelineManager.saveTimeline(timeline)
+            print("✅ Timeline saved with \(checkpoints.count) checkpoint(s)")
         }
 
         locationManager.resetTracking()
-        timelineStartTime = nil
     }
 }
 

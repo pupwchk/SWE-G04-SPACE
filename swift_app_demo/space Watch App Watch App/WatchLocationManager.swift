@@ -25,6 +25,9 @@ class WatchLocationManager: NSObject, ObservableObject {
     @Published var accuracy: Double = 0.0 // meters
     @Published var authorizationStatus: CLAuthorizationStatus = .notDetermined
 
+    // Health data history (synchronized with GPS data)
+    @Published var healthDataHistory: [(heartRate: Double?, calories: Double?, steps: Int?, distance: Double?)] = []
+
     // MARK: - Private Properties
 
     private let locationManager = CLLocationManager()
@@ -70,6 +73,7 @@ class WatchLocationManager: NSObject, ObservableObject {
         coordinates.removeAll()
         timestamps.removeAll()
         speeds.removeAll()
+        healthDataHistory.removeAll()
         totalDistance = 0.0
         lastLocation = nil
         startTime = Date()
@@ -111,13 +115,29 @@ class WatchLocationManager: NSObject, ObservableObject {
             return
         }
 
-        // Convert coordinates to dictionary format
-        let coordinatesData: [[String: Any]] = zip(coordinates, timestamps).map { coord, time in
-            [
-                "latitude": coord.latitude,
-                "longitude": coord.longitude,
-                "timestamp": time.timeIntervalSince1970
+        // Convert coordinates to dictionary format with health data
+        let coordinatesData: [[String: Any]] = zip(zip(coordinates, timestamps), healthDataHistory).map { coordTime, health in
+            var data: [String: Any] = [
+                "latitude": coordTime.0.latitude,
+                "longitude": coordTime.0.longitude,
+                "timestamp": coordTime.1.timeIntervalSince1970
             ]
+
+            // Add health data if available
+            if let heartRate = health.heartRate {
+                data["heartRate"] = heartRate
+            }
+            if let calories = health.calories {
+                data["calories"] = calories
+            }
+            if let steps = health.steps {
+                data["steps"] = steps
+            }
+            if let distance = health.distance {
+                data["healthDistance"] = distance
+            }
+
+            return data
         }
 
         // Send to iPhone via WatchConnectivity
@@ -126,7 +146,7 @@ class WatchLocationManager: NSObject, ObservableObject {
             timestamp: Date()
         )
 
-        print("📤 Sent \(coordinates.count) coordinates to iPhone")
+        print("📤 Sent \(coordinates.count) coordinates with health data to iPhone")
     }
 
     // MARK: - Distance Calculation
@@ -189,6 +209,17 @@ extension WatchLocationManager: CLLocationManagerDelegate {
         // Add to route
         coordinates.append(newLocation.coordinate)
         timestamps.append(newLocation.timestamp)
+
+        // Collect current health data from WatchHealthKitManager
+        let healthManager = WatchHealthKitManager.shared
+        let healthData = (
+            heartRate: healthManager.currentHeartRate > 0 ? healthManager.currentHeartRate : nil,
+            calories: healthManager.totalCalories > 0 ? healthManager.totalCalories : nil,
+            steps: healthManager.totalSteps > 0 ? healthManager.totalSteps : nil,
+            distance: healthManager.totalDistance > 0 ? healthManager.totalDistance : nil
+        )
+        healthDataHistory.append(healthData)
+
         lastLocation = newLocation
 
         // Send periodic updates to iPhone (every 10 points)

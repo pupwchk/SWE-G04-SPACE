@@ -13,90 +13,151 @@ struct ContentView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 20) {
-                // App Title
-                Text("SPACE")
-                    .font(.system(size: 24, weight: .bold))
-                    .foregroundColor(Color(hex: "A50034"))
-
-                // Tracking Status
-                VStack(spacing: 8) {
-                    if locationManager.isTracking {
-                        HStack {
-                            Circle()
-                                .fill(Color.green)
-                                .frame(width: 8, height: 8)
-                            Text("추적 중")
-                                .font(.system(size: 14))
-                                .foregroundColor(.green)
-                        }
-                    } else {
-                        HStack {
-                            Circle()
-                                .fill(Color.gray)
-                                .frame(width: 8, height: 8)
-                            Text("대기 중")
-                                .font(.system(size: 14))
-                                .foregroundColor(.gray)
-                        }
-                    }
-
-                    // Phone connection status
-                    HStack {
-                        Image(systemName: connectivityManager.isPhoneReachable ? "iphone.and.arrow.forward" : "iphone.slash")
-                            .font(.system(size: 12))
-                        Text(connectivityManager.isPhoneReachable ? "iPhone 연결됨" : "iPhone 연결 끊김")
-                            .font(.system(size: 12))
-                    }
-                    .foregroundColor(connectivityManager.isPhoneReachable ? .green : .gray)
-                }
-
-                // Map Navigation Button
-                NavigationLink(destination: WatchMapView()) {
-                    VStack(spacing: 4) {
-                        Image(systemName: "map.fill")
-                            .font(.system(size: 28))
-                        Text("지도")
-                            .font(.system(size: 14, weight: .semibold))
-                    }
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 80)
-                    .background(Color(hex: "A50034"))
-                    .foregroundColor(.white)
-                    .cornerRadius(12)
-                }
-                .buttonStyle(.plain)
-
-                // Quick Stats (if tracking)
-                if locationManager.isTracking {
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            Text("거리:")
-                                .font(.system(size: 12))
-                                .foregroundColor(.secondary)
-                            Spacer()
-                            Text(distanceText)
-                                .font(.system(size: 12, weight: .semibold))
-                        }
-
-                        HStack {
-                            Text("포인트:")
-                                .font(.system(size: 12))
-                                .foregroundColor(.secondary)
-                            Spacer()
-                            Text("\(locationManager.coordinates.count)")
-                                .font(.system(size: 12, weight: .semibold))
-                        }
-                    }
-                    .padding(8)
-                    .background(Color.secondary.opacity(0.1))
-                    .cornerRadius(8)
-                }
-
-                Spacer()
+            if connectivityManager.isAuthenticated {
+                // Authenticated View - Show normal interface
+                authenticatedView
+            } else {
+                // Not Authenticated View - Show login prompt
+                notAuthenticatedView
             }
-            .padding()
         }
+    }
+
+    // MARK: - Authenticated View
+
+    private var authenticatedView: some View {
+        VStack(spacing: 20) {
+            // App Title
+            Text("SPACE")
+                .font(.system(size: 24, weight: .bold))
+                .foregroundColor(Color(hex: "A50034"))
+
+            // Tracking Status
+            VStack(spacing: 8) {
+                if locationManager.isTracking {
+                    HStack {
+                        Circle()
+                            .fill(Color.green)
+                            .frame(width: 8, height: 8)
+                        Text("추적 중")
+                            .font(.system(size: 14))
+                            .foregroundColor(.green)
+                    }
+                } else {
+                    HStack {
+                        Circle()
+                            .fill(Color.gray)
+                            .frame(width: 8, height: 8)
+                        Text("대기 중")
+                            .font(.system(size: 14))
+                            .foregroundColor(.gray)
+                    }
+                }
+
+                // Phone connection status
+                HStack {
+                    Image(systemName: connectivityManager.isPhoneReachable ? "iphone.and.arrow.forward" : "iphone.slash")
+                        .font(.system(size: 12))
+                    Text(connectivityManager.isPhoneReachable ? "iPhone 연결됨" : "iPhone 연결 끊김")
+                        .font(.system(size: 12))
+                }
+                .foregroundColor(connectivityManager.isPhoneReachable ? .green : .gray)
+            }
+
+            // Map Navigation Button
+            NavigationLink(destination: WatchMapView()) {
+                VStack(spacing: 4) {
+                    Image(systemName: "map.fill")
+                        .font(.system(size: 28))
+                    Text("지도")
+                        .font(.system(size: 14, weight: .semibold))
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 80)
+                .background(Color(hex: "A50034"))
+                .foregroundColor(.white)
+                .cornerRadius(12)
+            }
+            .buttonStyle(.plain)
+
+            // Quick Stats (if tracking)
+            if locationManager.isTracking {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text("거리:")
+                            .font(.system(size: 12))
+                            .foregroundColor(.secondary)
+                        Spacer()
+                        Text(distanceText)
+                            .font(.system(size: 12, weight: .semibold))
+                    }
+
+                    HStack {
+                        Text("포인트:")
+                            .font(.system(size: 12))
+                            .foregroundColor(.secondary)
+                        Spacer()
+                        Text("\(locationManager.coordinates.count)")
+                            .font(.system(size: 12, weight: .semibold))
+                    }
+                }
+                .padding(8)
+                .background(Color.secondary.opacity(0.1))
+                .cornerRadius(8)
+            }
+
+            Spacer()
+        }
+        .padding()
+    }
+
+    // MARK: - Not Authenticated View
+
+    private var notAuthenticatedView: some View {
+        VStack(spacing: 20) {
+            Spacer()
+
+            // Lock Icon
+            Image(systemName: "lock.fill")
+                .font(.system(size: 40))
+                .foregroundColor(Color(hex: "A50034"))
+
+            // Title
+            Text("SPACE")
+                .font(.system(size: 24, weight: .bold))
+                .foregroundColor(Color(hex: "A50034"))
+
+            // Message
+            VStack(spacing: 8) {
+                Text("iPhone 앱에서")
+                    .font(.system(size: 14))
+                    .foregroundColor(.secondary)
+
+                Text("로그인이 필요합니다")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.primary)
+            }
+
+            // Connection Status
+            HStack {
+                Image(systemName: connectivityManager.isPhoneReachable ? "iphone.and.arrow.forward" : "iphone.slash")
+                    .font(.system(size: 12))
+                Text(connectivityManager.isPhoneReachable ? "iPhone 연결됨" : "iPhone 연결 끊김")
+                    .font(.system(size: 12))
+            }
+            .foregroundColor(connectivityManager.isPhoneReachable ? .green : .gray)
+            .padding(.top, 8)
+
+            Spacer()
+
+            // Help Text
+            Text("iPhone 앱을 열어 로그인해주세요")
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
+        }
+        .padding()
     }
 
     // MARK: - Computed Properties

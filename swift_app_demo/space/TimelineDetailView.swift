@@ -503,6 +503,83 @@ struct CheckpointBubbleView: View {
                     .foregroundColor(.primary)
             }
 
+            // Health data from Watch (if available)
+            if checkpoint.heartRate != nil || checkpoint.calories != nil || checkpoint.steps != nil || checkpoint.distance != nil {
+                Divider()
+
+                // Heart Rate
+                if let heartRate = checkpoint.heartRate {
+                    HStack(spacing: 6) {
+                        Image(systemName: "heart.fill")
+                            .font(.system(size: 11))
+                            .foregroundColor(.red)
+                        Text("심박수: \(Int(heartRate)) bpm")
+                            .font(.system(size: 12))
+                            .foregroundColor(.primary)
+                    }
+                }
+
+                // Calories
+                if let calories = checkpoint.calories {
+                    HStack(spacing: 6) {
+                        Image(systemName: "flame.fill")
+                            .font(.system(size: 11))
+                            .foregroundColor(.orange)
+                        Text("칼로리: \(Int(calories)) kcal")
+                            .font(.system(size: 12))
+                            .foregroundColor(.primary)
+                    }
+                }
+
+                // Steps
+                if let steps = checkpoint.steps {
+                    HStack(spacing: 6) {
+                        Image(systemName: "figure.walk")
+                            .font(.system(size: 11))
+                            .foregroundColor(.green)
+                        Text("걸음수: \(steps)")
+                            .font(.system(size: 12))
+                            .foregroundColor(.primary)
+                    }
+                }
+
+                // Distance
+                if let distance = checkpoint.distance {
+                    HStack(spacing: 6) {
+                        Image(systemName: "location.fill")
+                            .font(.system(size: 11))
+                            .foregroundColor(.blue)
+                        Text("거리: \(distanceFormatted(distance))")
+                            .font(.system(size: 12))
+                            .foregroundColor(.primary)
+                    }
+                }
+
+                // HRV (Heart Rate Variability)
+                if let hrv = checkpoint.hrv {
+                    HStack(spacing: 6) {
+                        Image(systemName: "waveform.path.ecg")
+                            .font(.system(size: 11))
+                            .foregroundColor(.purple)
+                        Text("HRV: \(String(format: "%.1f", hrv)) ms")
+                            .font(.system(size: 12))
+                            .foregroundColor(.primary)
+                    }
+                }
+
+                // Stress Level
+                if let stressLevel = checkpoint.stressLevel {
+                    HStack(spacing: 6) {
+                        Image(systemName: "brain.head.profile")
+                            .font(.system(size: 11))
+                            .foregroundColor(stressLevelColor(for: stressLevel))
+                        Text("스트레스: \(stressLevel)%")
+                            .font(.system(size: 12))
+                            .foregroundColor(.primary)
+                    }
+                }
+            }
+
             // Note if exists
             if let note = checkpoint.note, !note.isEmpty {
                 Divider()
@@ -521,11 +598,32 @@ struct CheckpointBubbleView: View {
         .frame(minWidth: 160)
         .offset(y: -8)
     }
+
+    // MARK: - Helper Methods
+
+    private func distanceFormatted(_ meters: Double) -> String {
+        if meters >= 1000 {
+            return String(format: "%.2f km", meters / 1000)
+        } else {
+            return String(format: "%.0f m", meters)
+        }
+    }
+
+    private func stressLevelColor(for level: Int) -> Color {
+        switch level {
+        case 0..<30:
+            return .green  // Low stress
+        case 30..<60:
+            return .yellow  // Moderate stress
+        default:
+            return .red  // High stress
+        }
+    }
 }
 
 #Preview {
     TimelineDetailView(
-        locationManager: LocationManager(),
+        locationManager: LocationManager.shared,
         isTracking: .constant(false),
         onStartTracking: {},
         onStopTracking: {}

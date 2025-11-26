@@ -15,11 +15,20 @@ struct HaruApp: App {
         _ = WatchConnectivityManager.shared
         print("📱 iOS App initialized with WatchConnectivity")
 
-        // Initialize HealthKitManager and start real-time observers
+        // Initialize HealthKitManager and request authorization before starting observers
         let healthManager = HealthKitManager.shared
         if healthManager.isAvailable {
-            healthManager.startRealtimeObservers()
-            print("📱 HealthKit real-time observers started")
+            // Request authorization first, then start observers only if granted
+            healthManager.requestAuthorization { success in
+                if success {
+                    healthManager.startRealtimeObservers()
+                    print("📱 HealthKit authorization granted, real-time observers started")
+                } else {
+                    print("⚠️ HealthKit authorization not granted, observers not started")
+                }
+            }
+        } else {
+            print("⚠️ HealthKit not available on this device")
         }
     }
 

@@ -30,6 +30,7 @@ class HealthKitManager: ObservableObject {
     @Published var currentSteps: Int = 0 // steps
     @Published var currentDistance: Double = 0.0 // meters
     @Published var currentActiveMinutes: Int = 0 // minutes
+    @Published var currentHRV: Double = 0.0 // ms (Heart Rate Variability)
 
     // Historical data (last 7 days)
     @Published var weeklySleepData: [DailyHealthData] = []
@@ -66,9 +67,10 @@ class HealthKitManager: ObservableObject {
 
     // MARK: - Authorization
 
-    func requestAuthorization() {
+    func requestAuthorization(completion: ((Bool) -> Void)? = nil) {
         guard isAvailable else {
             print("❌ HealthKit not available")
+            completion?(false)
             return
         }
 
@@ -76,17 +78,23 @@ class HealthKitManager: ObservableObject {
             HKObjectType.categoryType(forIdentifier: .sleepAnalysis)!,
             HKObjectType.quantityType(forIdentifier: .activeEnergyBurned)!,
             HKObjectType.quantityType(forIdentifier: .heartRateVariabilitySDNN)!, // Proxy for stress
-            HKObjectType.quantityType(forIdentifier: .restingHeartRate)!
+            HKObjectType.quantityType(forIdentifier: .restingHeartRate)!,
+            HKObjectType.quantityType(forIdentifier: .heartRate)!, // Real-time heart rate
+            HKObjectType.quantityType(forIdentifier: .stepCount)!, // Real-time steps
+            HKObjectType.quantityType(forIdentifier: .distanceWalkingRunning)! // Real-time distance
         ]
 
         healthStore.requestAuthorization(toShare: nil, read: readTypes) { success, error in
             DispatchQueue.main.async {
                 if success {
                     print("✅ HealthKit authorization granted")
+                    self.authorizationStatus = .sharingAuthorized
                     self.fetchTodayHealthData()
                     self.fetchWeeklyHealthData()
+                    completion?(true)
                 } else {
                     print("❌ HealthKit authorization denied: \(error?.localizedDescription ?? "Unknown error")")
+                    completion?(false)
                 }
             }
         }
@@ -188,6 +196,7 @@ class HealthKitManager: ObservableObject {
             let stressLevel = max(0, min(100, Int(100 - hrvValue)))
 
             DispatchQueue.main.async {
+                self.currentHRV = hrvValue
                 self.stressLevel = stressLevel
                 print("😰 Stress: \(stressLevel)% (HRV: \(String(format: "%.1f", hrvValue))ms)")
             }
