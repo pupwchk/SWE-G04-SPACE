@@ -208,54 +208,38 @@ class HealthKitManager: ObservableObject {
     private func fetchWeeklySleep(from startDate: Date, to endDate: Date) {
         guard let sleepType = HKObjectType.categoryType(forIdentifier: .sleepAnalysis) else { return }
 
-        let calendar = Calendar.current
-        var anchorComponents = calendar.dateComponents([.day, .month, .year], from: Date())
-        anchorComponents.hour = 0
-        guard let anchorDate = calendar.date(from: anchorComponents) else { return }
+        let predicate = HKQuery.predicateForSamples(withStart: startDate, end: endDate, options: .strictStartDate)
+        let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)
 
-        let interval = DateComponents(day: 1)
-
-        let query = HKStatisticsCollectionQuery(
-            quantityType: sleepType as! HKQuantityType,
-            quantitySamplePredicate: nil,
-            options: [],
-            anchorDate: anchorDate,
-            intervalComponents: interval
-        )
-
-        query.initialResultsHandler = { _, results, error in
-            guard let results = results, error == nil else {
+        let query = HKSampleQuery(sampleType: sleepType, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: [sortDescriptor]) { _, samples, error in
+            guard let samples = samples as? [HKCategorySample], error == nil else {
                 print("❌ Weekly sleep fetch error: \(error?.localizedDescription ?? "Unknown")")
                 return
             }
+            // Group samples by day
+            let calendar = Calendar.current
+            var sleepByDay: [Date: TimeInterval] = [:]
 
-            var weeklyData: [DailyHealthData] = []
-            results.enumerateStatistics(from: startDate, to: startDate) { statistics, _ in
-                // Process sleep samples for each day
-                let predicate = HKQuery.predicateForSamples(withStart: statistics.startDate, end: statistics.endDate, options: .strictStartDate)
+            for sample in samples {
+                // Only count actual sleep states
+                if sample.value == HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue ||
+                   sample.value == HKCategoryValueSleepAnalysis.asleepCore.rawValue ||
+                   sample.value == HKCategoryValueSleepAnalysis.asleepDeep.rawValue ||
+                   sample.value == HKCategoryValueSleepAnalysis.asleepREM.rawValue {
 
-                let dayQuery = HKSampleQuery(sampleType: sleepType, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, samples, _ in
-                    guard let samples = samples as? [HKCategorySample] else { return }
-
-                    var totalSleepSeconds: TimeInterval = 0
-                    for sample in samples {
-                        if sample.value == HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue ||
-                           sample.value == HKCategoryValueSleepAnalysis.asleepCore.rawValue ||
-                           sample.value == HKCategoryValueSleepAnalysis.asleepDeep.rawValue ||
-                           sample.value == HKCategoryValueSleepAnalysis.asleepREM.rawValue {
-                            totalSleepSeconds += sample.endDate.timeIntervalSince(sample.startDate)
-                        }
-                    }
-
-                    let sleepHours = totalSleepSeconds / 3600.0
-                    weeklyData.append(DailyHealthData(date: statistics.startDate, value: sleepHours, unit: "h"))
+                    let dayStart = calendar.startOfDay(for: sample.startDate)
+                    let duration = sample.endDate.timeIntervalSince(sample.startDate)
+                    sleepByDay[dayStart, default: 0] += duration
                 }
-
-                self.healthStore.execute(dayQuery)
             }
 
+            // Convert to DailyHealthData array
+            let weeklyData = sleepByDay.map { date, totalSeconds in
+                DailyHealthData(date: date, value: totalSeconds / 3600.0, unit: "h")
+            }.sorted { $0.date < $1.date }
+
             DispatchQueue.main.async {
-                self.weeklySleepData = weeklyData.sorted { $0.date < $1.date }
+                self.weeklySleepData = weeklyData
                 print("😴 Weekly sleep data loaded: \(weeklyData.count) days")
             }
         }
