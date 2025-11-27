@@ -55,13 +55,12 @@ class User(Base):
         cascade="all, delete-orphan",
     )
     
-    # 1 : N 관계
-    
-    characters = relationship(
-        "Character",
-        back_populates="user",
-        cascade="all, delete-orphan",
-    )
+    # 1 : N 관계 (Character 모델이 있을 경우에만 활성화)
+    # characters = relationship(
+    #     "Character",
+    #     back_populates="user",
+    #     cascade="all, delete-orphan",
+    # )
 
 
 class UserPhone(Base):
