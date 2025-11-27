@@ -9,7 +9,6 @@ import json
 import os
 import sys
 import wave
-import struct
 from pathlib import Path
 
 # User ID 읽기
@@ -25,29 +24,40 @@ WS_URL = f"ws://localhost:11325/api/voice/ws/voice/{USER_ID}"
 
 def load_audio_file(file_path: str) -> bytes:
     """
-    음성 파일 로드 (WAV, PCM16, 16kHz, mono)
-    헤더(44 bytes)를 제외한 순수 PCM 데이터만 반환합니다.
+    음성 파일 로드 (WAV 또는 PCM, 16kHz, 16-bit, mono)
+    순수 PCM 데이터만 반환합니다.
     """
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"파일을 찾을 수 없습니다: {file_path}")
 
-    if not file_path.endswith('.wav'):
-        raise ValueError(f"WAV 파일만 지원합니다: {file_path}")
+    # .pcm 파일 처리 (순수 PCM 데이터, 헤더 없음)
+    if file_path.endswith('.pcm'):
+        print(f"   파일 형식: PCM (16kHz, 16-bit, mono 가정)")
+        with open(file_path, 'rb') as f:
+            pcm_data = f.read()
+            duration = len(pcm_data) / 32000  # 16kHz * 16bit/8 * 1ch = 32000 bytes/sec
+            print(f"   파일 크기: {len(pcm_data)} bytes (~{duration:.1f}초)")
+            return pcm_data
 
-    # wave 모듈로 포맷 검증
-    with wave.open(file_path, 'rb') as wav_file:
-        channels = wav_file.getnchannels()
-        sample_width = wav_file.getsampwidth()
-        framerate = wav_file.getframerate()
-        print(f"   파일 정보 (wave 모듈): {channels}ch, {sample_width*8}bit, {framerate}Hz")
-        if channels != 1 or sample_width != 2 or framerate != 16000:
-            raise ValueError("오디오는 16kHz, 16-bit, mono PCM 형식이어야 합니다.")
+    # .wav 파일 처리 (헤더 검증 후 PCM 데이터 추출)
+    elif file_path.endswith('.wav'):
+        # wave 모듈로 포맷 검증
+        with wave.open(file_path, 'rb') as wav_file:
+            channels = wav_file.getnchannels()
+            sample_width = wav_file.getsampwidth()
+            framerate = wav_file.getframerate()
+            print(f"   파일 정보: {channels}ch, {sample_width*8}bit, {framerate}Hz")
+            if channels != 1 or sample_width != 2 or framerate != 16000:
+                raise ValueError("오디오는 16kHz, 16-bit, mono 형식이어야 합니다.")
 
-    # 사용자님의 분석에 따라, 헤더를 건너뛰고 데이터만 읽습니다.
-    with open(file_path, 'rb') as f:
-        f.seek(44)  # 44바이트 헤더 건너뛰기
-        pcm_data = f.read()
-        return pcm_data
+        # 헤더를 건너뛰고 PCM 데이터만 읽기
+        with open(file_path, 'rb') as f:
+            f.seek(44)  # 44바이트 WAV 헤더 건너뛰기
+            pcm_data = f.read()
+            return pcm_data
+
+    else:
+        raise ValueError(f"지원하지 않는 파일 형식입니다. .wav 또는 .pcm 파일을 사용하세요: {file_path}")
 
 
 async def test_conversation_with_audio(audio_files: list):
@@ -95,17 +105,25 @@ async def test_conversation_with_audio(audio_files: list):
 
                 # 오디오 전송 (청크 단위)
                 print(f"\n📤 오디오 전송 중...")
-                chunk_size = 4096
+                chunk_size = 8192  # 더 큰 청크 사이즈 사용
                 chunks_sent = 0
+                total_sent = 0
 
                 for i in range(0, len(audio_data), chunk_size):
                     chunk = audio_data[i:i + chunk_size]
                     await websocket.send(chunk)
                     chunks_sent += 1
+                    total_sent += len(chunk)
                     # 실제 녹음 속도 시뮬레이션 (16kHz, 16bit = 32000 bytes/sec)
                     await asyncio.sleep(len(chunk) / 32000)
 
-                print(f"✅ 전송 완료 ({chunks_sent}개 청크)")
+                print(f"✅ 전송 완료 ({chunks_sent}개 청크, {total_sent} bytes)")
+
+                # 오디오 전송 후 버퍼가 채워질 시간 확보
+                # 최소 100ms가 필요하므로 충분한 대기 시간 추가
+                wait_time = max(0.5, len(audio_data) / 32000 * 0.1)  # 전체 길이의 10%
+                print(f"\n⏳ 오디오 버퍼 안정화 대기 중 ({wait_time:.1f}초)...")
+                await asyncio.sleep(wait_time)
 
                 # 응답 생성 요청
                 print(f"\n📤 응답 생성 요청 (audio_commit)...")
@@ -114,7 +132,6 @@ async def test_conversation_with_audio(audio_files: list):
                 # AI 응답 수신
                 print(f"\n⏳ AI 응답 대기 중...\n")
                 turn_audio = []
-                transcript_received = False
                 assistant_responded = False
                 start_time = asyncio.get_event_loop().time()
                 timeout = 20.0
@@ -143,25 +160,25 @@ async def test_conversation_with_audio(audio_files: list):
 
                             if msg_type == 'transcript' and data.get('role') == 'user':
                                 print(f"📝 [USER]: {data.get('text')}")
-                            
+
                             elif msg_type == 'transcript' and data.get('role') == 'assistant':
                                 print(f"📝 [ASSISTANT]: {data.get('text')}")
-                                transcript_received = True
                                 assistant_responded = True
-                            
+
                             elif msg_type == 'response.done':
-                                print(f"✅ 응답 완료")
-                                if assistant_responded:
-                                    await asyncio.sleep(1.0)
-                                    break
-                            
+                                print(f"✅ 응답 완료 (response.done 수신)")
+                                # response.done을 받으면 즉시 종료
+                                await asyncio.sleep(0.2)  # 마지막 오디오 청크 수신 대기
+                                break
+
                             elif msg_type == 'error':
                                 print(f"❌ 에러: {data.get('message')}")
                                 break
 
                     except asyncio.TimeoutError:
+                        # response.done이 오지 않은 경우에만 타임아웃으로 종료
                         if assistant_responded:
-                            print(f"✅ 응답 수신 완료 (타임아웃으로 대기 종료)")
+                            print(f"⚠️ response.done 없이 타임아웃 (응답은 수신함)")
                             break
                         else:
                             continue
@@ -243,19 +260,24 @@ async def main():
 """)
 
     script_dir = Path(__file__).parent
-    audio_files = [str(script_dir / "input1.pcm"), str(script_dir / "input2.pcm")]
+    # .pcm 파일 우선 검색, 없으면 .wav 확인
+    audio_files = []
+    for i in [1, 2]:
+        pcm_path = script_dir / f"input{i}.pcm"
+        wav_path = script_dir / f"input{i}.wav"
+
+        if pcm_path.exists():
+            audio_files.append(str(pcm_path))
+        elif wav_path.exists():
+            audio_files.append(str(wav_path))
+        else:
+            print(f"❌ 파일을 찾을 수 없습니다: {pcm_path} 또는 {wav_path}")
+            print(f"   16kHz, 16-bit, mono 형식의 PCM 또는 WAV 파일을 준비하세요.")
+            return 1
+
     print("=" * 70)
     print("🎤 음성 파일 설정")
     print("=" * 70)
-    
-    all_files_exist = True
-    for file_path in audio_files:
-        if not os.path.exists(file_path):
-            print(f"❌ 파일을 찾을 수 없습니다: {file_path}")
-            all_files_exist = False
-    
-    if not all_files_exist:
-        return 1
         
     print(f"  - Turn 1: {os.path.basename(audio_files[0])}")
     print(f"  - Turn 2: {os.path.basename(audio_files[1])}")

@@ -291,7 +291,8 @@ class LLMService:
         appliances: List[Dict[str, Any]],
         weather: Dict[str, Any],
         fatigue_level: int,
-        user_message: str
+        user_message: str,
+        persona: Optional[Dict] = None
     ) -> str:
         """
         가전 제어 제안 메시지 생성 (시나리오 2용)
@@ -301,6 +302,7 @@ class LLMService:
             weather: 날씨 데이터
             fatigue_level: 피로도 레벨
             user_message: 사용자 원본 메시지
+            persona: 페르소나 정보 (nickname, description)
 
         Returns:
             제안 메시지 (예: "현재 온도가 28도로 높고, 피로도가 3이에요. 에어컨을 23도로 켜고, 공기청정기도 켤까요?")
@@ -329,10 +331,13 @@ class LLMService:
 반드시 일반 텍스트로만 응답하세요 (JSON 아님).
 """
 
+            # 시스템 프롬프트 생성 (페르소나 적용)
+            system_prompt = self._build_system_prompt(persona)
+
             response = await client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": "당신은 친근한 스마트홈 AI 어시스턴트입니다."},
+                    {"role": "system", "content": system_prompt},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.7,

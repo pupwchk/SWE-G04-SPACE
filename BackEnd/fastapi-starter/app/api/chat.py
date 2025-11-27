@@ -31,6 +31,7 @@ class ChatMessageRequest(BaseModel):
     """채팅 메시지 요청"""
     message: str = Field(..., description="사용자 메시지")
     context: Optional[Dict[str, Any]] = Field(None, description="추가 컨텍스트")
+    character_id: Optional[str] = Field(None, description="페르소나 character ID")
 
 
 class ChatMessageResponse(BaseModel):
@@ -118,6 +119,20 @@ async def send_chat_message(
         session_id = get_or_create_session(user_id)
         session = chat_sessions[session_id]
 
+        # 페르소나 로드 (character_id가 있으면)
+        persona = None
+        if request.character_id:
+            from app.cruds import info as infoCruds
+            character = infoCruds.get_character(db, UUID(request.character_id))
+            if character:
+                persona = {
+                    "nickname": character.nickname,
+                    "description": character.persona
+                }
+                logger.info(f"✅ Loaded persona: {character.nickname}")
+            else:
+                logger.warning(f"⚠️ Character not found: {request.character_id}")
+
         # 1. 의도 파싱
         intent_result = await llm_service.parse_user_intent(
             user_message=request.message,
@@ -142,7 +157,10 @@ async def send_chat_message(
 
         # 2. 일반 대화인 경우
         if intent_type == "general_chat" or not needs_control:
-            llm_result = await llm_service.generate_response(request.message)
+            llm_result = await llm_service.generate_response(
+                user_message=request.message,
+                persona=persona  # 페르소나 적용
+            )
             ai_response = llm_result.get("response", "죄송합니다. 응답을 생성할 수 없습니다.")
             session["conversation_history"].append({
                 "role": "assistant",
@@ -207,7 +225,8 @@ async def send_chat_message(
             appliances=recommendations,
             weather=weather_data,
             fatigue_level=fatigue_level,
-            user_message=request.message
+            user_message=request.message,
+            persona=persona  # 페르소나 적용
         )
 
         # 3-4. 세션에 저장

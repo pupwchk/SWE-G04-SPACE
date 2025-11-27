@@ -30,9 +30,12 @@ class VoiceRealtimeHandler:
     클라이언트 ↔ FastAPI ↔ OpenAI Realtime API
     """
 
-    def __init__(self, db: Session):
+    def __init__(self, db: Session, use_manual_commit: bool = False):
         self.db = db
         self.registered_functions = False
+        self.use_manual_commit = use_manual_commit  # 테스트용 수동 커밋 모드
+        self.audio_buffer = bytearray() if use_manual_commit else None
+        self.total_audio_received = 0  # 디버깅용
 
     def register_function_handlers(self, user_id: str):
         """Function calling 핸들러 등록"""
@@ -163,19 +166,33 @@ class VoiceRealtimeHandler:
         self.registered_functions = True
         logger.info("✅ Function handlers registered")
 
-    async def handle_websocket(self, websocket: WebSocket, user_id: str):
+    async def handle_websocket(self, websocket: WebSocket, user_id: str, character_id: str = None):
         """WebSocket 연결 처리"""
         await websocket.accept()
-        logger.info(f"🎙️ WebSocket connected: {user_id}")
+        logger.info(f"🎙️ WebSocket connected: {user_id}, character_id: {character_id}")
 
         try:
             # Function handlers 등록
             self.register_function_handlers(user_id)
 
+            # 페르소나 로드 (character_id가 있으면)
+            persona_instructions = None
+            if character_id:
+                from app.cruds import info as infoCruds
+                from uuid import UUID
+                character = infoCruds.get_character(self.db, UUID(character_id))
+                if character:
+                    persona_instructions = character.persona
+                    logger.info(f"✅ Loaded persona: {character.nickname}")
+                else:
+                    logger.warning(f"⚠️ Character not found: {character_id}")
+
             # Realtime API 세션 생성
+            # voice 옵션: alloy(중성), echo(남성/낮음), fable(표현력), onyx(남성/깊음), nova(여성/밝음), shimmer(여성/부드러움)
             session_info = await realtime_agent.create_session(
                 user_id=user_id,
-                voice="alloy"
+                instructions=persona_instructions,  # 페르소나 적용
+                voice="shimmer"  # 부드럽고 명확한 여성 음성
             )
             logger.info(f"✅ Realtime session created: {session_info}")
 
@@ -218,67 +235,94 @@ class VoiceRealtimeHandler:
                 except Exception as e:
                     logger.error(f"❌ Error send error: {str(e)}")
 
+            # 응답 완료 콜백
+            async def response_done_callback():
+                """응답 완료 알림"""
+                try:
+                    await websocket.send_json({
+                        "type": "response.done"
+                    })
+                    logger.info("📤 Response done event sent to client")
+                except Exception as e:
+                    logger.error(f"❌ Response done send error: {str(e)}")
+
             # 이벤트 처리 태스크 시작
             event_task = asyncio.create_task(
                 realtime_agent.handle_events(
                     user_id=user_id,
                     audio_callback=audio_callback,
                     transcript_callback=transcript_callback,
-                    error_callback=error_callback
+                    error_callback=error_callback,
+                    response_done_callback=response_done_callback
                 )
             )
 
             # 클라이언트로부터 메시지 수신
             while True:
                 try:
-                    message = await websocket.receive()
-                    logger.info(f"👉 RAW MSG RECV: Type={type(message)}, Msg={str(message)[:250]}")
+                    # FastAPI WebSocket의 receive() 메서드 사용
+                    data = await websocket.receive()
 
-                    text_data = None
-                    bytes_data = None
+                    # WebSocket disconnect 이벤트 처리
+                    if data.get("type") == "websocket.disconnect":
+                        logger.info(f"🔌 WebSocket disconnected: {user_id}")
+                        break
 
-                    if isinstance(message, dict):
-                        logger.info("👉 MSG PATH: DICT")
-                        if message.get("type") == "websocket.disconnect":
-                            logger.info(f"🔌 WebSocket disconnected (event): {user_id}")
-                            break
-                        text_data = message.get("text")
-                        bytes_data = message.get("bytes")
-                    elif isinstance(message, str):
-                        logger.info("👉 MSG PATH: STR")
-                        text_data = message
-                    elif isinstance(message, bytes):
-                        logger.info("👉 MSG PATH: BYTES")
-                        bytes_data = message
-                    else:
-                        logger.warning(f"👉 MSG PATH: UNKNOWN! Type={type(message)}")
+                    # 바이너리 오디오 데이터 처리
+                    if "bytes" in data:
+                        bytes_data = data["bytes"]
+                        self.total_audio_received += len(bytes_data)
 
+                        if self.use_manual_commit:
+                            # 테스트 모드: 버퍼에 쌓기
+                            self.audio_buffer.extend(bytes_data)
+                            duration_ms = (len(self.audio_buffer) / 32000) * 1000
+                            logger.info(f"🎤 Audio chunk received: {len(bytes_data)} bytes (buffer: {len(self.audio_buffer)} bytes, ~{duration_ms:.1f}ms)")
+                        else:
+                            # 실시간 모드: 즉시 전송 (Server VAD가 자동으로 처리)
+                            logger.info(f"🎤 Audio chunk received: {len(bytes_data)} bytes (realtime streaming)")
+                            await realtime_agent.send_audio(user_id, bytes_data)
 
-                    if bytes_data:
-                        logger.info(f"👉 AUDIO SEND: Passing {len(bytes_data)} bytes to realtime_agent")
-                        await realtime_agent.send_audio(user_id, bytes_data)
-                    elif text_data:
-                        logger.info(f"👉 TEXT PROC: Processing text data: {text_data}")
-                        data = json.loads(text_data)
-                        msg_type = data.get("type")
+                    # 텍스트 메시지 처리 (JSON 제어 명령)
+                    elif "text" in data:
+                        text_data = data["text"]
+                        try:
+                            msg = json.loads(text_data)
+                            msg_type = msg.get("type")
 
-                        if msg_type == "audio_commit":
-                            logger.info("👉 COMMITTING AUDIO")
-                            await realtime_agent.commit_audio(user_id)
-                        elif msg_type == "close":
-                            logger.info(f"🔌 Client requested close: {user_id}")
-                            break
-                    else:
-                        logger.warning("👉 NO DATA TO PROCESS in received message.")
+                            if msg_type == "audio_commit":
+                                if self.use_manual_commit:
+                                    # 테스트 모드: 버퍼에 있는 모든 오디오를 한 번에 전송
+                                    if self.audio_buffer and len(self.audio_buffer) > 0:
+                                        duration_ms = (len(self.audio_buffer) / 32000) * 1000
+                                        logger.info(f"📤 Sending buffered audio: {len(self.audio_buffer)} bytes (~{duration_ms:.1f}ms)")
+                                        await realtime_agent.send_audio(user_id, bytes(self.audio_buffer))
+                                        self.audio_buffer.clear()
 
+                                        await asyncio.sleep(0.1)
+                                        logger.info("📤 Committing audio buffer")
+                                        await realtime_agent.commit_audio(user_id)
+                                    else:
+                                        logger.warning("⚠️ No audio in buffer to commit")
+                                else:
+                                    # 실시간 모드: Server VAD가 자동 처리하므로 수동 커밋 불필요
+                                    logger.info("📤 Manual commit ignored (Server VAD enabled)")
+
+                            elif msg_type == "close":
+                                logger.info(f"🔌 Client requested close: {user_id}")
+                                break
+                            else:
+                                logger.warning(f"⚠️ Unknown message type: {msg_type}")
+                        except json.JSONDecodeError:
+                            logger.warning(f"⚠️ Invalid JSON: {text_data[:100]}")
 
                 except WebSocketDisconnect:
                     logger.info(f"🔌 WebSocket disconnected (exception): {user_id}")
                     break
-                except json.JSONDecodeError:
-                    logger.warning("⚠️ Invalid JSON received")
                 except Exception as e:
                     logger.error(f"❌ Receive error: {str(e)}")
+                    import traceback
+                    traceback.print_exc()
                     break
 
             # 정리
@@ -306,6 +350,7 @@ class VoiceRealtimeHandler:
 async def websocket_voice_endpoint(
     websocket: WebSocket,
     user_id: str,
+    character_id: str = None,  # Query parameter로 페르소나 선택
     db: Session = Depends(get_db)
 ):
     """
@@ -340,5 +385,7 @@ async def websocket_voice_endpoint(
     };
     ```
     """
-    handler = VoiceRealtimeHandler(db)
-    await handler.handle_websocket(websocket, user_id)
+    # 현재는 테스트용 수동 커밋 모드 활성화
+    # 실제 서비스: use_manual_commit=False (Server VAD 자동 처리)
+    handler = VoiceRealtimeHandler(db, use_manual_commit=True)
+    await handler.handle_websocket(websocket, user_id, character_id)

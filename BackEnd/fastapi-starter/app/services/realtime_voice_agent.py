@@ -52,7 +52,7 @@ class RealtimeVoiceAgent:
         self,
         user_id: str,
         instructions: Optional[str] = None,
-        voice: str = "alloy"
+        voice: str = "shimmer"
     ) -> Dict[str, Any]:
         """
         Realtime API 세션 생성
@@ -60,7 +60,13 @@ class RealtimeVoiceAgent:
         Args:
             user_id: 사용자 ID
             instructions: 시스템 프롬프트
-            voice: TTS 음성 (alloy, echo, fable, onyx, nova, shimmer)
+            voice: TTS 음성
+                - alloy: 중성적, 균형잡힌 (기본)
+                - echo: 낮고 침착한 남성
+                - fable: 따뜻하고 표현력 있는
+                - onyx: 깊고 권위있는 남성
+                - nova: 밝고 활기찬 여성 ⭐ 추천
+                - shimmer: 부드럽고 명확한 여성 ⭐ 추천
 
         Returns:
             세션 정보
@@ -85,7 +91,12 @@ class RealtimeVoiceAgent:
 
             # 세션 설정
             if instructions is None:
+                # 페르소나 없음: 기본 시스템 프롬프트
                 instructions = self._build_system_instructions()
+            else:
+                # 페르소나 있음: 기본 프롬프트 + 페르소나 결합
+                base_instructions = self._build_system_instructions()
+                instructions = f"{base_instructions}\n\n**페르소나 (말투/성격):**\n{instructions}"
 
             session_config = {
                 "type": "session.update",
@@ -100,14 +111,14 @@ class RealtimeVoiceAgent:
                     },
                     "turn_detection": {
                         "type": "server_vad",
-                        "threshold": 0.5,
-                        "prefix_padding_ms": 300,
-                        "silence_duration_ms": 500
+                        "threshold": 0.5,  # 음성 감지 민감도 (0.0~1.0)
+                        "prefix_padding_ms": 300,  # 음성 시작 전 패딩
+                        "silence_duration_ms": 500  # 침묵 감지 시간 (짧을수록 빠른 응답)
                     },
                     "tools": self._get_function_definitions(),
                     "tool_choice": "auto",
-                    "temperature": 0.8,
-                    "max_response_output_tokens": 4096
+                    "temperature": 0.9,  # 0.8 → 0.9 (더 자연스럽고 다양한 응답)
+                    "max_response_output_tokens": 2048  # 4096 → 2048 (더 간결한 응답)
                 }
             }
 
@@ -124,24 +135,33 @@ class RealtimeVoiceAgent:
             raise
 
     def _build_system_instructions(self) -> str:
-        """시스템 프롬프트 생성"""
-        return """당신은 SPACE 스마트홈 AI 어시스턴트입니다.
+        """시스템 프롬프트 생성 (텍스트 LLM과 동일한 스타일)"""
+        return """당신은 사용자의 스마트홈 AI 어시스턴트입니다.
 
 **역할:**
-- 사용자와 자연스럽게 음성 대화
-- 집안의 가전제품 제어 (에어컨, 가습기, 제습기, 공기청정기, 조명, TV)
-- 사용자의 피로도와 날씨 상태를 고려한 제안
-- 친근하고 도움이 되는 태도 유지
+- 사용자와 자연스럽게 대화
+- 집안일 도움 (가전제품 제어, 일정 관리 등)
+- 사용자의 상태 파악 (피로도, 스트레스 등)
 
 **가전 제어:**
-- 사용자가 "에어컨 켜줘", "불 켜줘" 등을 요청하면 해당 function을 호출하세요
-- 환경 불편 표현("덥다", "건조하다" 등)이 있으면 적절한 가전을 제안하세요
+- 사용자가 "에어컨 켜줘", "불 켜줘" 등을 요청하면 control_appliance 함수를 호출하세요
+- "덥다", "춥다", "건조하다" 등 환경 불편 표현이 있으면:
+  1. 먼저 get_current_status로 현재 상태를 확인
+  2. recommend_appliances로 추천 받기
+  3. 사용자에게 제안하고 동의를 구한 후 제어
 - 가전 제어 전에는 반드시 사용자에게 확인을 받으세요
 
 **대화 스타일:**
-- 짧고 명확하게 응답
+- 자연스럽고 친근하게 대화
 - 존댓말 사용
-- 필요한 정보만 전달
+- 간결하지만 따뜻한 응답
+- 사용자의 감정과 상태를 고려한 배려
+- 불필요한 정보는 생략
+
+**중요:**
+- 음성 대화이므로 너무 길게 말하지 마세요 (1-2문장 권장)
+- 숫자나 전문용어는 쉽게 풀어서 설명하세요
+- 질문은 명확하고 간단하게 하세요
 """
 
     def _get_function_definitions(self) -> list[Dict[str, Any]]:
@@ -213,8 +233,16 @@ class RealtimeVoiceAgent:
             ws = self.sessions.get(user_id)
             if not ws:
                 raise ValueError(f"No session found for user {user_id}")
-            
-            await ws.send(audio_data)
+
+            # OpenAI Realtime API는 base64 인코딩된 오디오를 JSON으로 전송
+            duration_ms = (len(audio_data) / 32000) * 1000  # 16kHz * 2 bytes = 32000 bytes/sec
+            logger.info(f"📤 Sending audio chunk: {len(audio_data)} bytes (~{duration_ms:.1f}ms)")
+
+            event = {
+                "type": "input_audio_buffer.append",
+                "audio": base64.b64encode(audio_data).decode('utf-8')
+            }
+            await ws.send(json.dumps(event))
 
         except Exception as e:
             logger.error(f"❌ Send audio error: {str(e)}")
@@ -232,11 +260,17 @@ class RealtimeVoiceAgent:
             if not ws:
                 raise ValueError(f"No session found for user {user_id}")
 
-            event = {
+            # 먼저 오디오 입력 커밋
+            commit_event = {
+                "type": "input_audio_buffer.commit"
+            }
+            await ws.send(json.dumps(commit_event))
+
+            # 그 다음 응답 생성 요청
+            response_event = {
                 "type": "response.create"
             }
-
-            await ws.send(json.dumps(event))
+            await ws.send(json.dumps(response_event))
 
         except Exception as e:
             logger.error(f"❌ Commit audio error: {str(e)}")
@@ -247,7 +281,8 @@ class RealtimeVoiceAgent:
         user_id: str,
         audio_callback: Optional[Callable[[bytes], Awaitable[None]]] = None,
         transcript_callback: Optional[Callable[[str, str], Awaitable[None]]] = None,
-        error_callback: Optional[Callable[[str], Awaitable[None]]] = None
+        error_callback: Optional[Callable[[str], Awaitable[None]]] = None,
+        response_done_callback: Optional[Callable[[], Awaitable[None]]] = None
     ):
         """
         이벤트 스트림 처리
@@ -257,6 +292,7 @@ class RealtimeVoiceAgent:
             audio_callback: 오디오 수신 콜백 (audio_data)
             transcript_callback: 텍스트 수신 콜백 (role, text)
             error_callback: 에러 콜백 (error_message)
+            response_done_callback: 응답 완료 콜백
         """
         try:
             ws = self.sessions.get(user_id)
@@ -293,6 +329,19 @@ class RealtimeVoiceAgent:
                     # Function calling
                     elif event_type == "response.function_call_arguments.done":
                         await self._handle_function_call(user_id, event)
+
+                    # 응답 완료
+                    elif event_type == "response.done":
+                        logger.info(f"✅ Response completed")
+                        if response_done_callback:
+                            await response_done_callback()
+
+                    # 오디오 전사 완료 (응답 음성의 텍스트)
+                    elif event_type == "response.audio_transcript.done":
+                        transcript = event.get("transcript", "")
+                        if transcript and transcript_callback:
+                            await transcript_callback("assistant", transcript)
+                            logger.info(f"🤖 Assistant: {transcript}")
 
                     # 에러
                     elif event_type == "error":
