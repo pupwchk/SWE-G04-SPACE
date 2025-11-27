@@ -12,6 +12,7 @@ struct MenuRow: View {
     let icon: String
     let title: String
     let action: () -> Void
+    var fontSize: Double = 16.0
 
     var body: some View {
         Button(action: action) {
@@ -24,7 +25,7 @@ struct MenuRow: View {
 
                 // Title
                 Text(title)
-                    .font(.system(size: 17, weight: .regular))
+                    .font(.system(size: fontSize + 1, weight: .regular))
                     .foregroundColor(.black)
 
                 Spacer()

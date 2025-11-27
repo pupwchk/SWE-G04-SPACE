@@ -10,10 +10,10 @@ import SwiftUI
 /// Menu screen - settings and user options
 struct MenuView: View {
     @StateObject private var supabaseManager = SupabaseManager.shared
+    @StateObject private var fontSizeManager = FontSizeManager.shared
     @State private var userProfile: UserProfile?
     @State private var showMyPage = false
     @State private var showGeneral = false
-    @State private var showResetAlert = false
     @State private var showLogoutAlert = false
     @State private var isLoading = true
     @Environment(\.dismiss) var dismiss
@@ -51,15 +51,15 @@ struct MenuView: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 if isLoading {
                                     Text("로딩 중...")
-                                        .font(.system(size: 18, weight: .semibold))
+                                        .font(.system(size: fontSizeManager.fontSize + 2, weight: .semibold))
                                         .foregroundColor(.gray)
                                 } else {
                                     Text(userProfile?.name ?? supabaseManager.currentUser?.name ?? "사용자")
-                                        .font(.system(size: 18, weight: .semibold))
+                                        .font(.system(size: fontSizeManager.fontSize + 2, weight: .semibold))
                                         .foregroundColor(.black)
 
                                     Text(userProfile?.email ?? supabaseManager.currentUser?.email ?? "")
-                                        .font(.system(size: 14, weight: .regular))
+                                        .font(.system(size: fontSizeManager.fontSize - 2, weight: .regular))
                                         .foregroundColor(.gray)
                                 }
                             }
@@ -73,28 +73,21 @@ struct MenuView: View {
                         VStack(spacing: 0) {
                             MenuRow(icon: "person", title: "My page", action: {
                                 handleMyPage()
-                            })
+                            }, fontSize: fontSizeManager.fontSize)
 
                             Divider()
                                 .padding(.leading, 64)
 
                             MenuRow(icon: "gearshape", title: "General", action: {
                                 handleGeneral()
-                            })
+                            }, fontSize: fontSizeManager.fontSize)
 
                             Divider()
                                 .padding(.leading, 64)
 
                             MenuRow(icon: "questionmark.circle", title: "FAQ", action: {
                                 handleFAQ()
-                            })
-
-                            Divider()
-                                .padding(.leading, 64)
-
-                            MenuRow(icon: "arrow.counterclockwise", title: "페르소나 초기화", action: {
-                                showResetAlert = true
-                            })
+                            }, fontSize: fontSizeManager.fontSize)
                         }
                         .background(Color.white)
 
@@ -105,7 +98,7 @@ struct MenuView: View {
                             handleLogout()
                         }) {
                             Text("로그아웃")
-                                .font(.system(size: 16, weight: .regular))
+                                .font(.system(size: fontSizeManager.fontSize, weight: .regular))
                                 .foregroundColor(Color(hex: "A50034"))
                         }
                         .padding(.vertical, 40)
@@ -125,14 +118,6 @@ struct MenuView: View {
             }
             .navigationDestination(isPresented: $showGeneral) {
                 GeneralView()
-            }
-            .alert("페르소나 초기화", isPresented: $showResetAlert) {
-                Button("취소", role: .cancel) { }
-                Button("초기화", role: .destructive) {
-                    handleResetPersona()
-                }
-            } message: {
-                Text("저장된 모든 페르소나가 삭제됩니다.\n처음부터 다시 시작하시겠습니까?")
             }
             .alert("로그아웃", isPresented: $showLogoutAlert) {
                 Button("취소", role: .cancel) { }
@@ -170,11 +155,6 @@ struct MenuView: View {
 
     private func handleLogout() {
         showLogoutAlert = true
-    }
-
-    private func handleResetPersona() {
-        // TODO: Integrate with PersonaRepository to reset personas
-        print("Reset persona requested")
     }
 
     // MARK: - Data Loading

@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct FontSizeView: View {
-    @State private var fontSize: Double = 16.0
+    @StateObject private var fontSizeManager = FontSizeManager.shared
 
     var body: some View {
         VStack(spacing: 0) {
@@ -26,7 +26,7 @@ struct FontSizeView: View {
                                 .foregroundColor(.gray)
 
                             Text("안녕하세요! 무엇을 도와드릴까요?")
-                                .font(.system(size: fontSize))
+                                .font(.system(size: fontSizeManager.fontSize))
                                 .foregroundColor(.black)
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 12)
@@ -41,7 +41,7 @@ struct FontSizeView: View {
                     HStack {
                         Spacer()
                         Text("냉장고 온도를 조절하고 싶어요")
-                            .font(.system(size: fontSize))
+                            .font(.system(size: fontSizeManager.fontSize))
                             .foregroundColor(.white)
                             .padding(.horizontal, 16)
                             .padding(.vertical, 12)
@@ -74,7 +74,7 @@ struct FontSizeView: View {
                             .font(.system(size: 14, weight: .medium))
                             .foregroundColor(.gray)
 
-                        Slider(value: $fontSize, in: 12...24, step: 1)
+                        Slider(value: $fontSizeManager.fontSize, in: 12...24, step: 1)
                             .tint(Color(hex: "A50034"))
 
                         Text("A")
@@ -84,7 +84,7 @@ struct FontSizeView: View {
                     .padding(.horizontal, 20)
 
                     // Current size display
-                    Text("\(Int(fontSize))pt")
+                    Text("\(Int(fontSizeManager.fontSize))pt")
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundColor(Color(hex: "A50034"))
                         .padding(.bottom, 8)

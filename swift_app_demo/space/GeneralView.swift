@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct GeneralView: View {
+    @StateObject private var fontSizeManager = FontSizeManager.shared
     @Environment(\.dismiss) var dismiss
     @State private var showNotificationMethod = false
     @State private var showDoNotDisturb = false
@@ -12,36 +13,6 @@ struct GeneralView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Top profile section
-            HStack(spacing: 16) {
-                // Profile avatar
-                Circle()
-                    .fill(Color(red: 0.89, green: 0.82, blue: 0.85))
-                    .frame(width: 60, height: 60)
-                    .overlay(
-                        Image(systemName: "person.fill")
-                            .font(.system(size: 28))
-                            .foregroundColor(Color(red: 0.71, green: 0.47, blue: 0.56))
-                    )
-
-                // Profile text
-                Text("소고기 웨이퍼 공격")
-                    .font(.system(size: 17))
-                    .foregroundColor(.black)
-
-                Spacer()
-
-                // Chevron
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14))
-                    .foregroundColor(.gray.opacity(0.5))
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 20)
-            .background(Color.white)
-
-            Divider()
-
             ScrollView {
                 VStack(spacing: 0) {
                     // 알림 section
@@ -50,21 +21,21 @@ struct GeneralView: View {
                     Button(action: {
                         showNotificationMethod = true
                     }) {
-                        GeneralRow(title: "알림 방식 설정")
+                        GeneralRow(title: "알림 방식 설정", fontSize: fontSizeManager.fontSize)
                     }
                     .buttonStyle(.plain)
 
                     Button(action: {
                         showDoNotDisturb = true
                     }) {
-                        GeneralRow(title: "방해금지 시간 설정")
+                        GeneralRow(title: "방해금지 시간 설정", fontSize: fontSizeManager.fontSize)
                     }
                     .buttonStyle(.plain)
 
                     Button(action: {
                         showSpaceNotification = true
                     }) {
-                        GeneralRow(title: "HARU 알림")
+                        GeneralRow(title: "HARU 알림", fontSize: fontSizeManager.fontSize)
                     }
                     .buttonStyle(.plain)
 
@@ -79,7 +50,7 @@ struct GeneralView: View {
                         showHomeLocationSetting = true
                         print("🏠 showHomeLocationSetting set to: \(showHomeLocationSetting)")
                     }) {
-                        GeneralRow(title: "홈 위치 설정")
+                        GeneralRow(title: "홈 위치 설정", fontSize: fontSizeManager.fontSize)
                     }
                     .buttonStyle(.plain)
 
@@ -92,7 +63,7 @@ struct GeneralView: View {
                     Button(action: {
                         showFontSize = true
                     }) {
-                        GeneralRow(title: "글자 크기")
+                        GeneralRow(title: "글자 크기", fontSize: fontSizeManager.fontSize)
                     }
                     .buttonStyle(.plain)
 
@@ -105,14 +76,14 @@ struct GeneralView: View {
                     Button(action: {
                         showEmergencyCall = true
                     }) {
-                        GeneralRow(title: "긴급전화 알림")
+                        GeneralRow(title: "긴급전화 알림", fontSize: fontSizeManager.fontSize)
                     }
                     .buttonStyle(.plain)
 
                     Button(action: {
                         showCallErrorHistory = true
                     }) {
-                        GeneralRow(title: "전화 오약 기록")
+                        GeneralRow(title: "전화 오약 기록", fontSize: fontSizeManager.fontSize)
                     }
                     .buttonStyle(.plain)
                 }
@@ -126,7 +97,7 @@ struct GeneralView: View {
                     // Password change action
                 }) {
                     Text("비밀번호 변경")
-                        .font(.system(size: 14))
+                        .font(.system(size: fontSizeManager.fontSize - 2))
                         .foregroundColor(Color(white: 0.7))
                 }
 
@@ -134,7 +105,7 @@ struct GeneralView: View {
                     // Account deletion action
                 }) {
                     Text("탈퇴하기")
-                        .font(.system(size: 14))
+                        .font(.system(size: fontSizeManager.fontSize - 2))
                         .foregroundColor(Color(white: 0.7))
                 }
             }
@@ -203,11 +174,12 @@ struct SectionHeader: View {
 
 struct GeneralRow: View {
     let title: String
+    let fontSize: Double
 
     var body: some View {
         HStack {
             Text(title)
-                .font(.system(size: 17))
+                .font(.system(size: fontSize + 1))
                 .foregroundColor(.black)
 
             Spacer()

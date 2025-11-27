@@ -221,9 +221,11 @@ struct PersonaCard: View {
 
                     // Adjective tags
                     if !adjectives.isEmpty {
-                        FlowLayout(spacing: 8) {
-                            ForEach(adjectives) { adjective in
-                                SelectedAdjectiveTag(text: adjective.adjectiveName)
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(adjectives) { adjective in
+                                    SelectedAdjectiveTag(text: adjective.adjectiveName)
+                                }
                             }
                         }
                     }

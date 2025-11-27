@@ -129,6 +129,7 @@ struct SelectionView: View {
 }
 
 struct TextChatView: View {
+    @StateObject private var fontSizeManager = FontSizeManager.shared
     @State private var messages: [Message] = [
         Message(text: "안녕하세요! 오늘 집에 언제 도착하시나요?", isFromUser: false, timestamp: Date().addingTimeInterval(-7200)),
         Message(text: "6시쯤 도착할 것 같아요", isFromUser: true, timestamp: Date().addingTimeInterval(-7100)),
@@ -158,7 +159,7 @@ struct TextChatView: View {
                             }
 
                             Text(message.text)
-                                .font(.system(size: 15))
+                                .font(.system(size: fontSizeManager.fontSize))
                                 .foregroundColor(.black)
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 12)
@@ -196,7 +197,7 @@ struct TextChatView: View {
 
                 HStack {
                     TextField("메시지를 입력하세요", text: $messageText)
-                        .font(.system(size: 15))
+                        .font(.system(size: fontSizeManager.fontSize))
                         .padding(.vertical, 10)
                         .padding(.horizontal, 16)
 
