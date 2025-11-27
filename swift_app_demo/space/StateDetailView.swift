@@ -198,7 +198,27 @@ struct StateDetailView: View {
                     .cornerRadius(6)
                 }
             }
-            .frame(height: 200)
+            .chartYScale(domain: 0...(maxYValue * 1.2))
+            .chartXAxis {
+                AxisMarks(preset: .aligned) { _ in
+                    AxisValueLabel()
+                        .font(.system(size: 11))
+                        .foregroundStyle(.gray)
+                }
+            }
+            .chartYAxis {
+                AxisMarks(position: .leading) { _ in
+                    AxisGridLine()
+                        .foregroundStyle(Color.gray.opacity(0.2))
+                    AxisValueLabel()
+                        .font(.system(size: 11))
+                        .foregroundStyle(.gray)
+                }
+            }
+            .chartPlotStyle { plotArea in
+                plotArea.frame(height: 200)
+            }
+            .frame(height: 240)
             .padding(.horizontal, 20)
             .background(Color.white)
             .cornerRadius(16)
@@ -303,6 +323,12 @@ struct StateDetailView: View {
     private var averageValue: Double {
         guard !weeklyData.isEmpty else { return 0 }
         return weeklyData.map { $0.value }.reduce(0, +) / Double(weeklyData.count)
+    }
+
+    private var maxYValue: Double {
+        guard !weeklyData.isEmpty else { return 100 }
+        let maxValue = weeklyData.map { $0.value }.max() ?? 0
+        return max(maxValue, 10) // Minimum scale of 10
     }
 
     // MARK: - Helper Methods

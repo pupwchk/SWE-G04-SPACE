@@ -233,10 +233,15 @@ class HealthKitManager: ObservableObject {
                 }
             }
 
-            // Convert to DailyHealthData array
-            let weeklyData = sleepByDay.map { date, totalSeconds in
-                DailyHealthData(date: date, value: totalSeconds / 3600.0, unit: "h")
-            }.sorted { $0.date < $1.date }
+            // Create array with all 7 days, filling missing days with 0
+            var weeklyData: [DailyHealthData] = []
+            for dayOffset in 0..<7 {
+                if let date = calendar.date(byAdding: .day, value: dayOffset, to: startDate) {
+                    let dayStart = calendar.startOfDay(for: date)
+                    let totalSeconds = sleepByDay[dayStart] ?? 0
+                    weeklyData.append(DailyHealthData(date: dayStart, value: totalSeconds / 3600.0, unit: "h"))
+                }
+            }
 
             DispatchQueue.main.async {
                 self.weeklySleepData = weeklyData
@@ -271,16 +276,26 @@ class HealthKitManager: ObservableObject {
                 return
             }
 
-            var weeklyData: [DailyHealthData] = []
+            var caloriesByDay: [Date: Double] = [:]
             results.enumerateStatistics(from: startDate, to: endDate) { statistics, _ in
                 if let sum = statistics.sumQuantity() {
                     let calories = sum.doubleValue(for: .kilocalorie())
-                    weeklyData.append(DailyHealthData(date: statistics.startDate, value: calories, unit: "kcal"))
+                    caloriesByDay[statistics.startDate] = calories
+                }
+            }
+
+            // Create array with all 7 days, filling missing days with 0
+            var weeklyData: [DailyHealthData] = []
+            for dayOffset in 0..<7 {
+                if let date = calendar.date(byAdding: .day, value: dayOffset, to: startDate) {
+                    let dayStart = calendar.startOfDay(for: date)
+                    let calories = caloriesByDay[dayStart] ?? 0
+                    weeklyData.append(DailyHealthData(date: dayStart, value: calories, unit: "kcal"))
                 }
             }
 
             DispatchQueue.main.async {
-                self.weeklyCaloriesData = weeklyData.sorted { $0.date < $1.date }
+                self.weeklyCaloriesData = weeklyData
                 print("🔥 Weekly calories data loaded: \(weeklyData.count) days")
             }
         }
@@ -312,17 +327,27 @@ class HealthKitManager: ObservableObject {
                 return
             }
 
-            var weeklyData: [DailyHealthData] = []
+            var stressByDay: [Date: Double] = [:]
             results.enumerateStatistics(from: startDate, to: endDate) { statistics, _ in
                 if let average = statistics.averageQuantity() {
                     let hrvValue = average.doubleValue(for: HKUnit.secondUnit(with: .milli))
                     let stressLevel = max(0, min(100, 100 - hrvValue))
-                    weeklyData.append(DailyHealthData(date: statistics.startDate, value: stressLevel, unit: "%"))
+                    stressByDay[statistics.startDate] = stressLevel
+                }
+            }
+
+            // Create array with all 7 days, filling missing days with 0
+            var weeklyData: [DailyHealthData] = []
+            for dayOffset in 0..<7 {
+                if let date = calendar.date(byAdding: .day, value: dayOffset, to: startDate) {
+                    let dayStart = calendar.startOfDay(for: date)
+                    let stressLevel = stressByDay[dayStart] ?? 0
+                    weeklyData.append(DailyHealthData(date: dayStart, value: stressLevel, unit: "%"))
                 }
             }
 
             DispatchQueue.main.async {
-                self.weeklyStressData = weeklyData.sorted { $0.date < $1.date }
+                self.weeklyStressData = weeklyData
                 print("😰 Weekly stress data loaded: \(weeklyData.count) days")
             }
         }
