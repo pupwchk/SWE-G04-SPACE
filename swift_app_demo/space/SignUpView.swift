@@ -31,41 +31,17 @@ struct SignUpView: View {
             Color(hex: "F9F9F9")
                 .ignoresSafeArea()
 
-            VStack(spacing: 0) {
-                // MARK: - Top Banner
-                topBanner
-                    .frame(height: 260)
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 32) {
+                    // 상단 여백 (SafeArea 아래)
+                    Spacer()
+                        .frame(height: 40)
 
-                // MARK: - Sign Up Form Section
-                GeometryReader { proxy in
-                    ScrollView(showsIndicators: false) {
-                        VStack(spacing: 24) {
-                            Spacer(minLength: 0)
-                            signUpCard
-                        }
-                        .frame(minHeight: proxy.size.height, alignment: .top)
-                        .padding(.horizontal, 20)
-                        .padding(.top, -12)
-                        .padding(.bottom, 32)
-                    }
+                    signUpCard
                 }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 40)
             }
-        }
-        .ignoresSafeArea(edges: .top)
-    }
-
-    // MARK: - Top Banner Component
-    private var topBanner: some View {
-        ZStack {
-            // Base burgundy background
-            Color(hex: "A50034")
-
-            // Rotated "HARU" text
-            Text("HARU")
-                .font(.system(size: 80, weight: .bold, design: .default))
-                .foregroundColor(.white)
-                .rotationEffect(.degrees(-15))
-                .offset(x: 10, y: 30)
         }
     }
 
@@ -88,7 +64,7 @@ struct SignUpView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("이름")
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(Color.gray.opacity(0.8))
+                    .foregroundColor(Color(hex: "A50034"))
 
                 TextField("이름을 입력하세요", text: $name)
                     .padding(.horizontal, 16)
@@ -108,7 +84,7 @@ struct SignUpView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("이메일 주소")
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(Color.gray.opacity(0.8))
+                    .foregroundColor(Color(hex: "A50034"))
 
                 TextField("name@email.com", text: $email)
                     .padding(.horizontal, 16)
@@ -129,7 +105,7 @@ struct SignUpView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("비밀번호")
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(Color.gray.opacity(0.8))
+                    .foregroundColor(Color(hex: "A50034"))
 
                 HStack {
                     if showPassword {
@@ -165,7 +141,7 @@ struct SignUpView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("비밀번호 확인")
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(Color.gray.opacity(0.8))
+                    .foregroundColor(Color(hex: "A50034"))
 
                 HStack {
                     if showConfirmPassword {
@@ -270,7 +246,7 @@ struct SignUpView: View {
                         }) {
                             Text("이용약관")
                                 .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(.blue)
+                                .foregroundColor(Color(hex: "A50034"))
                         }
                     }
 
@@ -284,7 +260,7 @@ struct SignUpView: View {
                         }) {
                             Text("개인정보 처리방침")
                                 .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(.blue)
+                                .foregroundColor(Color(hex: "A50034"))
                         }
                     }
                 }

@@ -26,45 +26,21 @@ struct LoginView: View {
             Color(hex: "F9F9F9")
                 .ignoresSafeArea()
 
-            VStack(spacing: 0) {
-                // MARK: - Liquid Glass Top Banner
-                liquidGlassBanner
-                    .frame(height: 260)
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 32) {
+                    // 상단 여백 (SafeArea 아래)
+                    Spacer()
+                        .frame(height: 40)
 
-                // MARK: - Login Card Section
-                GeometryReader { proxy in
-                    ScrollView(showsIndicators: false) {
-                        VStack(spacing: 24) {
-                            Spacer(minLength: 0) // Push content down when there is extra space
-                            loginCard
-                            socialLoginSection
-                        }
-                        .frame(minHeight: proxy.size.height, alignment: .top)
-                        .padding(.horizontal, 20)
-                        .padding(.top, -12) // Keep slight overlap with the banner
-                        .padding(.bottom, 32)
-                    }
+                    loginCard
+                    socialLoginSection
                 }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 40)
             }
         }
-        .ignoresSafeArea(edges: .top)
         .sheet(isPresented: $showSignUp) {
             SignUpView(isLoggedIn: $isLoggedIn)
-        }
-    }
-
-    // MARK: - Liquid Glass Banner Component
-    private var liquidGlassBanner: some View {
-        ZStack {
-            // Base burgundy background
-            Color(hex: "A50034")
-
-            // Rotated "HARU" text
-            Text("HARU")
-                .font(.system(size: 80, weight: .bold, design: .default))
-                .foregroundColor(.white)
-                .rotationEffect(.degrees(-15))
-                .offset(x: 10, y: 30)
         }
     }
 
@@ -81,7 +57,7 @@ struct LoginView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("이메일 주소")
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(Color.gray.opacity(0.8))
+                    .foregroundColor(Color(hex: "A50034"))
 
                 TextField("your@email.com", text: $email)
                     .padding(.horizontal, 16)
@@ -102,7 +78,7 @@ struct LoginView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("비밀번호")
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(Color.gray.opacity(0.8))
+                    .foregroundColor(Color(hex: "A50034"))
 
                 SecureField("비밀번호를 입력하세요", text: $password)
                     .padding(.horizontal, 16)
@@ -124,7 +100,7 @@ struct LoginView: View {
                 }) {
                     Text("비밀번호를 잊으셨나요?")
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(.blue)
+                        .foregroundColor(Color(hex: "A50034"))
                 }
             }
             .padding(.top, -4)
@@ -164,28 +140,6 @@ struct LoginView: View {
             .buttonStyle(.plain)
             .padding(.top, 4)
 
-            // Temporary bypass button for testing
-            Button(action: {
-                print("Bypass button tapped")
-                withAnimation {
-                    isLoggedIn = true
-                }
-            }) {
-                Text("🚀 홈 화면으로 바로가기 (테스트용)")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(Color(hex: "A50034"))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .background(Color(hex: "A50034").opacity(0.1))
-                    .cornerRadius(10)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10)
-                            .stroke(Color(hex: "A50034").opacity(0.3), lineWidth: 1.5)
-                    )
-            }
-            .buttonStyle(.plain)
-            .padding(.top, 8)
-
             // Register link
             HStack(spacing: 4) {
                 Text("계정이 없으신가요?")
@@ -222,6 +176,8 @@ struct LoginView: View {
                 Text("또는 다음으로 계속하기")
                     .font(.system(size: 13, weight: .regular))
                     .foregroundColor(Color.gray.opacity(0.7))
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
 
                 Rectangle()
                     .fill(Color.gray.opacity(0.25))
