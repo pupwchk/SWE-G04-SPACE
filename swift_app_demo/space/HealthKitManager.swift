@@ -59,9 +59,9 @@ class HealthKitManager: ObservableObject {
         isAvailable = HKHealthStore.isHealthDataAvailable()
 
         if isAvailable {
-            print("✅ HealthKit is available")
+            print(" HealthKit is available")
         } else {
-            print("❌ HealthKit is not available on this device")
+            print("  HealthKit is not available on this device")
         }
     }
 
@@ -69,7 +69,7 @@ class HealthKitManager: ObservableObject {
 
     func requestAuthorization(completion: ((Bool) -> Void)? = nil) {
         guard isAvailable else {
-            print("❌ HealthKit not available")
+            print("  HealthKit not available")
             completion?(false)
             return
         }
@@ -87,13 +87,13 @@ class HealthKitManager: ObservableObject {
         healthStore.requestAuthorization(toShare: nil, read: readTypes) { success, error in
             DispatchQueue.main.async {
                 if success {
-                    print("✅ HealthKit authorization granted")
+                    print(" HealthKit authorization granted")
                     self.authorizationStatus = .sharingAuthorized
                     self.fetchTodayHealthData()
                     self.fetchWeeklyHealthData()
                     completion?(true)
                 } else {
-                    print("❌ HealthKit authorization denied: \(error?.localizedDescription ?? "Unknown error")")
+                    print("  HealthKit authorization denied: \(error?.localizedDescription ?? "Unknown error")")
                     completion?(false)
                 }
             }
@@ -129,7 +129,7 @@ class HealthKitManager: ObservableObject {
 
         let query = HKSampleQuery(sampleType: sleepType, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, samples, error in
             guard let samples = samples as? [HKCategorySample], error == nil else {
-                print("❌ Sleep data fetch error: \(error?.localizedDescription ?? "Unknown")")
+                print("  Sleep data fetch error: \(error?.localizedDescription ?? "Unknown")")
                 return
             }
 
@@ -160,7 +160,7 @@ class HealthKitManager: ObservableObject {
 
         let query = HKStatisticsQuery(quantityType: caloriesType, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, error in
             guard let result = result, let sum = result.sumQuantity(), error == nil else {
-                print("❌ Calories data fetch error: \(error?.localizedDescription ?? "Unknown")")
+                print("  Calories data fetch error: \(error?.localizedDescription ?? "Unknown")")
                 return
             }
 
@@ -184,7 +184,7 @@ class HealthKitManager: ObservableObject {
 
         let query = HKStatisticsQuery(quantityType: hrvType, quantitySamplePredicate: predicate, options: .discreteAverage) { _, result, error in
             guard let result = result, let average = result.averageQuantity(), error == nil else {
-                print("❌ HRV data fetch error: \(error?.localizedDescription ?? "Unknown")")
+                print("  HRV data fetch error: \(error?.localizedDescription ?? "Unknown")")
                 return
             }
 
@@ -213,7 +213,7 @@ class HealthKitManager: ObservableObject {
 
         let query = HKSampleQuery(sampleType: sleepType, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: [sortDescriptor]) { _, samples, error in
             guard let samples = samples as? [HKCategorySample], error == nil else {
-                print("❌ Weekly sleep fetch error: \(error?.localizedDescription ?? "Unknown")")
+                print("  Weekly sleep fetch error: \(error?.localizedDescription ?? "Unknown")")
                 return
             }
             // Group samples by day
@@ -272,7 +272,7 @@ class HealthKitManager: ObservableObject {
 
         query.initialResultsHandler = { _, results, error in
             guard let results = results, error == nil else {
-                print("❌ Weekly calories fetch error: \(error?.localizedDescription ?? "Unknown")")
+                print("  Weekly calories fetch error: \(error?.localizedDescription ?? "Unknown")")
                 return
             }
 
@@ -323,7 +323,7 @@ class HealthKitManager: ObservableObject {
 
         query.initialResultsHandler = { _, results, error in
             guard let results = results, error == nil else {
-                print("❌ Weekly stress fetch error: \(error?.localizedDescription ?? "Unknown")")
+                print("  Weekly stress fetch error: \(error?.localizedDescription ?? "Unknown")")
                 return
             }
 
@@ -360,7 +360,7 @@ class HealthKitManager: ObservableObject {
     /// Start observing real-time health data changes
     func startRealtimeObservers() {
         guard isAvailable else {
-            print("❌ HealthKit not available for observers")
+            print("  HealthKit not available for observers")
             return
         }
 
@@ -369,7 +369,7 @@ class HealthKitManager: ObservableObject {
         startStepsObserver()
         startDistanceObserver()
 
-        print("✅ Real-time health observers started")
+        print(" Real-time health observers started")
     }
 
     /// Stop all real-time observers
@@ -395,7 +395,7 @@ class HealthKitManager: ObservableObject {
 
         let query = HKObserverQuery(sampleType: heartRateType, predicate: nil) { [weak self] _, completionHandler, error in
             if let error = error {
-                print("❌ Heart rate observer error: \(error.localizedDescription)")
+                print("  Heart rate observer error: \(error.localizedDescription)")
                 completionHandler()
                 return
             }
@@ -411,9 +411,9 @@ class HealthKitManager: ObservableObject {
         // Enable background delivery for heart rate
         healthStore.enableBackgroundDelivery(for: heartRateType, frequency: .immediate) { success, error in
             if success {
-                print("✅ Heart rate background delivery enabled")
+                print(" Heart rate background delivery enabled")
             } else {
-                print("❌ Heart rate background delivery failed: \(error?.localizedDescription ?? "Unknown")")
+                print("  Heart rate background delivery failed: \(error?.localizedDescription ?? "Unknown")")
             }
         }
     }
@@ -423,7 +423,7 @@ class HealthKitManager: ObservableObject {
 
         let query = HKObserverQuery(sampleType: caloriesType, predicate: nil) { [weak self] _, completionHandler, error in
             if let error = error {
-                print("❌ Calories observer error: \(error.localizedDescription)")
+                print("  Calories observer error: \(error.localizedDescription)")
                 completionHandler()
                 return
             }
@@ -438,7 +438,7 @@ class HealthKitManager: ObservableObject {
 
         healthStore.enableBackgroundDelivery(for: caloriesType, frequency: .immediate) { success, error in
             if success {
-                print("✅ Calories background delivery enabled")
+                print(" Calories background delivery enabled")
             }
         }
     }
@@ -448,7 +448,7 @@ class HealthKitManager: ObservableObject {
 
         let query = HKObserverQuery(sampleType: stepsType, predicate: nil) { [weak self] _, completionHandler, error in
             if let error = error {
-                print("❌ Steps observer error: \(error.localizedDescription)")
+                print("  Steps observer error: \(error.localizedDescription)")
                 completionHandler()
                 return
             }
@@ -462,7 +462,7 @@ class HealthKitManager: ObservableObject {
 
         healthStore.enableBackgroundDelivery(for: stepsType, frequency: .immediate) { success, error in
             if success {
-                print("✅ Steps background delivery enabled")
+                print(" Steps background delivery enabled")
             }
         }
     }
@@ -472,7 +472,7 @@ class HealthKitManager: ObservableObject {
 
         let query = HKObserverQuery(sampleType: distanceType, predicate: nil) { [weak self] _, completionHandler, error in
             if let error = error {
-                print("❌ Distance observer error: \(error.localizedDescription)")
+                print("  Distance observer error: \(error.localizedDescription)")
                 completionHandler()
                 return
             }
@@ -486,7 +486,7 @@ class HealthKitManager: ObservableObject {
 
         healthStore.enableBackgroundDelivery(for: distanceType, frequency: .immediate) { success, error in
             if success {
-                print("✅ Distance background delivery enabled")
+                print(" Distance background delivery enabled")
             }
         }
     }

@@ -14,7 +14,7 @@ class FastAPIService {
     /// - Returns: 성공 시 백엔드 user_id (UUID), 실패 시 nil
     func registerUser(email: String) async -> String? {
         guard let url = URL(string: "\(baseURL)/api/users/") else {
-            print("❌ [FastAPI] Invalid URL")
+            print("  [FastAPI] Invalid URL")
             return nil
         }
 
@@ -30,7 +30,7 @@ class FastAPIService {
             let (data, response) = try await URLSession.shared.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
-                print("❌ [FastAPI] Invalid response")
+                print("  [FastAPI] Invalid response")
                 return nil
             }
 
@@ -38,7 +38,7 @@ class FastAPIService {
             if httpResponse.statusCode == 201 {
                 if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                    let userId = json["id"] as? String {
-                    print("✅ [FastAPI] User registered successfully: \(userId)")
+                    print(" [FastAPI] User registered successfully: \(userId)")
                     return userId
                 }
             }
@@ -50,14 +50,14 @@ class FastAPIService {
             }
 
             // 기타 에러
-            print("❌ [FastAPI] Registration failed with status: \(httpResponse.statusCode)")
+            print("  [FastAPI] Registration failed with status: \(httpResponse.statusCode)")
             if let errorString = String(data: data, encoding: .utf8) {
-                print("❌ [FastAPI] Error details: \(errorString)")
+                print("  [FastAPI] Error details: \(errorString)")
             }
             return nil
 
         } catch {
-            print("❌ [FastAPI] Network error: \(error.localizedDescription)")
+            print("  [FastAPI] Network error: \(error.localizedDescription)")
             return nil
         }
     }

@@ -174,9 +174,9 @@ extension WatchLocationManager: CLLocationManagerDelegate {
 
         switch manager.authorizationStatus {
         case .authorizedWhenInUse, .authorizedAlways:
-            print("✅ Location authorization granted")
+            print(" Location authorization granted")
         case .denied, .restricted:
-            print("❌ Location authorization denied")
+            print("  Location authorization denied")
         case .notDetermined:
             print("⚠️ Location authorization not determined")
         @unknown default:
@@ -231,7 +231,7 @@ extension WatchLocationManager: CLLocationManagerDelegate {
     }
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        print("❌ Location manager error: \(error.localizedDescription)")
+        print("  Location manager error: \(error.localizedDescription)")
 
         if let clError = error as? CLError {
             switch clError.code {

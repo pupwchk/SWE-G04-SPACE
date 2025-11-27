@@ -52,7 +52,7 @@ class WatchHealthKitManager: NSObject, ObservableObject {
         if isAvailable {
             print("⌚ HealthKit is available on Watch")
         } else {
-            print("❌ HealthKit is not available on this Watch")
+            print("  HealthKit is not available on this Watch")
         }
     }
 
@@ -60,7 +60,7 @@ class WatchHealthKitManager: NSObject, ObservableObject {
 
     func requestAuthorization() {
         guard isAvailable else {
-            print("❌ HealthKit not available")
+            print("  HealthKit not available")
             return
         }
 
@@ -83,9 +83,9 @@ class WatchHealthKitManager: NSObject, ObservableObject {
         healthStore.requestAuthorization(toShare: typesToShare, read: typesToRead) { success, error in
             DispatchQueue.main.async {
                 if success {
-                    print("✅ HealthKit authorization granted on Watch")
+                    print(" HealthKit authorization granted on Watch")
                 } else {
-                    print("❌ HealthKit authorization denied: \(error?.localizedDescription ?? "Unknown error")")
+                    print("  HealthKit authorization denied: \(error?.localizedDescription ?? "Unknown error")")
                 }
             }
         }
@@ -129,18 +129,18 @@ class WatchHealthKitManager: NSObject, ObservableObject {
             workoutSession?.startActivity(with: startDate)
             workoutBuilder?.beginCollection(withStart: startDate!) { success, error in
                 if success {
-                    print("✅ Workout session started")
+                    print(" Workout session started")
                     DispatchQueue.main.async {
                         self.isWorkoutActive = true
                         self.startRealtimeQueries()
                     }
                 } else {
-                    print("❌ Failed to start workout: \(error?.localizedDescription ?? "Unknown")")
+                    print("  Failed to start workout: \(error?.localizedDescription ?? "Unknown")")
                 }
             }
 
         } catch {
-            print("❌ Failed to create workout session: \(error.localizedDescription)")
+            print("  Failed to create workout session: \(error.localizedDescription)")
         }
     }
 
@@ -160,18 +160,18 @@ class WatchHealthKitManager: NSObject, ObservableObject {
         // Finish collection
         workoutBuilder?.endCollection(withEnd: endDate) { success, error in
             if success {
-                print("✅ Workout collection ended")
+                print(" Workout collection ended")
 
                 // Finish workout
                 self.workoutBuilder?.finishWorkout { workout, error in
                     if let workout = workout {
-                        print("✅ Workout finished and saved to HealthKit")
+                        print(" Workout finished and saved to HealthKit")
                         print("📊 Duration: \(workout.duration)s, Calories: \(workout.totalEnergyBurned?.doubleValue(for: .kilocalorie()) ?? 0) kcal")
 
                         // Send final data to iPhone
                         self.sendHealthDataToiPhone()
                     } else {
-                        print("❌ Failed to finish workout: \(error?.localizedDescription ?? "Unknown")")
+                        print("  Failed to finish workout: \(error?.localizedDescription ?? "Unknown")")
                     }
 
                     DispatchQueue.main.async {
@@ -180,7 +180,7 @@ class WatchHealthKitManager: NSObject, ObservableObject {
                     }
                 }
             } else {
-                print("❌ Failed to end collection: \(error?.localizedDescription ?? "Unknown")")
+                print("  Failed to end collection: \(error?.localizedDescription ?? "Unknown")")
             }
         }
     }
@@ -314,7 +314,7 @@ extension WatchHealthKitManager: HKWorkoutSessionDelegate {
         DispatchQueue.main.async {
             switch toState {
             case .running:
-                print("✅ Workout session running")
+                print(" Workout session running")
                 self.startPeriodicSending()
             case .ended:
                 print("🛑 Workout session ended")
@@ -332,7 +332,7 @@ extension WatchHealthKitManager: HKWorkoutSessionDelegate {
     }
 
     func workoutSession(_ workoutSession: HKWorkoutSession, didFailWithError error: Error) {
-        print("❌ Workout session failed: \(error.localizedDescription)")
+        print("  Workout session failed: \(error.localizedDescription)")
         DispatchQueue.main.async {
             self.isWorkoutActive = false
         }

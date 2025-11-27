@@ -210,7 +210,7 @@ class PersonaEditViewModel: ObservableObject {
             adjectives = try await SupabaseManager.shared.fetchAdjectives()
         } catch {
             errorMessage = "형용사를 불러오는데 실패했습니다: \(error.localizedDescription)"
-            print("❌ Failed to load adjectives: \(error)")
+            print("  Failed to load adjectives: \(error)")
         }
 
         isLoadingAdjectives = false
@@ -252,10 +252,10 @@ class PersonaEditViewModel: ObservableObject {
             }
 
             saveSuccess = true
-            print("✅ Persona saved successfully")
+            print(" Persona saved successfully")
         } catch {
             errorMessage = "저장 실패: \(error.localizedDescription)"
-            print("❌ Failed to save persona: \(error)")
+            print("  Failed to save persona: \(error)")
         }
 
         isSaving = false

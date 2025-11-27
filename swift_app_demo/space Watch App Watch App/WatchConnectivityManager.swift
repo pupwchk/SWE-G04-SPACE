@@ -38,7 +38,7 @@ class WatchConnectivityManager: NSObject, ObservableObject {
             session?.activate()
             print("⌚ WatchConnectivity session initialized")
         } else {
-            print("❌ WatchConnectivity not supported on this device")
+            print("  WatchConnectivity not supported on this device")
         }
     }
 
@@ -54,7 +54,7 @@ class WatchConnectivityManager: NSObject, ObservableObject {
         }
 
         session.sendMessage(message, replyHandler: replyHandler, errorHandler: { error in
-            print("❌ Failed to send message: \(error.localizedDescription)")
+            print("  Failed to send message: \(error.localizedDescription)")
             errorHandler?(error)
         })
 
@@ -64,7 +64,7 @@ class WatchConnectivityManager: NSObject, ObservableObject {
     /// Transfer user info to iPhone (background transfer, queued)
     func transferUserInfo(_ userInfo: [String: Any]) {
         guard let session = session else {
-            print("❌ WCSession not available")
+            print("  WCSession not available")
             return
         }
 
@@ -75,7 +75,7 @@ class WatchConnectivityManager: NSObject, ObservableObject {
     /// Update application context (latest state only, overwrites previous)
     func updateApplicationContext(_ context: [String: Any]) {
         guard let session = session else {
-            print("❌ WCSession not available")
+            print("  WCSession not available")
             return
         }
 
@@ -83,7 +83,7 @@ class WatchConnectivityManager: NSObject, ObservableObject {
             try session.updateApplicationContext(context)
             print("📤 Application context updated: \(context.keys.joined(separator: ", "))")
         } catch {
-            print("❌ Failed to update application context: \(error.localizedDescription)")
+            print("  Failed to update application context: \(error.localizedDescription)")
         }
     }
 
@@ -179,9 +179,9 @@ extension WatchConnectivityManager: WCSessionDelegate {
             self.isSessionActivated = (activationState == .activated)
 
             if let error = error {
-                print("❌ Session activation failed: \(error.localizedDescription)")
+                print("  Session activation failed: \(error.localizedDescription)")
             } else {
-                print("✅ WatchConnectivity session activated: \(activationState.rawValue)")
+                print(" WatchConnectivity session activated: \(activationState.rawValue)")
                 self.updatePhoneStatus()
             }
         }

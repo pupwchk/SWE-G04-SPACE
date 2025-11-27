@@ -213,7 +213,7 @@ struct TimelineWidget: View {
             checkpoints: checkpoints
         ) {
             timelineManager.saveTimeline(timeline)
-            print("✅ Timeline saved with \(checkpoints.count) checkpoint(s)")
+            print(" Timeline saved with \(checkpoints.count) checkpoint(s)")
         }
 
         locationManager.resetTracking()

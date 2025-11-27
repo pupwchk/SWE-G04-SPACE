@@ -106,12 +106,12 @@ class LocationManager: NSObject, ObservableObject {
                     options: [.alert, .sound, .badge]
                 )
                 if granted {
-                    print("✅ Notification permission granted")
+                    print(" Notification permission granted")
                 } else {
                     print("⚠️ Notification permission denied")
                 }
             } catch {
-                print("❌ Failed to request notification permission: \(error)")
+                print("  Failed to request notification permission: \(error)")
             }
         }
     }
@@ -119,7 +119,7 @@ class LocationManager: NSObject, ObservableObject {
     /// Start tracking GPS
     func startTracking() {
         guard authorizationStatus == .authorizedWhenInUse || authorizationStatus == .authorizedAlways else {
-            print("❌ Location permission not granted")
+            print("  Location permission not granted")
             requestPermission()
             return
         }
@@ -284,7 +284,7 @@ extension LocationManager: CLLocationManagerDelegate {
     }
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        print("❌ Location error: \(error.localizedDescription)")
+        print("  Location error: \(error.localizedDescription)")
     }
 
     // MARK: - Live Checkpoints
@@ -528,7 +528,7 @@ extension LocationManager: CLLocationManagerDelegate {
             try await UNUserNotificationCenter.current().add(request)
             print("📍 Sent proximity notification for \(location.fullDisplayName) at \(String(format: "%.0fm", distance))")
         } catch {
-            print("❌ Failed to send notification: \(error)")
+            print("  Failed to send notification: \(error)")
         }
     }
 }

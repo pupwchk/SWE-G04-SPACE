@@ -41,17 +41,17 @@ class TaggedLocationManager: ObservableObject {
         defer { isLoading = false }
 
         guard let userId = supabase.currentUser?.id else {
-            print("❌ User not authenticated")
+            print("  User not authenticated")
             return
         }
 
         guard let accessToken = supabase.getAccessToken() else {
-            print("❌ No access token available")
+            print("  No access token available")
             return
         }
 
         guard let url = URL(string: "https://aghsjspkzivcpibwwzvu.supabase.co/rest/v1/tagged_locations?user_id=eq.\(userId)&order=created_at.desc") else {
-            print("❌ Invalid URL")
+            print("  Invalid URL")
             return
         }
 
@@ -66,7 +66,7 @@ class TaggedLocationManager: ObservableObject {
 
             // Check for authentication errors
             if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
-                print("❌ Authentication failed: \(httpResponse.statusCode)")
+                print("  Authentication failed: \(httpResponse.statusCode)")
                 self.error = TaggedLocationError.notAuthenticated
                 return
             }
@@ -93,9 +93,9 @@ class TaggedLocationManager: ObservableObject {
             }
             let locations = try decoder.decode([TaggedLocation].self, from: data)
             self.taggedLocations = locations
-            print("✅ Loaded \(locations.count) tagged locations")
+            print(" Loaded \(locations.count) tagged locations")
         } catch {
-            print("❌ Failed to load tagged locations: \(error)")
+            print("  Failed to load tagged locations: \(error)")
             self.error = error
         }
     }
@@ -181,14 +181,14 @@ class TaggedLocationManager: ObservableObject {
         let locations = try decoder.decode([TaggedLocation].self, from: data)
 
         guard let created = locations.first else {
-            print("❌ Creation returned no data. Response: \(String(data: data, encoding: .utf8) ?? "Unable to decode response")")
+            print("  Creation returned no data. Response: \(String(data: data, encoding: .utf8) ?? "Unable to decode response")")
             throw TaggedLocationError.creationFailed
         }
 
         // Add to local array
         taggedLocations.insert(created, at: 0)
 
-        print("✅ Created tagged location: \(created.fullDisplayName)")
+        print(" Created tagged location: \(created.fullDisplayName)")
         return created
     }
 
@@ -269,7 +269,7 @@ class TaggedLocationManager: ObservableObject {
         let locations = try decoder.decode([TaggedLocation].self, from: data)
 
         guard let result = locations.first else {
-            print("❌ Update returned no data. Response: \(String(data: data, encoding: .utf8) ?? "Unable to decode response")")
+            print("  Update returned no data. Response: \(String(data: data, encoding: .utf8) ?? "Unable to decode response")")
             throw TaggedLocationError.updateFailed
         }
 
@@ -278,7 +278,7 @@ class TaggedLocationManager: ObservableObject {
             taggedLocations[index] = result
         }
 
-        print("✅ Updated tagged location: \(result.fullDisplayName)")
+        print(" Updated tagged location: \(result.fullDisplayName)")
     }
 
     // MARK: - Delete Tagged Location
@@ -311,7 +311,7 @@ class TaggedLocationManager: ObservableObject {
         // Remove from local array
         taggedLocations.removeAll { $0.id == location.id }
 
-        print("✅ Deleted tagged location: \(location.fullDisplayName)")
+        print(" Deleted tagged location: \(location.fullDisplayName)")
     }
 
     // MARK: - Find Tagged Location for Coordinate
@@ -363,7 +363,7 @@ class TaggedLocationManager: ObservableObject {
     func recordNotification(for location: TaggedLocation, distance: CLLocationDistance) async {
         guard let userId = supabase.currentUser?.id else { return }
         guard let accessToken = supabase.getAccessToken() else {
-            print("❌ No access token available for notification recording")
+            print("  No access token available for notification recording")
             return
         }
 
@@ -378,7 +378,7 @@ class TaggedLocationManager: ObservableObject {
         )
 
         guard let url = URL(string: "https://aghsjspkzivcpibwwzvu.supabase.co/rest/v1/location_notifications") else {
-            print("❌ Invalid URL for notification recording")
+            print("  Invalid URL for notification recording")
             return
         }
 
@@ -402,13 +402,13 @@ class TaggedLocationManager: ObservableObject {
 
             if let httpResponse = response as? HTTPURLResponse {
                 if httpResponse.statusCode == 201 {
-                    print("✅ Recorded notification for \(location.fullDisplayName)")
+                    print(" Recorded notification for \(location.fullDisplayName)")
                 } else if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
-                    print("❌ Authentication failed when recording notification")
+                    print("  Authentication failed when recording notification")
                 }
             }
         } catch {
-            print("❌ Failed to record notification: \(error)")
+            print("  Failed to record notification: \(error)")
         }
     }
 

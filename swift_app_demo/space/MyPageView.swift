@@ -176,7 +176,7 @@ struct MyPageView: View {
             let profile = try await supabaseManager.fetchUserProfile()
             userProfile = profile
         } catch {
-            print("❌ Failed to load user profile: \(error.localizedDescription)")
+            print("  Failed to load user profile: \(error.localizedDescription)")
         }
     }
 
@@ -192,7 +192,7 @@ struct MyPageView: View {
             await loadUserProfile()
             showEditName = false
         } catch {
-            print("❌ Failed to update name: \(error.localizedDescription)")
+            print("  Failed to update name: \(error.localizedDescription)")
         }
     }
 
@@ -208,7 +208,7 @@ struct MyPageView: View {
             await loadUserProfile()
             showEditBirthday = false
         } catch {
-            print("❌ Failed to update birthday: \(error.localizedDescription)")
+            print("  Failed to update birthday: \(error.localizedDescription)")
         }
     }
 }

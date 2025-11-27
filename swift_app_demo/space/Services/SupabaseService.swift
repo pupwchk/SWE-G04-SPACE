@@ -60,7 +60,7 @@ class SupabaseService: SupabaseServiceProtocol {
 
         guard httpResponse.statusCode == 200 else {
             if let errorString = String(data: data, encoding: .utf8) {
-                print("❌ Query failed: \(errorString)")
+                print("  Query failed: \(errorString)")
             }
             throw SupabaseError.queryFailed(statusCode: httpResponse.statusCode)
         }
@@ -106,7 +106,7 @@ class SupabaseService: SupabaseServiceProtocol {
 
         guard httpResponse.statusCode == 201 else {
             if let errorString = String(data: responseData, encoding: .utf8) {
-                print("❌ Insert failed: \(errorString)")
+                print("  Insert failed: \(errorString)")
             }
             throw SupabaseError.insertFailed(statusCode: httpResponse.statusCode)
         }
@@ -145,7 +145,7 @@ class SupabaseService: SupabaseServiceProtocol {
 
         guard httpResponse.statusCode == 200 || httpResponse.statusCode == 204 else {
             if let errorString = String(data: responseData, encoding: .utf8) {
-                print("❌ Update failed: \(errorString)")
+                print("  Update failed: \(errorString)")
             }
             throw SupabaseError.updateFailed(statusCode: httpResponse.statusCode)
         }
@@ -176,7 +176,7 @@ class SupabaseService: SupabaseServiceProtocol {
 
         guard httpResponse.statusCode == 200 || httpResponse.statusCode == 204 else {
             if let errorString = String(data: responseData, encoding: .utf8) {
-                print("❌ Delete failed: \(errorString)")
+                print("  Delete failed: \(errorString)")
             }
             throw SupabaseError.deleteFailed(statusCode: httpResponse.statusCode)
         }
@@ -210,7 +210,7 @@ class SupabaseService: SupabaseServiceProtocol {
 
         guard httpResponse.statusCode == 200 else {
             if let errorString = String(data: data, encoding: .utf8) {
-                print("❌ RPC failed: \(errorString)")
+                print("  RPC failed: \(errorString)")
             }
             throw SupabaseError.rpcFailed(statusCode: httpResponse.statusCode)
         }

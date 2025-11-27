@@ -167,7 +167,7 @@ struct MenuView: View {
             let profile = try await supabaseManager.fetchUserProfile()
             userProfile = profile
         } catch {
-            print("❌ Failed to load user profile: \(error.localizedDescription)")
+            print("  Failed to load user profile: \(error.localizedDescription)")
             // If profile fetch fails, we still show user info from currentUser
         }
     }
@@ -175,10 +175,10 @@ struct MenuView: View {
     private func performLogout() async {
         do {
             try await supabaseManager.signOut()
-            print("✅ Logged out successfully")
+            print(" Logged out successfully")
             // The app will automatically navigate to login screen via ContentView
         } catch {
-            print("❌ Logout failed: \(error.localizedDescription)")
+            print("  Logout failed: \(error.localizedDescription)")
         }
     }
 }

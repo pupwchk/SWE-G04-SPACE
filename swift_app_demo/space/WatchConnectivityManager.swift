@@ -36,7 +36,7 @@ class WatchConnectivityManager: NSObject, ObservableObject {
             session?.activate()
             print("📱 WatchConnectivity session initialized")
         } else {
-            print("❌ WatchConnectivity not supported on this device")
+            print("  WatchConnectivity not supported on this device")
         }
     }
 
@@ -52,7 +52,7 @@ class WatchConnectivityManager: NSObject, ObservableObject {
         }
 
         session.sendMessage(message, replyHandler: replyHandler, errorHandler: { error in
-            print("❌ Failed to send message: \(error.localizedDescription)")
+            print("  Failed to send message: \(error.localizedDescription)")
             errorHandler?(error)
         })
 
@@ -62,7 +62,7 @@ class WatchConnectivityManager: NSObject, ObservableObject {
     /// Transfer user info to Watch (background transfer, queued)
     func transferUserInfo(_ userInfo: [String: Any]) {
         guard let session = session else {
-            print("❌ WCSession not available")
+            print("  WCSession not available")
             return
         }
 
@@ -73,7 +73,7 @@ class WatchConnectivityManager: NSObject, ObservableObject {
     /// Update application context (latest state only, overwrites previous)
     func updateApplicationContext(_ context: [String: Any]) {
         guard let session = session else {
-            print("❌ WCSession not available")
+            print("  WCSession not available")
             return
         }
 
@@ -81,7 +81,7 @@ class WatchConnectivityManager: NSObject, ObservableObject {
             try session.updateApplicationContext(context)
             print("📤 Application context updated: \(context.keys.joined(separator: ", "))")
         } catch {
-            print("❌ Failed to update application context: \(error.localizedDescription)")
+            print("  Failed to update application context: \(error.localizedDescription)")
         }
     }
 
@@ -167,9 +167,9 @@ extension WatchConnectivityManager: WCSessionDelegate {
             self.isSessionActivated = (activationState == .activated)
 
             if let error = error {
-                print("❌ Session activation failed: \(error.localizedDescription)")
+                print("  Session activation failed: \(error.localizedDescription)")
             } else {
-                print("✅ WatchConnectivity session activated: \(activationState.rawValue)")
+                print(" WatchConnectivity session activated: \(activationState.rawValue)")
                 self.updateWatchStatus()
             }
         }
@@ -346,7 +346,7 @@ extension WatchConnectivityManager: WCSessionDelegate {
                 locationManager.healthDataHistory.append(health)
             }
 
-            print("✅ Added \(locationCoordinates.count) coordinates with health data from Watch to LocationManager (both arrays)")
+            print(" Added \(locationCoordinates.count) coordinates with health data from Watch to LocationManager (both arrays)")
         }
     }
 
@@ -385,22 +385,22 @@ extension WatchConnectivityManager: WCSessionDelegate {
             // Store the latest Watch health data
             if let hr = heartRate {
                 healthManager.currentHeartRate = hr
-                print("✅ Heart rate updated: \(Int(hr)) bpm")
+                print(" Heart rate updated: \(Int(hr)) bpm")
             }
             if let cal = calories {
                 healthManager.currentCalories = cal
-                print("✅ Calories updated: \(Int(cal)) kcal")
+                print(" Calories updated: \(Int(cal)) kcal")
             }
             if let st = steps {
                 healthManager.currentSteps = st
-                print("✅ Steps updated: \(st)")
+                print(" Steps updated: \(st)")
             }
             if let dist = distance {
                 healthManager.currentDistance = dist
-                print("✅ Distance updated: \(String(format: "%.2f", dist / 1000)) km")
+                print(" Distance updated: \(String(format: "%.2f", dist / 1000)) km")
             }
 
-            print("✅ Health data integrated into HealthKitManager")
+            print(" Health data integrated into HealthKitManager")
         }
     }
 
@@ -464,11 +464,11 @@ extension WatchConnectivityManager: WCSessionDelegate {
             if let currentTimeline = timelineManager.currentTimeline {
                 // Add to existing current timeline
                 timelineManager.addCheckpoint(to: currentTimeline.id, checkpoint: checkpoint)
-                print("✅ Checkpoint added to current timeline from Watch")
+                print(" Checkpoint added to current timeline from Watch")
             } else if let latestTimeline = timelineManager.timelines.first {
                 // Add to the most recent timeline if no current timeline
                 timelineManager.addCheckpoint(to: latestTimeline.id, checkpoint: checkpoint)
-                print("✅ Checkpoint added to latest timeline from Watch")
+                print(" Checkpoint added to latest timeline from Watch")
             } else {
                 print("⚠️ No timeline available to add checkpoint")
             }
@@ -492,7 +492,7 @@ extension WatchConnectivityManager: WCSessionDelegate {
                 // Watch started tracking - start iPhone GPS to mirror Watch state
                 if !locationManager.isTracking {
                     locationManager.startTracking()
-                    print("✅ iPhone GPS started to mirror Watch tracking")
+                    print(" iPhone GPS started to mirror Watch tracking")
                 }
             } else {
                 // Watch stopped tracking - create and save timeline
@@ -507,7 +507,7 @@ extension WatchConnectivityManager: WCSessionDelegate {
                 // Stop iPhone GPS
                 if locationManager.isTracking {
                     locationManager.stopTracking()
-                    print("✅ iPhone GPS stopped to mirror Watch tracking")
+                    print(" iPhone GPS stopped to mirror Watch tracking")
                 }
 
                 // Generate checkpoints automatically
@@ -529,7 +529,7 @@ extension WatchConnectivityManager: WCSessionDelegate {
                     checkpoints: checkpoints
                 ) {
                     timelineManager.saveTimeline(timeline)
-                    print("✅ Timeline saved from Watch session with \(checkpoints.count) checkpoint(s)")
+                    print(" Timeline saved from Watch session with \(checkpoints.count) checkpoint(s)")
                 } else {
                     print("⚠️ Failed to create timeline from Watch session")
                 }

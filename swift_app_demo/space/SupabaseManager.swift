@@ -65,7 +65,7 @@ class SupabaseManager: ObservableObject {
         if httpResponse.statusCode != 200 {
             // Parse error response
             if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                print("❌ Error JSON: \(json)")
+                print("  Error JSON: \(json)")
                 if let message = json["msg"] as? String ?? json["error_description"] as? String ?? json["message"] as? String {
                     throw AuthError.serverError(message)
                 }
@@ -132,9 +132,9 @@ class SupabaseManager: ObservableObject {
         } catch let error as AuthError {
             throw error
         } catch {
-            print("❌ JSON Decoding Error: \(error)")
+            print("  JSON Decoding Error: \(error)")
             if let decodingError = error as? DecodingError {
-                print("❌ Decoding Error Details: \(decodingError)")
+                print("  Decoding Error Details: \(decodingError)")
             }
             throw AuthError.serverError("Failed to parse server response: \(error.localizedDescription)")
         }
@@ -174,7 +174,7 @@ class SupabaseManager: ObservableObject {
         if httpResponse.statusCode != 200 {
             // Parse error response
             if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                print("❌ Error JSON: \(json)")
+                print("  Error JSON: \(json)")
                 if let message = json["error_description"] as? String ?? json["msg"] as? String ?? json["message"] as? String {
                     throw AuthError.serverError(message)
                 }
@@ -185,23 +185,23 @@ class SupabaseManager: ObservableObject {
         do {
             let authResponse = try JSONDecoder().decode(AuthResponse.self, from: data)
 
-            print("✅ Auth response decoded successfully")
+            print(" Auth response decoded successfully")
 
             // Try to get session from either nested or top-level fields
             guard let session = authResponse.getSession() else {
-                print("❌ No session found in response")
+                print("  No session found in response")
                 throw AuthError.serverError("Login failed - no session returned")
             }
 
-            print("✅ Session retrieved: \(session.accessToken.prefix(20))...")
+            print(" Session retrieved: \(session.accessToken.prefix(20))...")
 
             // Get user object
             guard let userObj = authResponse.user else {
-                print("❌ No user object in response")
+                print("  No user object in response")
                 throw AuthError.serverError("Login failed - no user data")
             }
 
-            print("✅ User object validated: \(userObj.email)")
+            print(" User object validated: \(userObj.email)")
 
             // Save session
             saveSession(session)
@@ -213,7 +213,7 @@ class SupabaseManager: ObservableObject {
                 name: userName
             )
 
-            print("✅ About to set authenticated state")
+            print(" About to set authenticated state")
 
             // Register user with FastAPI backend (or ensure they exist)
             Task {
@@ -223,7 +223,7 @@ class SupabaseManager: ObservableObject {
             await MainActor.run {
                 self.currentUser = user
                 self.isAuthenticated = true
-                print("✅ isAuthenticated set to true")
+                print(" isAuthenticated set to true")
             }
 
             // Send authentication status to Watch
@@ -238,14 +238,14 @@ class SupabaseManager: ObservableObject {
                 await TaggedLocationManager.shared.loadTaggedLocations()
             }
 
-            print("✅ Returning user: \(user.email)")
+            print(" Returning user: \(user.email)")
             return user
         } catch let error as AuthError {
             throw error
         } catch {
-            print("❌ JSON Decoding Error: \(error)")
+            print("  JSON Decoding Error: \(error)")
             if let decodingError = error as? DecodingError {
-                print("❌ Decoding Error Details: \(decodingError)")
+                print("  Decoding Error Details: \(decodingError)")
             }
             throw AuthError.serverError("Failed to parse server response: \(error.localizedDescription)")
         }
@@ -320,7 +320,7 @@ class SupabaseManager: ObservableObject {
 
         if httpResponse.statusCode != 200 {
             if let responseString = String(data: data, encoding: .utf8) {
-                print("❌ Fetch profile failed: \(responseString)")
+                print("  Fetch profile failed: \(responseString)")
             }
             throw AuthError.serverError("Failed to fetch profile")
         }
@@ -374,12 +374,12 @@ class SupabaseManager: ObservableObject {
 
         if httpResponse.statusCode != 200 && httpResponse.statusCode != 204 {
             if let responseString = String(data: data, encoding: .utf8) {
-                print("❌ Update profile failed: \(responseString)")
+                print("  Update profile failed: \(responseString)")
             }
             throw AuthError.serverError("Failed to update profile")
         }
 
-        print("✅ Profile updated successfully")
+        print(" Profile updated successfully")
     }
 
     // MARK: - Settings Management
@@ -411,7 +411,7 @@ class SupabaseManager: ObservableObject {
 
         if httpResponse.statusCode != 200 {
             if let responseString = String(data: data, encoding: .utf8) {
-                print("❌ Fetch settings failed: \(responseString)")
+                print("  Fetch settings failed: \(responseString)")
             }
             throw AuthError.serverError("Failed to fetch settings")
         }
@@ -457,12 +457,12 @@ class SupabaseManager: ObservableObject {
 
         if httpResponse.statusCode != 200 && httpResponse.statusCode != 204 {
             if let responseString = String(data: data, encoding: .utf8) {
-                print("❌ Update settings failed: \(responseString)")
+                print("  Update settings failed: \(responseString)")
             }
             throw AuthError.serverError("Failed to update settings")
         }
 
-        print("✅ Settings updated successfully")
+        print(" Settings updated successfully")
     }
 
     // MARK: - Persona Management
@@ -516,7 +516,7 @@ class SupabaseManager: ObservableObject {
         )
 
         let persona = try await personaRepository.createPersona(request)
-        print("✅ Persona created successfully")
+        print(" Persona created successfully")
         return persona
     }
 
@@ -538,13 +538,13 @@ class SupabaseManager: ObservableObject {
         )
 
         try await personaRepository.updatePersona(id: personaId, request)
-        print("✅ Persona updated successfully")
+        print(" Persona updated successfully")
     }
 
     /// Delete a persona
     func deletePersona(personaId: String) async throws {
         try await personaRepository.deletePersona(id: personaId)
-        print("✅ Persona deleted successfully")
+        print(" Persona deleted successfully")
     }
 
     /// Fetch active persona
@@ -563,7 +563,7 @@ class SupabaseManager: ObservableObject {
         }
 
         try await personaRepository.setActivePersona(userId: userId, personaId: personaId)
-        print("✅ Active persona set successfully")
+        print(" Active persona set successfully")
     }
 
     // MARK: - Multi-Persona Selection
@@ -584,7 +584,7 @@ class SupabaseManager: ObservableObject {
         }
 
         try await personaRepository.addSelectedPersona(userId: userId, personaId: personaId, order: order)
-        print("✅ Persona selected successfully")
+        print(" Persona selected successfully")
     }
 
     /// Remove a selected persona
@@ -594,7 +594,7 @@ class SupabaseManager: ObservableObject {
         }
 
         try await personaRepository.removeSelectedPersona(userId: userId, personaId: personaId)
-        print("✅ Persona unselected successfully")
+        print(" Persona unselected successfully")
     }
 
     /// Set selected personas (replaces all existing selections, max 5)
@@ -604,7 +604,7 @@ class SupabaseManager: ObservableObject {
         }
 
         try await personaRepository.setSelectedPersonas(userId: userId, personaIds: personaIds)
-        print("✅ Selected personas updated successfully")
+        print(" Selected personas updated successfully")
     }
 
     /// Create user profile in database
@@ -637,11 +637,11 @@ class SupabaseManager: ObservableObject {
 
         if httpProfileResponse.statusCode != 201 {
             if let responseString = String(data: profileData, encoding: .utf8) {
-                print("❌ Profile creation failed: \(responseString)")
+                print("  Profile creation failed: \(responseString)")
             }
             print("⚠️ Warning: Could not create user profile")
         } else {
-            print("✅ User profile created successfully")
+            print(" User profile created successfully")
         }
 
         // Create default user settings
@@ -675,11 +675,11 @@ class SupabaseManager: ObservableObject {
 
         if httpSettingsResponse.statusCode != 201 {
             if let responseString = String(data: settingsData, encoding: .utf8) {
-                print("❌ Settings creation failed: \(responseString)")
+                print("  Settings creation failed: \(responseString)")
             }
             print("⚠️ Warning: Could not create user settings")
         } else {
-            print("✅ User settings created successfully")
+            print(" User settings created successfully")
         }
     }
 
@@ -771,9 +771,9 @@ class SupabaseManager: ObservableObject {
                 await TaggedLocationManager.shared.loadTaggedLocations()
             }
 
-            print("✅ Session validated, user: \(user.email)")
+            print(" Session validated, user: \(user.email)")
         } catch {
-            print("❌ Session validation failed: \(error.localizedDescription)")
+            print("  Session validation failed: \(error.localizedDescription)")
             // Keep authentication state but log the error
         }
     }

@@ -26,10 +26,8 @@ struct ChatView: View {
                     // Selection screen
                     SelectionView(selectedMode: $selectedMode, showPhoneCall: $showPhoneCall)
                 } else if selectedMode == .text {
-                    // Text chat view
-                    TextChatView(onBack: {
-                        selectedMode = nil
-                    })
+                    // Persona chat list view
+                    PersonaChatListView()
                 }
             }
             .navigationTitle("채팅")
@@ -128,115 +126,148 @@ struct SelectionView: View {
     }
 }
 
-struct TextChatView: View {
-    @StateObject private var fontSizeManager = FontSizeManager.shared
-    @State private var messages: [Message] = [
-        Message(text: "안녕하세요! 오늘 집에 언제 도착하시나요?", isFromUser: false, timestamp: Date().addingTimeInterval(-7200)),
-        Message(text: "6시쯤 도착할 것 같아요", isFromUser: true, timestamp: Date().addingTimeInterval(-7100)),
-        Message(text: "알겠습니다. 저녁은 준비해놓을게요", isFromUser: false, timestamp: Date().addingTimeInterval(-7000)),
-        Message(text: "감사합니다!", isFromUser: true, timestamp: Date().addingTimeInterval(-6900)),
-        Message(text: "장 봐올 게 있나요?", isFromUser: false, timestamp: Date().addingTimeInterval(-3600)),
-        Message(text: "우유랑 빵 좀 부탁드려요", isFromUser: true, timestamp: Date().addingTimeInterval(-3500))
-    ]
-    @State private var messageText = ""
-
-    let onBack: () -> Void
+/// 페르소나 채팅방 목록 화면
+struct PersonaChatListView: View {
+    @StateObject private var viewModel = PersonaChatListViewModel()
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Messages
-            ScrollView {
-                VStack(spacing: 12) {
-                    ForEach(messages) { message in
-                        HStack(alignment: .bottom, spacing: 8) {
-                            if message.isFromUser {
-                                Spacer()
+        ZStack {
+            Color.white
+                .ignoresSafeArea()
 
-                                Text(timeString(from: message.timestamp))
-                                    .font(.system(size: 11))
-                                    .foregroundColor(.gray)
-                                    .padding(.bottom, 4)
-                            }
+            if viewModel.isLoading {
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle(tint: Color(hex: "A50034")))
+            } else if viewModel.personas.isEmpty {
+                // Empty state
+                VStack(spacing: 20) {
+                    Image(systemName: "message.circle")
+                        .font(.system(size: 60))
+                        .foregroundColor(Color(hex: "A50034").opacity(0.6))
 
-                            Text(message.text)
-                                .font(.system(size: fontSizeManager.fontSize))
-                                .foregroundColor(.black)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 12)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 18)
-                                        .fill(message.isFromUser ?
-                                              Color(red: 0.98, green: 0.95, blue: 0.98) :
-                                              Color(red: 0.95, green: 0.95, blue: 0.97))
+                    Text("대화 가능한 페르소나가 없습니다")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundColor(.gray)
+
+                    Text("페르소나 탭에서 페르소나를 생성해주세요")
+                        .font(.system(size: 14))
+                        .foregroundColor(.gray.opacity(0.7))
+                }
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(viewModel.personas) { persona in
+                            NavigationLink(destination: PersonaChatView(persona: persona)) {
+                                SimpleChatRoomCell(
+                                    persona: persona,
+                                    adjectives: viewModel.getAdjectivesFor(persona: persona)
                                 )
-                                .frame(maxWidth: 250, alignment: message.isFromUser ? .trailing : .leading)
-
-                            if !message.isFromUser {
-                                Text(timeString(from: message.timestamp))
-                                    .font(.system(size: 11))
-                                    .foregroundColor(.gray)
-                                    .padding(.bottom, 4)
-
-                                Spacer()
                             }
+                            .buttonStyle(.plain)
+
+                            Divider()
+                                .padding(.leading, 80)
                         }
-                        .padding(.horizontal, 16)
                     }
                 }
-                .padding(.vertical, 16)
             }
-            .background(Color.white)
-
-            // Input bar
-            HStack(spacing: 12) {
-                Button(action: {}) {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.system(size: 28))
-                        .foregroundColor(Color(hex: "A50034"))
-                }
-
-                HStack {
-                    TextField("메시지를 입력하세요", text: $messageText)
-                        .font(.system(size: fontSizeManager.fontSize))
-                        .padding(.vertical, 10)
-                        .padding(.horizontal, 16)
-
-                    if !messageText.isEmpty {
-                        Button(action: {
-                            sendMessage()
-                        }) {
-                            Image(systemName: "arrow.up.circle.fill")
-                                .font(.system(size: 24))
-                                .foregroundColor(Color(hex: "A50034"))
-                        }
-                        .padding(.trailing, 8)
-                    }
-                }
-                .background(
-                    RoundedRectangle(cornerRadius: 20)
-                        .fill(Color(red: 0.96, green: 0.96, blue: 0.98))
-                )
+        }
+        .onAppear {
+            Task {
+                await viewModel.loadData()
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(
-                Color.white
-                    .shadow(color: .black.opacity(0.05), radius: 1, x: 0, y: -1)
-            )
         }
     }
+}
 
-    private func sendMessage() {
-        guard !messageText.isEmpty else { return }
-        messages.append(Message(text: messageText, isFromUser: true, timestamp: Date()))
-        messageText = ""
+/// 간단한 채팅방 셀 컴포넌트 (편집/삭제 없는 버전)
+struct SimpleChatRoomCell: View {
+    let persona: Persona
+    let adjectives: [Adjective]
+
+    var body: some View {
+        HStack(spacing: 16) {
+            // 프로필 이미지
+            Circle()
+                .fill(
+                    LinearGradient(
+                        gradient: Gradient(colors: [
+                            Color(hex: "A50034"),
+                            Color(hex: "A50034").opacity(0.7)
+                        ]),
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .frame(width: 56, height: 56)
+                .overlay(
+                    Text(String(persona.nickname.prefix(1)))
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundColor(.white)
+                )
+
+            VStack(alignment: .leading, spacing: 6) {
+                // 페르소나 이름
+                Text(persona.nickname)
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundColor(.black)
+
+                // 형용사 태그들을 텍스트로 표시
+                if !adjectives.isEmpty {
+                    Text(adjectives.map { $0.adjectiveName }.joined(separator: " · "))
+                        .font(.system(size: 14))
+                        .foregroundColor(.gray)
+                        .lineLimit(1)
+                } else {
+                    Text("대화를 시작해보세요")
+                        .font(.system(size: 14))
+                        .foregroundColor(.gray)
+                        .lineLimit(1)
+                }
+            }
+
+            Spacer()
+
+            // 시간 표시 (나중에 실제 메시지 시간으로 교체 가능)
+            Text("지금")
+                .font(.system(size: 13))
+                .foregroundColor(.gray)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
+        .background(Color.white)
+        .contentShape(Rectangle())
+    }
+}
+
+/// PersonaChatListView의 ViewModel
+@MainActor
+class PersonaChatListViewModel: ObservableObject {
+    @Published var personas: [Persona] = []
+    @Published var adjectives: [Adjective] = []
+    @Published var isLoading = false
+
+    func loadData() async {
+        isLoading = true
+
+        do {
+            // Load personas and adjectives in parallel
+            async let personasTask = SupabaseManager.shared.fetchPersonas()
+            async let adjectivesTask = SupabaseManager.shared.fetchAdjectives()
+
+            personas = try await personasTask
+            adjectives = try await adjectivesTask
+
+            print(" Loaded \(personas.count) personas for chat")
+        } catch {
+            print("  Failed to load data: \(error)")
+        }
+
+        isLoading = false
     }
 
-    private func timeString(from date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "a h:mm"
-        formatter.locale = Locale(identifier: "ko_KR")
-        return formatter.string(from: date)
+    func getAdjectivesFor(persona: Persona) -> [Adjective] {
+        return adjectives.filter { persona.adjectiveIds.contains($0.id) }
     }
 }
 

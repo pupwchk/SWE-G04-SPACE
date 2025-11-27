@@ -169,9 +169,9 @@ class PersonaBubbleWidgetViewModel: ObservableObject {
             // Load all adjectives
             allAdjectives = try await SupabaseManager.shared.fetchAdjectives()
 
-            print("✅ Widget loaded \(selectedPersonas.count) selected personas")
+            print(" Widget loaded \(selectedPersonas.count) selected personas")
         } catch {
-            print("❌ Failed to load selected personas: \(error)")
+            print("  Failed to load selected personas: \(error)")
         }
 
         isLoading = false

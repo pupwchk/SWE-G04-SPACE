@@ -13,12 +13,14 @@ struct PersonaListView: View {
     @State private var personaToEdit: Persona?
     @State private var personaToDelete: Persona?
     @State private var showingDeleteAlert = false
+    @State private var isSelectionMode = false
+    @State private var selectedPersonaIds: Set<String> = []
 
     var body: some View {
         NavigationStack {
             ZStack {
                 // Background
-                Color(hex: "F9F9F9")
+                Color.white
                     .ignoresSafeArea()
 
                 if viewModel.isLoading {
@@ -49,73 +51,97 @@ struct PersonaListView: View {
                     }
                 } else {
                     VStack(spacing: 0) {
-                        // Selection count header
-                        HStack {
-                            Text("선택된 페르소나: \(viewModel.selectedPersonaIds.count)/5")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(Color(hex: "A50034"))
-
-                            Spacer()
-
-                            if !viewModel.selectedPersonaIds.isEmpty {
-                                Button("선택 저장") {
-                                    Task {
-                                        await viewModel.saveSelectedPersonas()
-                                    }
-                                }
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 8)
-                                .background(Color(hex: "A50034"))
-                                .cornerRadius(20)
-                            }
-                        }
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 12)
-                        .background(Color.white)
-
                         ScrollView {
-                            LazyVStack(spacing: 16) {
+                            LazyVStack(spacing: 0) {
                                 ForEach(viewModel.personas) { persona in
-                                    PersonaCard(
-                                        persona: persona,
-                                        isSelected: viewModel.selectedPersonaIds.contains(persona.id),
-                                        adjectives: viewModel.getAdjectivesFor(persona: persona),
-                                        onTap: {
-                                            viewModel.togglePersonaSelection(persona.id)
-                                        },
-                                        onEdit: {
-                                            personaToEdit = persona
-                                        },
-                                        onDelete: {
-                                            personaToDelete = persona
-                                            showingDeleteAlert = true
+                                    if isSelectionMode {
+                                        // Selection mode - show checkbox
+                                        Button(action: {
+                                            toggleSelection(for: persona.id)
+                                        }) {
+                                            ChatRoomCell(
+                                                persona: persona,
+                                                adjectives: viewModel.getAdjectivesFor(persona: persona),
+                                                onEdit: {
+                                                    personaToEdit = persona
+                                                },
+                                                onDelete: {
+                                                    personaToDelete = persona
+                                                    showingDeleteAlert = true
+                                                },
+                                                isSelectionMode: true,
+                                                isSelected: selectedPersonaIds.contains(persona.id)
+                                            )
                                         }
-                                    )
-                                }
-                            }
+                                        .buttonStyle(.plain)
+                                    } else {
+                                        // Normal mode - navigate to chat
+                                        NavigationLink(destination: PersonaChatView(persona: persona)) {
+                                            ChatRoomCell(
+                                                persona: persona,
+                                                adjectives: viewModel.getAdjectivesFor(persona: persona),
+                                                onEdit: {
+                                                    personaToEdit = persona
+                                                },
+                                                onDelete: {
+                                                    personaToDelete = persona
+                                                    showingDeleteAlert = true
+                                                },
+                                                isSelectionMode: false,
+                                                isSelected: false
+                                            )
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
 
-                            // Add button at the end
-                            Button(action: {
-                                showingEditView = true
-                            }) {
-                                HStack {
-                                    Image(systemName: "plus.circle.fill")
-                                        .font(.system(size: 20))
-                                    Text("페르소나 추가")
-                                        .font(.system(size: 16, weight: .medium))
+                                    Divider()
+                                        .padding(.leading, isSelectionMode ? 100 : 80)
                                 }
-                                .foregroundColor(Color(hex: "A50034"))
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 16)
-                                .background(Color.white)
-                                .cornerRadius(12)
                             }
                         }
-                        .padding(.horizontal, 20)
-                        .padding(.top, 16)
-                        .padding(.bottom, 40)
+
+                        // Selection mode bottom bar
+                        if isSelectionMode {
+                            VStack(spacing: 0) {
+                                Divider()
+
+                                HStack(spacing: 16) {
+                                    Text("\(selectedPersonaIds.count)/5 선택됨")
+                                        .font(.system(size: 14))
+                                        .foregroundColor(.gray)
+
+                                    Spacer()
+
+                                    Button(action: {
+                                        isSelectionMode = false
+                                        selectedPersonaIds.removeAll()
+                                    }) {
+                                        Text("취소")
+                                            .font(.system(size: 16, weight: .medium))
+                                            .foregroundColor(.gray)
+                                    }
+
+                                    Button(action: {
+                                        Task {
+                                            await saveSelection()
+                                        }
+                                    }) {
+                                        Text("선택 저장")
+                                            .font(.system(size: 16, weight: .semibold))
+                                            .foregroundColor(.white)
+                                            .padding(.horizontal, 20)
+                                            .padding(.vertical, 10)
+                                            .background(Color(hex: "A50034"))
+                                            .cornerRadius(20)
+                                    }
+                                    .disabled(selectedPersonaIds.isEmpty)
+                                    .opacity(selectedPersonaIds.isEmpty ? 0.5 : 1.0)
+                                }
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 12)
+                                .background(Color.white)
+                            }
+                        }
                     }
                 }
 
@@ -135,6 +161,31 @@ struct PersonaListView: View {
             }
             .navigationTitle("페르소나")
             .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    if !viewModel.personas.isEmpty {
+                        Button(action: {
+                            toggleSelectionMode()
+                        }) {
+                            Text(isSelectionMode ? "완료" : "선택")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(Color(hex: "A50034"))
+                        }
+                    }
+                }
+
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: {
+                        showingEditView = true
+                    }) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundColor(Color(hex: "A50034"))
+                    }
+                    .disabled(isSelectionMode)
+                    .opacity(isSelectionMode ? 0.3 : 1.0)
+                }
+            }
             .sheet(isPresented: $showingEditView, onDismiss: {
                 Task {
                     await viewModel.loadData()
@@ -171,39 +222,116 @@ struct PersonaListView: View {
             .onAppear {
                 Task {
                     await viewModel.loadData()
+                    await loadSelectedPersonas()
                 }
+            }
+        }
+    }
+
+    // MARK: - Helper Methods
+
+    private func toggleSelectionMode() {
+        isSelectionMode.toggle()
+        if !isSelectionMode {
+            selectedPersonaIds.removeAll()
+        }
+    }
+
+    private func toggleSelection(for personaId: String) {
+        if selectedPersonaIds.contains(personaId) {
+            selectedPersonaIds.remove(personaId)
+        } else {
+            // 최대 5개까지만 선택 가능
+            if selectedPersonaIds.count < 5 {
+                selectedPersonaIds.insert(personaId)
+            } else {
+                viewModel.errorMessage = "최대 5개까지만 선택할 수 있습니다"
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                    viewModel.errorMessage = nil
+                }
+            }
+        }
+    }
+
+    private func loadSelectedPersonas() async {
+        do {
+            let selected = try await SupabaseManager.shared.fetchSelectedPersonas()
+            selectedPersonaIds = Set(selected.map { $0.id })
+        } catch {
+            print("  Failed to load selected personas: \(error)")
+        }
+    }
+
+    private func saveSelection() async {
+        do {
+            let personaIdsArray = Array(selectedPersonaIds)
+            try await SupabaseManager.shared.setSelectedPersonas(personaIds: personaIdsArray)
+
+            viewModel.errorMessage = " 선택이 저장되었습니다"
+            isSelectionMode = false
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                viewModel.errorMessage = nil
+            }
+        } catch {
+            viewModel.errorMessage = "선택 저장에 실패했습니다"
+            print("  Failed to save selection: \(error)")
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                viewModel.errorMessage = nil
             }
         }
     }
 }
 
-/// 페르소나 카드 컴포넌트
-struct PersonaCard: View {
+/// 채팅방 셀 컴포넌트 (채팅 앱 느낌)
+struct ChatRoomCell: View {
     let persona: Persona
-    let isSelected: Bool
     let adjectives: [Adjective]
-    let onTap: () -> Void
     let onEdit: () -> Void
     let onDelete: () -> Void
+    var isSelectionMode: Bool = false
+    var isSelected: Bool = false
 
     var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 12) {
-                // Selection checkbox
+        HStack(spacing: 16) {
+            // 체크박스 (선택 모드일 때만 표시)
+            if isSelectionMode {
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 24))
                     .foregroundColor(isSelected ? Color(hex: "A50034") : .gray.opacity(0.3))
+            }
 
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        // Nickname
-                        Text(persona.nickname)
-                            .font(.system(size: 18, weight: .bold))
-                            .foregroundColor(.black)
+            // 프로필 이미지
+            Circle()
+                .fill(
+                    LinearGradient(
+                        gradient: Gradient(colors: [
+                            Color(hex: "A50034"),
+                            Color(hex: "A50034").opacity(0.7)
+                        ]),
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .frame(width: 56, height: 56)
+                .overlay(
+                    Text(String(persona.nickname.prefix(1)))
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundColor(.white)
+                )
 
-                        Spacer()
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    // 페르소나 이름
+                    Text(persona.nickname)
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundColor(.black)
 
-                        // Menu button
+                    Spacer()
+
+                    // 메뉴 버튼 (선택 모드가 아닐 때만 표시)
+                    if !isSelectionMode {
                         Menu {
                             Button(action: onEdit) {
                                 Label("편집", systemImage: "pencil")
@@ -213,35 +341,34 @@ struct PersonaCard: View {
                             }
                         } label: {
                             Image(systemName: "ellipsis")
-                                .font(.system(size: 16, weight: .semibold))
+                                .font(.system(size: 14))
                                 .foregroundColor(.gray)
-                                .padding(8)
-                        }
-                    }
-
-                    // Adjective tags
-                    if !adjectives.isEmpty {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 8) {
-                                ForEach(adjectives) { adjective in
-                                    SelectedAdjectiveTag(text: adjective.adjectiveName)
-                                }
-                            }
+                                .frame(width: 30, height: 30)
                         }
                     }
                 }
+
+                // 형용사 태그들을 텍스트로 표시
+                if !adjectives.isEmpty {
+                    Text(adjectives.map { $0.adjectiveName }.joined(separator: " · "))
+                        .font(.system(size: 14))
+                        .foregroundColor(.gray)
+                        .lineLimit(1)
+                } else {
+                    Text("대화를 시작해보세요")
+                        .font(.system(size: 14))
+                        .foregroundColor(.gray)
+                        .lineLimit(1)
+                }
             }
-            .padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.white)
-            .cornerRadius(12)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(isSelected ? Color(hex: "A50034") : Color.clear, lineWidth: 2)
-            )
-            .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
+
+            // 읽지 않은 메시지 표시 (나중에 추가 가능)
+            Spacer()
         }
-        .buttonStyle(.plain)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
+        .background(Color.white)
+        .contentShape(Rectangle())
     }
 }
 
@@ -308,8 +435,6 @@ struct FlowLayout<Content: View>: View {
 class PersonaListViewModel: ObservableObject {
     @Published var personas: [Persona] = []
     @Published var adjectives: [Adjective] = []
-    @Published var selectedPersonaIds: [String] = [] // Multi-selection support
-    private let maxSelection = 5
 
     @Published var isLoading = false
     @Published var errorMessage: String?
@@ -319,22 +444,17 @@ class PersonaListViewModel: ObservableObject {
         errorMessage = nil
 
         do {
-            // Load personas, adjectives, and selected personas in parallel
+            // Load personas and adjectives in parallel
             async let personasTask = SupabaseManager.shared.fetchPersonas()
             async let adjectivesTask = SupabaseManager.shared.fetchAdjectives()
-            async let selectedPersonasTask = SupabaseManager.shared.fetchSelectedPersonas()
 
             personas = try await personasTask
             adjectives = try await adjectivesTask
-            let selectedPersonas = try await selectedPersonasTask
 
-            // Extract IDs from selected personas
-            selectedPersonaIds = selectedPersonas.map { $0.id }
-
-            print("✅ Loaded \(personas.count) personas, \(adjectives.count) adjectives, \(selectedPersonaIds.count) selected")
+            print(" Loaded \(personas.count) personas, \(adjectives.count) adjectives")
         } catch {
             errorMessage = "데이터를 불러오는데 실패했습니다"
-            print("❌ Failed to load data: \(error)")
+            print("  Failed to load data: \(error)")
         }
 
         isLoading = false
@@ -344,68 +464,15 @@ class PersonaListViewModel: ObservableObject {
         return adjectives.filter { persona.adjectiveIds.contains($0.id) }
     }
 
-    /// Toggle persona selection (max 5)
-    func togglePersonaSelection(_ personaId: String) {
-        if let index = selectedPersonaIds.firstIndex(of: personaId) {
-            // Deselect
-            selectedPersonaIds.remove(at: index)
-        } else {
-            // Select (if not at max)
-            if selectedPersonaIds.count < maxSelection {
-                selectedPersonaIds.append(personaId)
-            } else {
-                errorMessage = "최대 5개까지만 선택할 수 있습니다"
-                // Clear error after 2 seconds
-                Task {
-                    try? await Task.sleep(nanoseconds: 2_000_000_000)
-                    errorMessage = nil
-                }
-            }
-        }
-    }
-
-    /// Save selected personas to database
-    func saveSelectedPersonas() async {
-        guard !selectedPersonaIds.isEmpty else { return }
-
-        do {
-            try await SupabaseManager.shared.setSelectedPersonas(personaIds: selectedPersonaIds)
-            print("✅ Saved \(selectedPersonaIds.count) selected personas")
-
-            // Show success message
-            errorMessage = "✅ 선택이 저장되었습니다"
-
-            // Clear success message after 2 seconds
-            Task {
-                try? await Task.sleep(nanoseconds: 2_000_000_000)
-                errorMessage = nil
-            }
-        } catch {
-            errorMessage = "❌ 선택 저장 실패"
-            print("❌ Failed to save selected personas: \(error)")
-
-            // Clear error message after 3 seconds
-            Task {
-                try? await Task.sleep(nanoseconds: 3_000_000_000)
-                errorMessage = nil
-            }
-        }
-    }
-
     func deletePersona(_ personaId: String) async {
         do {
             try await SupabaseManager.shared.deletePersona(personaId: personaId)
             personas.removeAll { $0.id == personaId }
 
-            // Also remove from selection if it was selected
-            if let index = selectedPersonaIds.firstIndex(of: personaId) {
-                selectedPersonaIds.remove(at: index)
-            }
-
-            print("✅ Deleted persona: \(personaId)")
+            print(" Deleted persona: \(personaId)")
         } catch {
             errorMessage = "페르소나 삭제 실패"
-            print("❌ Failed to delete persona: \(error)")
+            print("  Failed to delete persona: \(error)")
         }
     }
 }

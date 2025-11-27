@@ -114,7 +114,7 @@ class PersonaWidgetViewModel: ObservableObject {
                 self.isLoading = false
             }
         } catch {
-            print("❌ Failed to load selected personas: \(error.localizedDescription)")
+            print("  Failed to load selected personas: \(error.localizedDescription)")
             await MainActor.run {
                 self.selectedPersonas = []
                 self.isLoading = false

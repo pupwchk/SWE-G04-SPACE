@@ -247,7 +247,7 @@ class TimelineManager: ObservableObject {
     func saveTimeline(_ timeline: TimelineRecord) {
         timelines.insert(timeline, at: 0) // Add to beginning
         saveToUserDefaults()
-        print("✅ Timeline saved: \(timeline.distanceFormatted), \(timeline.durationFormatted)")
+        print(" Timeline saved: \(timeline.distanceFormatted), \(timeline.durationFormatted)")
     }
 
     func deleteTimeline(_ timeline: TimelineRecord) {
