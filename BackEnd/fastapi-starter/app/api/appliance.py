@@ -1,14 +1,46 @@
 # app/api/appliances.py
 from uuid import UUID
+from typing import Optional, Dict, Any
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from pydantic import BaseModel, Field
 
 from app.config.db import get_db
 import app.schemas.info as infoSchema
 import app.cruds.info as infoCruds
+from app.services.appliance_control_service import appliance_control_service
+from app.services.appliance_rule_engine import appliance_rule_engine
+from app.services.weather_service import weather_service
+from app.models.appliance import ApplianceConditionRule
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+# ========== 새로운 제어 API 스키마 ==========
+class ApplianceControlRequest(BaseModel):
+    """가전 제어 요청"""
+    appliance_type: str = Field(..., description="가전 종류")
+    action: str = Field(..., description="on/off/set")
+    settings: Optional[Dict[str, Any]] = Field(None, description="설정값")
+
+
+class ApplianceRecommendRequest(BaseModel):
+    """가전 추천 요청"""
+    latitude: float
+    longitude: float
+    sido: str = "서울"
+
+
+class RuleModifyRequest(BaseModel):
+    """가전 규칙 수정 요청"""
+    appliance_type: str = Field(..., description="가전 종류 (에어컨, 제습기 등)")
+    fatigue_level: Optional[int] = Field(None, description="피로도 레벨 (1-4)")
+    operation: str = Field(..., description="enable/disable/modify_threshold")
+    new_threshold: Optional[Dict[str, Any]] = Field(None, description="새로운 임계값 (modify_threshold일 때 필수)")
+    is_enabled: Optional[bool] = Field(None, description="활성화 여부 (enable/disable일 때 사용)")
 
 
 # -----------------------------
@@ -243,6 +275,266 @@ def get_light_config(
             detail="LightConfig not found",
         )
     return cfg
+
+
+# ========== 새로운 제어 API ==========
+
+@router.post("/smart-control/{user_id}")
+async def smart_control_appliances(
+    user_id: str,
+    request: ApplianceControlRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    가전 스마트 제어 (Rule Engine 기반)
+    """
+    try:
+        result = appliance_control_service.execute_command(
+            db=db,
+            user_id=user_id,
+            appliance_type=request.appliance_type,
+            action=request.action,
+            settings=request.settings,
+            triggered_by="manual"
+        )
+        return result
+    except Exception as e:
+        logger.error(f"❌ Control error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/recommend/{user_id}")
+async def recommend_appliances(
+    user_id: str,
+    request: ApplianceRecommendRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    현재 상황 기반 가전 제어 추천 (피로도 + 날씨 분석)
+    """
+    try:
+        weather_data = await weather_service.get_combined_weather(
+            db=db,
+            latitude=request.latitude,
+            longitude=request.longitude,
+            sido_name=request.sido
+        )
+
+        recommendations = appliance_rule_engine.get_appliances_to_control(
+            db=db,
+            user_id=user_id,
+            weather_data=weather_data
+        )
+
+        return {
+            "user_id": user_id,
+            "weather": {
+                "temperature": weather_data.get("temperature"),
+                "humidity": weather_data.get("humidity"),
+                "pm10": weather_data.get("pm10"),
+                "pm2_5": weather_data.get("pm2_5")
+            },
+            "recommendations": recommendations
+        }
+    except Exception as e:
+        logger.error(f"❌ Recommend error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/smart-status/{user_id}")
+async def get_smart_status(
+    user_id: str,
+    appliance_type: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """
+    가전 스마트 상태 조회
+    """
+    try:
+        statuses = appliance_control_service.get_appliance_status(
+            db=db,
+            user_id=user_id,
+            appliance_type=appliance_type
+        )
+        return {"user_id": user_id, "appliances": statuses}
+    except Exception as e:
+        logger.error(f"❌ Status error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/smart-history/{user_id}")
+async def get_smart_history(
+    user_id: str,
+    limit: int = 20,
+    db: Session = Depends(get_db)
+):
+    """
+    가전 제어 히스토리
+    """
+    try:
+        history = appliance_control_service.get_command_history(
+            db=db,
+            user_id=user_id,
+            limit=limit
+        )
+        return {"user_id": user_id, "history": history}
+    except Exception as e:
+        logger.error(f"❌ History error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/setup-rules/{user_id}")
+async def setup_default_rules(
+    user_id: str,
+    db: Session = Depends(get_db)
+):
+    """
+    사용자를 위한 기본 가전 규칙 생성
+    """
+    try:
+        appliance_rule_engine.create_default_rules(db, user_id)
+        return {
+            "status": "ok",
+            "message": "Default rules created successfully"
+        }
+    except Exception as e:
+        logger.error(f"❌ Setup error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.patch("/rules/{user_id}")
+async def modify_appliance_rule(
+    user_id: str,
+    request: RuleModifyRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    가전 자동 작동 조건 수정 API
+
+    사용 예시:
+    1. 제습기 자동 작동 끄기: operation="disable", appliance_type="제습기"
+    2. 에어컨 임계값 수정: operation="modify_threshold", appliance_type="에어컨", new_threshold={"temp_threshold": 26}
+    3. 제습기 다시 켜기: operation="enable", appliance_type="제습기"
+    """
+    try:
+        # fatigue_level이 없으면 모든 레벨에 적용
+        if request.fatigue_level:
+            rules = db.query(ApplianceConditionRule).filter(
+                ApplianceConditionRule.user_id == UUID(user_id),
+                ApplianceConditionRule.appliance_type == request.appliance_type,
+                ApplianceConditionRule.fatigue_level == request.fatigue_level
+            ).all()
+        else:
+            rules = db.query(ApplianceConditionRule).filter(
+                ApplianceConditionRule.user_id == UUID(user_id),
+                ApplianceConditionRule.appliance_type == request.appliance_type
+            ).all()
+
+        if not rules:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No rules found for {request.appliance_type}"
+            )
+
+        # Operation에 따라 처리
+        if request.operation == "enable":
+            for rule in rules:
+                rule.is_enabled = True
+            db.commit()
+            logger.info(f"✅ Enabled {len(rules)} rules for {request.appliance_type}")
+            return {
+                "status": "ok",
+                "message": f"{request.appliance_type} 자동 작동이 활성화되었습니다",
+                "updated_count": len(rules)
+            }
+
+        elif request.operation == "disable":
+            for rule in rules:
+                rule.is_enabled = False
+            db.commit()
+            logger.info(f"✅ Disabled {len(rules)} rules for {request.appliance_type}")
+            return {
+                "status": "ok",
+                "message": f"{request.appliance_type} 자동 작동이 비활성화되었습니다",
+                "updated_count": len(rules)
+            }
+
+        elif request.operation == "modify_threshold":
+            if not request.new_threshold:
+                raise HTTPException(
+                    status_code=400,
+                    detail="new_threshold is required for modify_threshold operation"
+                )
+
+            for rule in rules:
+                # 기존 condition_json에 새로운 임계값 병합
+                updated_condition = {**rule.condition_json, **request.new_threshold}
+                rule.condition_json = updated_condition
+
+            db.commit()
+            logger.info(f"✅ Modified threshold for {len(rules)} rules: {request.new_threshold}")
+            return {
+                "status": "ok",
+                "message": f"{request.appliance_type} 작동 조건이 수정되었습니다",
+                "updated_count": len(rules),
+                "new_threshold": request.new_threshold
+            }
+
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unknown operation: {request.operation}. Use enable/disable/modify_threshold"
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Rule modification error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/rules/{user_id}")
+async def get_appliance_rules(
+    user_id: str,
+    appliance_type: Optional[str] = None,
+    fatigue_level: Optional[int] = None,
+    db: Session = Depends(get_db)
+):
+    """
+    사용자의 가전 규칙 조회
+    """
+    try:
+        query = db.query(ApplianceConditionRule).filter(
+            ApplianceConditionRule.user_id == UUID(user_id)
+        )
+
+        if appliance_type:
+            query = query.filter(ApplianceConditionRule.appliance_type == appliance_type)
+
+        if fatigue_level:
+            query = query.filter(ApplianceConditionRule.fatigue_level == fatigue_level)
+
+        rules = query.all()
+
+        return {
+            "user_id": user_id,
+            "rules": [
+                {
+                    "id": str(rule.id),
+                    "appliance_type": rule.appliance_type,
+                    "fatigue_level": rule.fatigue_level,
+                    "condition": rule.condition_json,
+                    "action": rule.action,
+                    "settings": rule.settings_json,
+                    "is_enabled": rule.is_enabled,
+                    "priority": rule.priority
+                }
+                for rule in rules
+            ]
+        }
+    except Exception as e:
+        logger.error(f"❌ Get rules error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # -----------------------------
