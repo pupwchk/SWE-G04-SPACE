@@ -31,7 +31,7 @@ struct WatchMapView: View {
             .onAppear {
                 updateRegion()
             }
-            .onChange(of: locationManager.location) { _, _ in
+            .onChange(of: locationManager.location) { _ in
                 updateRegion()
             }
 

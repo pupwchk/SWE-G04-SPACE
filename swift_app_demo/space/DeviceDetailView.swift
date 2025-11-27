@@ -18,9 +18,7 @@ struct ApplianceDetailView: View {
 
                 controlSection
 
-                if !appliance.status.isEmpty && appliance.status != appliance.statusSummary {
-                    statusCard
-                }
+                statusCard
 
                 Spacer(minLength: 20)
             }
@@ -32,62 +30,110 @@ struct ApplianceDetailView: View {
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(action: {
-                    appliance.syncStatusFromControls()
+                    appliance.hasCustomStatus = false
+                    appliance.syncStatusFromControls(force: true)
                 }) {
                     Image(systemName: "arrow.triangle.2.circlepath")
-                        .foregroundColor(Color(hex: "A50034"))
+                        .foregroundColor(appliance.accentColor)
                 }
             }
         }
     }
 
     private var headerCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top, spacing: 12) {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .center, spacing: 12) {
                 ZStack {
                     Circle()
-                        .fill(appliance.accentColor.opacity(0.12))
-                        .frame(width: 48, height: 48)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    appliance.accentColor.opacity(0.24),
+                                    appliance.accentColor.opacity(0.12)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 52, height: 52)
 
                     Image(systemName: appliance.iconName)
                         .font(.system(size: 22, weight: .semibold))
                         .foregroundColor(appliance.accentColor)
                 }
 
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 8) {
                     Text(appliance.type.displayName)
                         .font(.system(size: 20, weight: .bold))
                         .foregroundColor(.black)
 
-                    Text(appliance.location)
-                        .font(.system(size: 14))
-                        .foregroundColor(.gray)
+                    HStack(spacing: 8) {
+                        Label(appliance.location, systemImage: "mappin.and.ellipse")
+                            .labelStyle(.titleAndIcon)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(.gray)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(Color.white.opacity(0.8))
+                            .cornerRadius(20)
 
-                    Text(appliance.statusSummary)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.black.opacity(0.85))
+                        Text(appliance.statusSummary)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.black.opacity(0.85))
+                    }
+
+                    if !appliance.status.isEmpty {
+                        Text(appliance.status)
+                            .font(.system(size: 12))
+                            .foregroundColor(.gray)
+                    }
                 }
 
                 Spacer()
 
                 Toggle("", isOn: $appliance.isOn)
                     .labelsHidden()
-                    .tint(Color(hex: "A50034"))
+                    .tint(appliance.accentColor)
+            }
+
+            if !appliance.mode.isEmpty {
+                Text(appliance.mode)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(appliance.accentColor)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(appliance.accentColor.opacity(0.12))
+                    .cornerRadius(10)
             }
 
             if let secondaryText = appliance.secondaryValueText {
                 HStack(spacing: 12) {
-                    valueBadge(title: appliance.primaryLabel, value: appliance.primaryValueText)
-                    valueBadge(title: appliance.secondaryLabel ?? "설정", value: secondaryText)
+                    infoChip(title: appliance.primaryLabel, icon: "gauge.medium", value: appliance.primaryValueText)
+                    infoChip(title: appliance.secondaryLabel ?? "설정", icon: "slider.horizontal.3", value: secondaryText)
                 }
             } else {
-                valueBadge(title: appliance.primaryLabel, value: appliance.primaryValueText)
+                infoChip(title: appliance.primaryLabel, icon: "gauge.medium", value: appliance.primaryValueText)
             }
         }
-        .padding(16)
-        .background(Color.white)
-        .cornerRadius(16)
-        .shadow(color: Color.black.opacity(0.06), radius: 8, x: 0, y: 4)
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            LinearGradient(
+                gradient: Gradient(colors: [
+                    appliance.accentColor.opacity(0.16),
+                    Color.white
+                ]),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18)
+                .stroke(appliance.accentColor.opacity(0.12), lineWidth: 1)
+                .allowsHitTesting(false)
+        )
+        .cornerRadius(18)
+        .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 6)
     }
 
     @ViewBuilder
@@ -134,10 +180,16 @@ struct ApplianceDetailView: View {
                     in: 18...28,
                     step: 1
                 )
+                sliderLabels(min: "18°C", value: "\(Int(appliance.primaryValue))°C", max: "28°C")
             }
 
-            controlCard(title: "풍량", subtitle: "\(Int(secondaryBinding(defaultValue: 3).wrappedValue))단") {
+            controlCard(title: "바람 세기", subtitle: "\(Int(secondaryBinding(defaultValue: 3).wrappedValue))단") {
                 Slider(value: secondaryBinding(defaultValue: 3), in: 1...5, step: 1)
+                sliderLabels(
+                    min: "1단",
+                    value: "\(Int(secondaryBinding(defaultValue: 3).wrappedValue))단",
+                    max: "5단"
+                )
             }
         }
     }
@@ -168,10 +220,16 @@ struct ApplianceDetailView: View {
                     in: 0...100,
                     step: 1
                 )
+                sliderLabels(min: "0%", value: "\(Int(appliance.primaryValue))%", max: "100%")
             }
 
             controlCard(title: "색온도", subtitle: "\(Int(secondaryBinding(defaultValue: 4200).wrappedValue))K") {
                 Slider(value: secondaryBinding(defaultValue: 4200), in: 2700...6500, step: 100)
+                sliderLabels(
+                    min: "2700K",
+                    value: "\(Int(secondaryBinding(defaultValue: 4200).wrappedValue))K",
+                    max: "6500K"
+                )
             }
         }
     }
@@ -190,7 +248,7 @@ struct ApplianceDetailView: View {
                 }
             }
 
-            controlCard(title: "풍량", subtitle: "\(Int(appliance.primaryValue))단") {
+            controlCard(title: "바람 세기", subtitle: "\(Int(appliance.primaryValue))단") {
                 Slider(
                     value: Binding(
                         get: { appliance.primaryValue },
@@ -202,6 +260,7 @@ struct ApplianceDetailView: View {
                     in: 1...5,
                     step: 1
                 )
+                sliderLabels(min: "1단", value: "\(Int(appliance.primaryValue))단", max: "5단")
             }
 
             controlCard(title: "공기질 표시", subtitle: appliance.status.isEmpty ? "공기질 상태" : appliance.status) {
@@ -241,10 +300,16 @@ struct ApplianceDetailView: View {
                     in: 35...60,
                     step: 1
                 )
+                sliderLabels(min: "35%", value: "\(Int(appliance.primaryValue))%", max: "60%")
             }
 
             controlCard(title: "송풍 세기", subtitle: "\(Int(secondaryBinding(defaultValue: 2).wrappedValue))단") {
                 Slider(value: secondaryBinding(defaultValue: 2), in: 1...4, step: 1)
+                sliderLabels(
+                    min: "1단",
+                    value: "\(Int(secondaryBinding(defaultValue: 2).wrappedValue))단",
+                    max: "4단"
+                )
             }
         }
     }
@@ -275,10 +340,16 @@ struct ApplianceDetailView: View {
                     in: 40...65,
                     step: 1
                 )
+                sliderLabels(min: "40%", value: "\(Int(appliance.primaryValue))%", max: "65%")
             }
 
             controlCard(title: "분무 세기", subtitle: "\(Int(secondaryBinding(defaultValue: 2).wrappedValue))단") {
                 Slider(value: secondaryBinding(defaultValue: 2), in: 1...4, step: 1)
+                sliderLabels(
+                    min: "1단",
+                    value: "\(Int(secondaryBinding(defaultValue: 2).wrappedValue))단",
+                    max: "4단"
+                )
             }
         }
     }
@@ -309,28 +380,56 @@ struct ApplianceDetailView: View {
                     in: 0...100,
                     step: 1
                 )
+                sliderLabels(min: "0", value: "\(Int(appliance.primaryValue))", max: "100")
             }
 
             controlCard(title: "화면 밝기", subtitle: "\(Int(secondaryBinding(defaultValue: 65).wrappedValue))%") {
                 Slider(value: secondaryBinding(defaultValue: 65), in: 30...100, step: 1)
+                sliderLabels(
+                    min: "30%",
+                    value: "\(Int(secondaryBinding(defaultValue: 65).wrappedValue))%",
+                    max: "100%"
+                )
             }
         }
     }
 
     private var statusCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("상태 메모")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(.black)
+        controlCard(title: "상태 메모") {
+            VStack(alignment: .leading, spacing: 10) {
+                TextField(
+                    "메모를 입력해 주세요",
+                    text: Binding(
+                        get: { appliance.status },
+                        set: { newValue in
+                            appliance.status = newValue
+                            appliance.hasCustomStatus = true
+                        }
+                    )
+                )
+                .textFieldStyle(.roundedBorder)
 
-            Text(appliance.status)
-                .font(.system(size: 14))
-                .foregroundColor(.gray)
+                HStack(spacing: 8) {
+                    Label(
+                        appliance.hasCustomStatus ? "사용자 입력을 유지 중" : "제어값에 따라 자동 업데이트",
+                        systemImage: appliance.hasCustomStatus ? "pencil.circle" : "arrow.triangle.2.circlepath"
+                    )
+                    .font(.system(size: 12))
+                    .foregroundColor(.gray)
+
+                    Spacer()
+
+                    if appliance.hasCustomStatus {
+                        Button("자동 값으로 복원") {
+                            appliance.hasCustomStatus = false
+                            appliance.syncStatusFromControls(force: true)
+                        }
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(appliance.accentColor)
+                    }
+                }
+            }
         }
-        .padding(16)
-        .background(Color.white)
-        .cornerRadius(14)
-        .shadow(color: Color.black.opacity(0.05), radius: 6, x: 0, y: 2)
     }
 
     private func controlCard<Content: View>(title: String, subtitle: String? = nil, @ViewBuilder content: () -> Content) -> some View {
@@ -344,33 +443,55 @@ struct ApplianceDetailView: View {
 
                 if let subtitle {
                     Text(subtitle)
-                        .font(.system(size: 13))
-                        .foregroundColor(.gray)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(appliance.accentColor)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(appliance.accentColor.opacity(0.12))
+                        .cornerRadius(10)
                 }
             }
 
             content()
+                .tint(appliance.accentColor)
         }
         .padding(16)
-        .background(Color.white)
-        .cornerRadius(14)
-        .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 4)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.white)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(appliance.accentColor.opacity(0.08), lineWidth: 1)
+                        .allowsHitTesting(false)
+                )
+        )
+        .shadow(color: Color.black.opacity(0.04), radius: 12, x: 0, y: 6)
     }
 
-    private func valueBadge(title: String, value: String) -> some View {
+    private func infoChip(title: String, icon: String, value: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .font(.system(size: 12))
-                .foregroundColor(.gray)
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(appliance.accentColor)
 
-            Text(value)
-                .font(.system(size: 18, weight: .bold))
-                .foregroundColor(.black)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.system(size: 12))
+                        .foregroundColor(.gray)
+
+                    Text(value)
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundColor(.black)
+                }
+            }
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(Color(hex: "F5F5F7"))
-        .cornerRadius(12)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.white.opacity(0.92))
+        .cornerRadius(14)
     }
 
     private func secondaryBinding(defaultValue: Double) -> Binding<Double> {
@@ -381,6 +502,26 @@ struct ApplianceDetailView: View {
                 appliance.syncStatusFromControls()
             }
         )
+    }
+
+    private func sliderLabels(min: String, value: String, max: String) -> some View {
+        HStack {
+            Text(min)
+                .font(.system(size: 12))
+                .foregroundColor(.gray)
+
+            Spacer()
+
+            Text(value)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(appliance.accentColor)
+
+            Spacer()
+
+            Text(max)
+                .font(.system(size: 12))
+                .foregroundColor(.gray)
+        }
     }
 }
 

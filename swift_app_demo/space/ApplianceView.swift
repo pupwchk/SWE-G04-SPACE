@@ -142,7 +142,7 @@ enum ApplianceType: String, CaseIterable, Identifiable {
         switch self {
         case .airConditioner: return "설정 온도"
         case .lighting: return "밝기"
-        case .airPurifier: return "풍량"
+        case .airPurifier: return "바람 세기"
         case .dehumidifier: return "목표 습도"
         case .humidifier: return "목표 습도"
         case .tv: return "볼륨"
@@ -151,7 +151,7 @@ enum ApplianceType: String, CaseIterable, Identifiable {
 
     var secondaryLabel: String? {
         switch self {
-        case .airConditioner: return "풍량"
+        case .airConditioner: return "바람 세기"
         case .lighting: return "색온도"
         case .airPurifier: return "공기질"
         case .dehumidifier: return "송풍 세기"
@@ -179,7 +179,7 @@ enum ApplianceType: String, CaseIterable, Identifiable {
         switch self {
         case .airConditioner:
             guard let level = item.secondaryValue else { return nil }
-            return "풍량 \(Int(level))단"
+            return "바람 세기 \(Int(level))단"
         case .lighting:
             guard let colorTemp = item.secondaryValue else { return nil }
             return "\(Int(colorTemp))K"
@@ -230,6 +230,7 @@ struct ApplianceItem: Identifiable, Hashable {
     var isOn: Bool
     var primaryValue: Double
     var secondaryValue: Double?
+    var hasCustomStatus: Bool
 
     init(
         id: UUID = UUID(),
@@ -239,7 +240,8 @@ struct ApplianceItem: Identifiable, Hashable {
         mode: String,
         isOn: Bool,
         primaryValue: Double,
-        secondaryValue: Double? = nil
+        secondaryValue: Double? = nil,
+        hasCustomStatus: Bool = false
     ) {
         self.id = id
         self.type = type
@@ -249,6 +251,7 @@ struct ApplianceItem: Identifiable, Hashable {
         self.isOn = isOn
         self.primaryValue = primaryValue
         self.secondaryValue = secondaryValue
+        self.hasCustomStatus = hasCustomStatus
     }
 
     static func == (lhs: ApplianceItem, rhs: ApplianceItem) -> Bool {
@@ -269,7 +272,9 @@ extension ApplianceItem {
     var iconName: String { type.iconName }
     var accentColor: Color { type.accentColor }
 
-    mutating func syncStatusFromControls() {
+    mutating func syncStatusFromControls(force: Bool = false) {
+        guard force || !hasCustomStatus else { return }
+
         switch type {
         case .airConditioner:
             status = "\(mode) · \(Int(primaryValue))°C"
