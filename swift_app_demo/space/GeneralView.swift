@@ -8,6 +8,7 @@ struct GeneralView: View {
     @State private var showEmergencyCall = false
     @State private var showCallErrorHistory = false
     @State private var showFontSize = false
+    @State private var showHomeLocationSetting = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -64,6 +65,21 @@ struct GeneralView: View {
                         showSpaceNotification = true
                     }) {
                         GeneralRow(title: "HARU 알림")
+                    }
+                    .buttonStyle(.plain)
+
+                    Divider()
+                        .padding(.vertical, 16)
+
+                    // 위치 section
+                    SectionHeader(title: "위치")
+
+                    Button(action: {
+                        print("🏠 Home location button tapped")
+                        showHomeLocationSetting = true
+                        print("🏠 showHomeLocationSetting set to: \(showHomeLocationSetting)")
+                    }) {
+                        GeneralRow(title: "홈 위치 설정")
                     }
                     .buttonStyle(.plain)
 
@@ -127,23 +143,43 @@ struct GeneralView: View {
         .navigationTitle("General")
         .navigationBarTitleDisplayMode(.inline)
         .background(Color.white)
-        .navigationDestination(isPresented: $showNotificationMethod) {
-            NotificationMethodView()
+        .sheet(isPresented: $showNotificationMethod) {
+            NavigationStack {
+                NotificationMethodView()
+            }
         }
-        .navigationDestination(isPresented: $showDoNotDisturb) {
-            DoNotDisturbView()
+        .sheet(isPresented: $showDoNotDisturb) {
+            NavigationStack {
+                DoNotDisturbView()
+            }
         }
-        .navigationDestination(isPresented: $showSpaceNotification) {
-            SpaceNotificationView()
+        .sheet(isPresented: $showSpaceNotification) {
+            NavigationStack {
+                SpaceNotificationView()
+            }
         }
-        .navigationDestination(isPresented: $showEmergencyCall) {
-            EmergencyCallView()
+        .sheet(isPresented: $showHomeLocationSetting) {
+            NavigationStack {
+                HomeLocationSetupView()
+                    .onAppear {
+                        print("🏠 HomeLocationSetupView appeared in sheet")
+                    }
+            }
         }
-        .navigationDestination(isPresented: $showCallErrorHistory) {
-            CallErrorHistoryView()
+        .sheet(isPresented: $showEmergencyCall) {
+            NavigationStack {
+                EmergencyCallView()
+            }
         }
-        .navigationDestination(isPresented: $showFontSize) {
-            FontSizeView()
+        .sheet(isPresented: $showCallErrorHistory) {
+            NavigationStack {
+                CallErrorHistoryView()
+            }
+        }
+        .sheet(isPresented: $showFontSize) {
+            NavigationStack {
+                FontSizeView()
+            }
         }
     }
 }

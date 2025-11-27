@@ -166,16 +166,18 @@ struct TaggedLocation: Codable, Identifiable, Equatable {
     }
 
     func updated(
+        coordinate: CLLocationCoordinate2D? = nil,
         tag: LocationTag? = nil,
         customName: String? = nil,
         isHome: Bool? = nil,
         notificationEnabled: Bool? = nil,
         notificationRadius: Int? = nil
     ) -> TaggedLocation {
-        TaggedLocation(
+        let targetCoordinate = coordinate ?? self.coordinate
+        return TaggedLocation(
             id: self.id,
             userId: self.userId,
-            coordinate: self.coordinate,
+            coordinate: targetCoordinate,
             tag: tag ?? self.tag,
             customName: customName ?? self.customName,
             isHome: isHome ?? self.isHome,

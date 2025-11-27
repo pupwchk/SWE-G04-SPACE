@@ -20,6 +20,14 @@ class TaggedLocationManager: ObservableObject {
     private let supabase = SupabaseManager.shared
     private var cancellables = Set<AnyCancellable>()
 
+    // Dedicated session with short timeouts so UI isn't blocked by long waits
+    private let session: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 10
+        config.timeoutIntervalForResource = 10
+        return URLSession(configuration: config)
+    }()
+
     // Cache for last notification times to prevent duplicate notifications
     private var lastNotificationTimes: [UUID: Date] = [:]
     private let minimumNotificationInterval: TimeInterval = 3600 // 1 hour
@@ -54,7 +62,7 @@ class TaggedLocationManager: ObservableObject {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await session.data(for: request)
 
             // Check for authentication errors
             if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
@@ -140,7 +148,7 @@ class TaggedLocationManager: ObservableObject {
         }
         request.httpBody = try encoder.encode(newLocation)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await session.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 201 else {
             if let httpResponse = response as? HTTPURLResponse {
@@ -170,7 +178,12 @@ class TaggedLocationManager: ObservableObject {
 
             throw DecodingError.dataCorruptedError(in: container, debugDescription: "Cannot decode date string \(dateString)")
         }
-        let created = try decoder.decode([TaggedLocation].self, from: data).first!
+        let locations = try decoder.decode([TaggedLocation].self, from: data)
+
+        guard let created = locations.first else {
+            print("❌ Creation returned no data. Response: \(String(data: data, encoding: .utf8) ?? "Unable to decode response")")
+            throw TaggedLocationError.creationFailed
+        }
 
         // Add to local array
         taggedLocations.insert(created, at: 0)
@@ -183,6 +196,7 @@ class TaggedLocationManager: ObservableObject {
 
     func updateTaggedLocation(
         _ location: TaggedLocation,
+        coordinate: CLLocationCoordinate2D? = nil,
         tag: LocationTag? = nil,
         customName: String? = nil,
         isHome: Bool? = nil,
@@ -194,6 +208,7 @@ class TaggedLocationManager: ObservableObject {
         }
 
         let updated = location.updated(
+            coordinate: coordinate,
             tag: tag,
             customName: customName,
             isHome: isHome,
@@ -221,7 +236,7 @@ class TaggedLocationManager: ObservableObject {
         }
         request.httpBody = try encoder.encode(updated)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await session.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
             if let httpResponse = response as? HTTPURLResponse {
@@ -251,7 +266,12 @@ class TaggedLocationManager: ObservableObject {
 
             throw DecodingError.dataCorruptedError(in: container, debugDescription: "Cannot decode date string \(dateString)")
         }
-        let result = try decoder.decode([TaggedLocation].self, from: data).first!
+        let locations = try decoder.decode([TaggedLocation].self, from: data)
+
+        guard let result = locations.first else {
+            print("❌ Update returned no data. Response: \(String(data: data, encoding: .utf8) ?? "Unable to decode response")")
+            throw TaggedLocationError.updateFailed
+        }
 
         // Update local array
         if let index = taggedLocations.firstIndex(where: { $0.id == location.id }) {
@@ -277,7 +297,7 @@ class TaggedLocationManager: ObservableObject {
         request.setValue("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFnaHNqc3Breml2Y3BpYnd3enZ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0OTI0OTMsImV4cCI6MjA3ODA2ODQ5M30.vtas9X3hNPoJaepihOc2C3Yxx5l38U3_-bTkKnYLAew", forHTTPHeaderField: "apikey")
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
 
-        let (_, response) = try await URLSession.shared.data(for: request)
+        let (_, response) = try await session.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 204 else {
             if let httpResponse = response as? HTTPURLResponse {
@@ -378,7 +398,7 @@ class TaggedLocationManager: ObservableObject {
             }
             request.httpBody = try encoder.encode(notification)
 
-            let (_, response) = try await URLSession.shared.data(for: request)
+            let (_, response) = try await session.data(for: request)
 
             if let httpResponse = response as? HTTPURLResponse {
                 if httpResponse.statusCode == 201 {

@@ -34,7 +34,31 @@ struct HaruApp: App {
         // Request notification permission for location proximity alerts
         let locationManager = LocationManager.shared
         locationManager.requestNotificationPermission()
+        locationManager.requestPermission()
         print("📱 Requested notification permission for location alerts")
+
+        // Load tagged locations cache first
+        Task {
+            await TaggedLocationManager.shared.loadTaggedLocations()
+
+            // Only start tracking if notifications are enabled and we have a home location
+            await MainActor.run {
+                let notificationsEnabled = UserDefaults.standard.object(forKey: "locationNotificationsEnabled") as? Bool ?? true
+                let hasHomeLocation = TaggedLocationManager.shared.primaryHomeLocation != nil
+
+                if notificationsEnabled && hasHomeLocation {
+                    // Delay to allow proper initialization
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                        if !locationManager.isTracking {
+                            locationManager.startTracking()
+                            print("📱 Started location tracking for proximity alerts")
+                        }
+                    }
+                } else {
+                    print("📱 Location tracking not started: notifications=\(notificationsEnabled), hasHome=\(hasHomeLocation)")
+                }
+            }
+        }
     }
 
     var body: some Scene {

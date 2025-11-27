@@ -1,40 +1,18 @@
 import SwiftUI
 
 struct SpaceNotificationView: View {
-    @State private var aiRecommendation = true
-    @State private var dndFollowup = true
-    @State private var locationAlarm = true
+    @StateObject private var locationManager = LocationManager.shared
+    @StateObject private var tagManager = TaggedLocationManager.shared
+    @AppStorage("locationNotificationsEnabled") private var locationAlarm = true
 
     var body: some View {
         VStack(spacing: 0) {
             VStack(spacing: 0) {
-                // AI 제안 피드백 알림
-                SpaceNotificationRow(
-                    icon: "sparkles",
-                    title: "AI 제안 피드백 알림",
-                    subtitle: "HARU가 추천한 아이템 대한\n피드백 알림을 받니다",
-                    isOn: $aiRecommendation
-                )
-
-                Divider()
-                    .padding(.leading, 68)
-
-                // HARU 방해금지 시간 추천
-                SpaceNotificationRow(
-                    icon: "moon.stars",
-                    title: "HARU 방해금지 시간 추천",
-                    subtitle: "사용자의 위치, 앱 사용 등 패턴을 분석하여\nHARU가 자동으로 방해 금지 시간을 설정합니다.",
-                    isOn: $dndFollowup
-                )
-
-                Divider()
-                    .padding(.leading, 68)
-
                 // 위치 알림
                 SpaceNotificationRow(
-                    icon: "location",
-                    title: "위치 알림",
-                    subtitle: "사용자의 위치를 알림받으려 알까요~",
+                    icon: "location.fill",
+                    title: "집 근접 알림",
+                    subtitle: homeLocationStatus,
                     isOn: $locationAlarm
                 )
             }
@@ -44,6 +22,39 @@ struct SpaceNotificationView: View {
         .navigationTitle("HARU 알림")
         .navigationBarTitleDisplayMode(.inline)
         .background(Color(hex: "F9F9F9"))
+        .onAppear {
+            // Request notification permission if not already granted
+            locationManager.requestNotificationPermission()
+
+            // Only start tracking if we have a home location
+            if locationAlarm && !locationManager.isTracking && tagManager.primaryHomeLocation != nil {
+                locationManager.startTracking()
+            }
+        }
+        .onChange(of: locationAlarm) { oldValue, newValue in
+            // Start or stop location tracking based on setting
+            if newValue {
+                if !locationManager.isTracking && tagManager.primaryHomeLocation != nil {
+                    locationManager.startTracking()
+                }
+            } else {
+                if locationManager.isTracking {
+                    locationManager.stopTracking()
+                }
+            }
+        }
+    }
+
+    private var homeLocationStatus: String {
+        if let home = tagManager.primaryHomeLocation {
+            if home.notificationEnabled {
+                return "설정한 집 위치(\(home.displayName))에\n가까워지면 알림을 받습니다"
+            } else {
+                return "집 위치는 설정되어 있지만\n알림이 비활성화되어 있습니다"
+            }
+        } else {
+            return "집 위치를 먼저 설정해주세요"
+        }
     }
 }
 

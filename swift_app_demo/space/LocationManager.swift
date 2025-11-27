@@ -83,10 +83,10 @@ class LocationManager: NSObject, ObservableObject {
 
     private func setupLocationManager() {
         locationManager.delegate = self
-        locationManager.desiredAccuracy = kCLLocationAccuracyBestForNavigation
-        locationManager.distanceFilter = 5.0 // Update every 5 meters
-        locationManager.allowsBackgroundLocationUpdates = false // Change to true if needed
-        locationManager.pausesLocationUpdatesAutomatically = false
+        locationManager.desiredAccuracy = kCLLocationAccuracyBest
+        locationManager.distanceFilter = 10.0 // Update every 10 meters (reduced frequency)
+        locationManager.allowsBackgroundLocationUpdates = false
+        locationManager.pausesLocationUpdatesAutomatically = true // Allow automatic pausing
 
         authorizationStatus = locationManager.authorizationStatus
     }
@@ -250,35 +250,36 @@ extension LocationManager: CLLocationManagerDelegate {
             evaluateCheckpoints(with: smoothedLocation)
         }
 
-        // Check proximity to tagged locations (always, not just when tracking)
+        // Always check proximity to tagged locations for home notifications
         checkTaggedLocationProximity(at: newLocation)
 
-        // Console logging
-        print("""
-        📍 위치 업데이트:
-        - 위도: \(String(format: "%.8f", currentLatitude))
-        - 경도: \(String(format: "%.8f", currentLongitude))
-        - 고도: \(String(format: "%.1f", currentAltitude)) m
-        - 속도: \(String(format: "%.2f", currentSpeed)) km/h
-        - 정확도(H): ±\(String(format: "%.1f", horizontalAccuracy))m / V: ±\(String(format: "%.1f", verticalAccuracy))m
-        - 타임스탬프: \(newLocation.timestamp)
-        """)
-
-        if isTracking {
-            print("- 총 거리: \(String(format: "%.2f", totalDistance / 1000)) km")
+        // Reduced console logging - only log significant updates
+        #if DEBUG
+        if Int(Date().timeIntervalSince1970) % 10 == 0 { // Log every ~10 seconds
+            print("""
+            📍 위치 업데이트:
+            - 위도: \(String(format: "%.6f", currentLatitude))
+            - 경도: \(String(format: "%.6f", currentLongitude))
+            - 속도: \(String(format: "%.1f", currentSpeed)) km/h
+            - 정확도: ±\(String(format: "%.1f", horizontalAccuracy))m
+            """)
+            if isTracking {
+                print("- 총 거리: \(String(format: "%.2f", totalDistance / 1000)) km")
+            }
         }
+        #endif
     }
 
     func locationManager(_ manager: CLLocationManager, didUpdateHeading newHeading: CLHeading) {
         if newHeading.headingAccuracy >= 0 {
             currentHeading = newHeading.trueHeading
 
-            print("""
-            🧭 방위 업데이트:
-            - 진북 기준: \(String(format: "%.1f", newHeading.trueHeading))°
-            - 자북 기준: \(String(format: "%.1f", newHeading.magneticHeading))°
-            - 정확도: ±\(String(format: "%.1f", newHeading.headingAccuracy))°
-            """)
+            #if DEBUG
+            // Only log occasionally to reduce console spam
+            if Int(Date().timeIntervalSince1970) % 30 == 0 {
+                print("🧭 방위: \(String(format: "%.1f", newHeading.trueHeading))°")
+            }
+            #endif
         }
     }
 
@@ -451,6 +452,12 @@ extension LocationManager: CLLocationManagerDelegate {
 
     /// Check proximity to tagged locations and send notifications if needed
     private func checkTaggedLocationProximity(at location: CLLocation) {
+        // Check if location notifications are enabled
+        let notificationsEnabled = UserDefaults.standard.bool(forKey: "locationNotificationsEnabled")
+        guard notificationsEnabled else {
+            return
+        }
+
         Task { @MainActor in
             let tagManager = TaggedLocationManager.shared
             let nearbyLocations = tagManager.checkProximity(to: location)
@@ -482,8 +489,24 @@ extension LocationManager: CLLocationManagerDelegate {
         distance: CLLocationDistance
     ) async {
         let content = UNMutableNotificationContent()
-        content.title = "\(location.tag.icon) \(location.displayName) 근처"
-        content.body = String(format: "%.0fm 거리에 도착했습니다", distance)
+
+        // Customize message based on whether it's a home location
+        if location.isHome {
+            content.title = "\(location.tag.icon) 집에 다가오고 있습니다"
+
+            // Different messages based on distance
+            if distance < 100 {
+                content.body = "거의 도착했습니다!"
+            } else if distance < 500 {
+                content.body = String(format: "약 %.0fm 남았습니다", distance)
+            } else {
+                content.body = String(format: "%.1fkm 거리에 있습니다", distance / 1000)
+            }
+        } else {
+            content.title = "\(location.tag.icon) \(location.displayName) 근처"
+            content.body = String(format: "%.0fm 거리에 도착했습니다", distance)
+        }
+
         content.sound = .default
         content.badge = 1
 
@@ -491,7 +514,8 @@ extension LocationManager: CLLocationManagerDelegate {
         content.userInfo = [
             "type": "location_proximity",
             "location_id": location.id.uuidString,
-            "location_name": location.displayName
+            "location_name": location.displayName,
+            "is_home": location.isHome
         ]
 
         let request = UNNotificationRequest(
@@ -502,7 +526,7 @@ extension LocationManager: CLLocationManagerDelegate {
 
         do {
             try await UNUserNotificationCenter.current().add(request)
-            print("📍 Sent proximity notification for \(location.fullDisplayName)")
+            print("📍 Sent proximity notification for \(location.fullDisplayName) at \(String(format: "%.0fm", distance))")
         } catch {
             print("❌ Failed to send notification: \(error)")
         }
