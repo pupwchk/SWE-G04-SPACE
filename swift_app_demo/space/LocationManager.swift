@@ -53,9 +53,9 @@ class LocationManager: NSObject, ObservableObject {
     private var lastRecordedLocation: CLLocation?
     private var smoothingBuffer: [CLLocationCoordinate2D] = []
     private let smoothingWindowSize = 4
-    private let maxAllowedHorizontalAccuracy: CLLocationAccuracy = 25
-    private let maxReasonableSpeed: CLLocationSpeed = 8 // m/s (~29 km/h)
-    private let minMovementDistance: CLLocationDistance = 4
+    private let maxAllowedHorizontalAccuracy: CLLocationAccuracy = 100
+    private let maxReasonableSpeed: CLLocationSpeed = 50 // m/s (~180 km/h) – relaxed to avoid over-filtering
+    private let minMovementDistance: CLLocationDistance = 1
 
     // Live checkpoint detection state
     private var lastCheckpointDate: Date?
@@ -83,10 +83,11 @@ class LocationManager: NSObject, ObservableObject {
 
     private func setupLocationManager() {
         locationManager.delegate = self
-        locationManager.desiredAccuracy = kCLLocationAccuracyBest
-        locationManager.distanceFilter = 10.0 // Update every 10 meters (reduced frequency)
-        locationManager.allowsBackgroundLocationUpdates = false
-        locationManager.pausesLocationUpdatesAutomatically = true // Allow automatic pausing
+        locationManager.desiredAccuracy = kCLLocationAccuracyBestForNavigation
+        locationManager.distanceFilter = kCLDistanceFilterNone // 가장 세밀하게 수신
+        locationManager.allowsBackgroundLocationUpdates = true
+        locationManager.showsBackgroundLocationIndicator = true
+        locationManager.pausesLocationUpdatesAutomatically = false // 끊김 없이 계속 받기
 
         authorizationStatus = locationManager.authorizationStatus
     }
@@ -95,7 +96,12 @@ class LocationManager: NSObject, ObservableObject {
 
     /// Request location permission
     func requestPermission() {
-        locationManager.requestWhenInUseAuthorization()
+        // 앱 내부에서 바로 Always 권한까지 요청해 끊김 없이 위치를 받도록 한다
+        if authorizationStatus == .authorizedWhenInUse {
+            locationManager.requestAlwaysAuthorization()
+        } else {
+            locationManager.requestAlwaysAuthorization()
+        }
     }
 
     /// Request notification permission for location proximity alerts
@@ -122,6 +128,11 @@ class LocationManager: NSObject, ObservableObject {
             print("  Location permission not granted")
             requestPermission()
             return
+        }
+
+        // 백그라운드에서도 계속 위치를 받을 수 있도록 Always 승격 시도
+        if authorizationStatus == .authorizedWhenInUse {
+            locationManager.requestAlwaysAuthorization()
         }
 
         isTracking = true
@@ -427,9 +438,6 @@ extension LocationManager: CLLocationManagerDelegate {
             let speed = distance / timeDelta
 
             if speed > maxReasonableSpeed { return false }
-
-            let noiseGate = max(minMovementDistance, newLocation.horizontalAccuracy * 0.75)
-            if distance < noiseGate { return false }
         }
 
         return true

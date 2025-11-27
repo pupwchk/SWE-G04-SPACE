@@ -19,6 +19,13 @@ AWS EC2 connect completed.
 
 ---
 
+## Architecture
+
+<img width="1497" height="951" alt="image" src="https://github.com/user-attachments/assets/53d7f0a2-bdce-4ff6-a778-492ca97ef0c7" />
+
+
+---
+
 ## Group Members
 
 | Name | Organization | Email |
@@ -27,4 +34,5 @@ AWS EC2 connect completed.
 | Yeonseong Shin | Department of Data Science, Hanyang University | dustjd2651@gmail.com |
 | Dogyeom Kim | Department of Computer Science, Hanyang University | dogyeom74@hanyang.ac.kr |
 | Donghyun Lim | Department of Computer Science, Hanyang University | limdongxian1207@gmail.com |
+
 
