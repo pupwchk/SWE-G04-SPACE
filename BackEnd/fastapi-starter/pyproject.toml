@@ -11,7 +11,7 @@ authors = [
 package-mode = false  # optional, project-only mode 유지
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = "^3.10"
 fastapi = "^0.110.0"
 uvicorn = {extras = ["standard"], version = "^0.24.0.post1"}
 alembic = "^1.12.1"
