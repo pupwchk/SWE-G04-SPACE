@@ -9,14 +9,17 @@ import SwiftUI
 
 /// Home screen - main dashboard view
 struct HomeView: View {
-    @State private var hasAppliances = false
+    @State private var hasAppliances = true
     @StateObject private var deviceManager = DeviceManager.shared
     @StateObject private var connectivityManager = WatchConnectivityManager.shared
 
-    // Sample appliances data (keeping for smart home appliances)
     let sampleAppliances = [
-        (icon: "refrigerator.fill", title: "주방", subtitle: "냉장고", status: "동작 중"),
-        (icon: "dishwasher.fill", title: "거실", subtitle: "청소기", status: "오프라인")
+        (icon: "wind", title: "거실", subtitle: "에어컨", status: "24°C · 냉방"),
+        (icon: "lightbulb.fill", title: "거실", subtitle: "조명", status: "밝기 70%"),
+        (icon: "aqi.medium", title: "거실", subtitle: "공기청정기", status: "자동 · 공기질 좋음"),
+        (icon: "drop.circle.fill", title: "안방", subtitle: "제습기", status: "목표 45%"),
+        (icon: "drop.fill", title: "아이방", subtitle: "가습기", status: "목표 50%"),
+        (icon: "tv.fill", title: "거실", subtitle: "TV", status: "OTT · 볼륨 18")
     ]
 
     var body: some View {
