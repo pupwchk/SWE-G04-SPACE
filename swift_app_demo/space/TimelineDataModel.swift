@@ -9,6 +9,38 @@ import Foundation
 import CoreLocation
 import MapKit
 
+/// Weather information for timeline
+struct WeatherInfo: Codable, Equatable {
+    let temperature: Double? // °C
+    let humidity: Double? // %
+    let precipitation: Double? // mm
+    let windSpeed: Double? // m/s
+    let pm10: Double? // ㎍/㎥
+    let pm2_5: Double? // ㎍/㎥
+    let fetchedAt: Date
+
+    var temperatureFormatted: String {
+        if let temp = temperature {
+            return String(format: "%.1f°C", temp)
+        }
+        return "N/A"
+    }
+
+    var weatherSummary: String {
+        var summary: [String] = []
+        if let temp = temperature {
+            summary.append(String(format: "%.1f°C", temp))
+        }
+        if let humidity = humidity {
+            summary.append(String(format: "%.0f%%", humidity))
+        }
+        if let precip = precipitation, precip > 0 {
+            summary.append(String(format: "%.1fmm", precip))
+        }
+        return summary.joined(separator: " · ")
+    }
+}
+
 /// Single timeline record
 struct TimelineRecord: Identifiable, Codable, Equatable {
     let id: UUID
@@ -20,6 +52,7 @@ struct TimelineRecord: Identifiable, Codable, Equatable {
     let maxSpeed: Double // km/h
     let duration: TimeInterval // seconds
     var checkpoints: [Checkpoint] // checkpoints on the route
+    let weather: WeatherInfo? // weather at end time
 
     var durationFormatted: String {
         let hours = Int(duration) / 3600
@@ -286,7 +319,8 @@ class TimelineManager: ObservableObject {
         coordinates: [CLLocationCoordinate2D],
         timestamps: [Date],
         speeds: [Double],
-        checkpoints: [Checkpoint] = []
+        checkpoints: [Checkpoint] = [],
+        weather: WeatherInfo? = nil
     ) -> TimelineRecord? {
         guard !coordinates.isEmpty else { return nil }
 
@@ -319,7 +353,8 @@ class TimelineManager: ObservableObject {
             averageSpeed: averageSpeed,
             maxSpeed: maxSpeed,
             duration: duration,
-            checkpoints: checkpoints
+            checkpoints: checkpoints,
+            weather: weather
         )
     }
 

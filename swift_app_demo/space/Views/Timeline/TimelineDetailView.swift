@@ -219,6 +219,48 @@ struct TimelineDetailView: View {
                     statItem(title: "시간", value: timeline.durationFormatted, icon: "clock.fill")
                     statItem(title: "평균 속도", value: String(format: "%.1f km/h", timeline.averageSpeed), icon: "speedometer")
                 }
+
+                // Weather information (if available)
+                if let weather = timeline.weather {
+                    Divider()
+                        .padding(.vertical, 8)
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "cloud.sun.fill")
+                                .font(.system(size: 14))
+                                .foregroundColor(Color(hex: "A50034"))
+                            Text("날씨")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(.black)
+                        }
+
+                        // Compact weather grid
+                        VStack(spacing: 8) {
+                            // Row 1: Temperature & Humidity
+                            HStack(spacing: 12) {
+                                if let temp = weather.temperature {
+                                    compactWeatherItem(icon: "thermometer", label: "온도", value: String(format: "%.1f°C", temp), color: .orange)
+                                }
+                                if let humidity = weather.humidity {
+                                    compactWeatherItem(icon: "humidity.fill", label: "습도", value: String(format: "%.0f%%", humidity), color: .blue)
+                                }
+                            }
+
+                            // Row 2: Air Quality (only if available)
+                            if weather.pm10 != nil || weather.pm2_5 != nil {
+                                HStack(spacing: 12) {
+                                    if let pm10 = weather.pm10 {
+                                        compactWeatherItem(icon: "aqi.medium", label: "미세먼지", value: String(format: "%.0f", pm10), color: pmColor(pm10))
+                                    }
+                                    if let pm25 = weather.pm2_5 {
+                                        compactWeatherItem(icon: "aqi.high", label: "초미세", value: String(format: "%.0f", pm25), color: pmColor(pm25))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             } else if isTracking {
                 // Current tracking stats
                 HStack(spacing: 20) {
@@ -245,7 +287,7 @@ struct TimelineDetailView: View {
                         .foregroundColor(Color(hex: "A50034"))
                         .font(.system(size: 12))
 
-                    Text("H: ±\(String(format: "%.0f", locationManager.horizontalAccuracy))m | V: ±\(String(format: "%.0f", locationManager.verticalAccuracy))m")
+                    Text("환경에 따라 실제 위치와 차이가 있을 수 있습니다")
                         .font(.system(size: 11))
                         .foregroundColor(.gray)
                 }
@@ -278,6 +320,44 @@ struct TimelineDetailView: View {
                 .foregroundColor(.gray)
         }
         .frame(maxWidth: .infinity)
+    }
+
+    private func compactWeatherItem(icon: String, label: String, value: String, color: Color) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 16))
+                .foregroundColor(color)
+                .frame(width: 20)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label)
+                    .font(.system(size: 10))
+                    .foregroundColor(.gray)
+                Text(value)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.primary)
+            }
+            Spacer()
+        }
+        .frame(maxWidth: .infinity)
+        .padding(10)
+        .background(Color(hex: "F9F9F9"))
+        .cornerRadius(10)
+    }
+
+    private func pmColor(_ value: Double) -> Color {
+        // PM10 기준: 좋음(0-30), 보통(31-80), 나쁨(81-150), 매우나쁨(151+)
+        // PM2.5 기준: 좋음(0-15), 보통(16-35), 나쁨(36-75), 매우나쁨(76+)
+        switch value {
+        case 0..<31:
+            return .blue
+        case 31..<81:
+            return .green
+        case 81..<151:
+            return .orange
+        default:
+            return .red
+        }
     }
 
     // MARK: - Control Buttons
@@ -398,6 +478,18 @@ struct TimelineDetailView: View {
                     Text(formatDate(timeline.startTime))
                         .font(.system(size: 10))
                         .foregroundColor(.gray)
+
+                    // Weather summary (if available)
+                    if let weather = timeline.weather, let temp = weather.temperature {
+                        HStack(spacing: 4) {
+                            Image(systemName: "thermometer")
+                                .font(.system(size: 9))
+                                .foregroundColor(.orange)
+                            Text(String(format: "%.1f°C", temp))
+                                .font(.system(size: 10))
+                                .foregroundColor(.gray)
+                        }
+                    }
                 }
             }
             .padding(10)

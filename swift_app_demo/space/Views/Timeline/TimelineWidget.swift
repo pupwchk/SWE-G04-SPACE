@@ -203,20 +203,39 @@ struct TimelineWidget: View {
                 healthData: locationManager.healthDataHistory
             )
 
-        // Create timeline record using LocationManager's history
-        if let timeline = timelineManager.createTimeline(
-            startTime: startTime,
-            endTime: Date(),
-            coordinates: locationManager.routeCoordinates,
-            timestamps: locationManager.timestampHistory,
-            speeds: locationManager.speedHistory,
-            checkpoints: checkpoints
-        ) {
-            timelineManager.saveTimeline(timeline)
-            print(" Timeline saved with \(checkpoints.count) checkpoint(s)")
-        }
+        // Fetch weather asynchronously
+        Task {
+            var weather: WeatherInfo? = nil
 
-        locationManager.resetTracking()
+            // Get weather based on last location
+            if let lastCoordinate = locationManager.routeCoordinates.last {
+                weather = await FastAPIService.shared.getCurrentWeather(
+                    latitude: lastCoordinate.latitude,
+                    longitude: lastCoordinate.longitude
+                )
+            }
+
+            // Create timeline record using LocationManager's history
+            if let timeline = timelineManager.createTimeline(
+                startTime: startTime,
+                endTime: Date(),
+                coordinates: locationManager.routeCoordinates,
+                timestamps: locationManager.timestampHistory,
+                speeds: locationManager.speedHistory,
+                checkpoints: checkpoints,
+                weather: weather
+            ) {
+                timelineManager.saveTimeline(timeline)
+                print("✅ Timeline saved with \(checkpoints.count) checkpoint(s)")
+                if weather != nil {
+                    print("✅ Weather info included: \(weather!.weatherSummary)")
+                } else {
+                    print("⚠️ Weather info not available")
+                }
+            }
+
+            locationManager.resetTracking()
+        }
     }
 }
 

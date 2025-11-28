@@ -70,4 +70,77 @@ class FastAPIService {
         // GET /api/users/{user_id} 엔드포인트 사용
         return nil
     }
+
+    // MARK: - Weather API
+
+    /// 현재 날씨 정보 조회
+    /// - Parameters:
+    ///   - latitude: 위도
+    ///   - longitude: 경도
+    ///   - sido: 시도 이름 (미세먼지 조회용, 기본값: "서울")
+    /// - Returns: 날씨 정보 WeatherInfo 객체
+    func getCurrentWeather(latitude: Double, longitude: Double, sido: String = "서울") async -> WeatherInfo? {
+        guard let url = URL(string: "\(baseURL)/api/weather/current?latitude=\(latitude)&longitude=\(longitude)&sido=\(sido)") else {
+            print("❌ [FastAPI] Invalid weather URL")
+            return nil
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                print("❌ [FastAPI] Invalid response")
+                return nil
+            }
+
+            if httpResponse.statusCode == 200 {
+                // Print raw response for debugging
+                if let jsonString = String(data: data, encoding: .utf8) {
+                    print("📦 [FastAPI] Weather API Response: \(jsonString)")
+                }
+
+                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                    print("✅ [FastAPI] Weather fetched successfully")
+                    print("   - Temperature: \(json["temperature"] ?? "nil")")
+                    print("   - Humidity: \(json["humidity"] ?? "nil")")
+                    print("   - PM10: \(json["pm10"] ?? "nil")")
+                    print("   - PM2.5: \(json["pm2_5"] ?? "nil")")
+
+                    // Parse fetched_at string to Date
+                    let dateFormatter = ISO8601DateFormatter()
+                    var fetchedAt = Date()
+                    if let fetchedAtStr = json["fetched_at"] as? String {
+                        fetchedAt = dateFormatter.date(from: fetchedAtStr) ?? Date()
+                    }
+
+                    let weatherInfo = WeatherInfo(
+                        temperature: json["temperature"] as? Double,
+                        humidity: json["humidity"] as? Double,
+                        precipitation: json["precipitation"] as? Double,
+                        windSpeed: json["wind_speed"] as? Double,
+                        pm10: json["pm10"] as? Double,
+                        pm2_5: json["pm2_5"] as? Double,
+                        fetchedAt: fetchedAt
+                    )
+
+                    print("🌤️ [FastAPI] WeatherInfo created: \(weatherInfo.weatherSummary)")
+                    return weatherInfo
+                }
+            }
+
+            print("❌ [FastAPI] Weather fetch failed with status: \(httpResponse.statusCode)")
+            if let errorString = String(data: data, encoding: .utf8) {
+                print("❌ [FastAPI] Error details: \(errorString)")
+            }
+            return nil
+
+        } catch {
+            print("❌ [FastAPI] Network error: \(error.localizedDescription)")
+            return nil
+        }
+    }
 }

@@ -43,7 +43,8 @@ struct HomeLocationSetupView: View {
                 locationManager.stopTracking()
             }
 
-            Task { @MainActor in
+            // Load data without blocking UI
+            Task(priority: .userInitiated) {
                 await loadInitialData()
             }
         }
@@ -203,13 +204,10 @@ struct HomeLocationSetupView: View {
     // MARK: - Helpers
 
     private func loadInitialData() async {
-        await MainActor.run {
-            isLoading = true
-        }
-
         // Show cached or current location immediately so the UI doesn't block
         let cachedHome = tagManager.primaryHomeLocation
         let currentLocation = locationManager.location
+        let hasLocations = !tagManager.taggedLocations.isEmpty
 
         await MainActor.run {
             homeLocation = cachedHome
@@ -228,29 +226,31 @@ struct HomeLocationSetupView: View {
                 )
             )
 
-            // Remove spinner once we've set an initial position
+            // Remove spinner immediately - UI is ready
             isLoading = false
         }
 
-        // Refresh from server only when needed, without blocking the UI
-        guard tagManager.taggedLocations.isEmpty else {
-            return
-        }
+        // Refresh from server in background only if we have no cached data
+        // This won't block the UI since isLoading is already false
+        if !hasLocations {
+            Task(priority: .background) {
+                await tagManager.loadTaggedLocations()
 
-        await tagManager.loadTaggedLocations()
-
-        await MainActor.run {
-            if let home = tagManager.primaryHomeLocation {
-                homeLocation = home
-                centerCoordinate = home.coordinate
-                notificationRadius = home.notificationRadius
-                isNotificationEnabled = home.notificationEnabled
-                cameraPosition = .region(
-                    MKCoordinateRegion(
-                        center: home.coordinate,
-                        span: defaultSpan
-                    )
-                )
+                // Update UI if we got new data
+                await MainActor.run {
+                    if let home = tagManager.primaryHomeLocation {
+                        homeLocation = home
+                        centerCoordinate = home.coordinate
+                        notificationRadius = home.notificationRadius
+                        isNotificationEnabled = home.notificationEnabled
+                        cameraPosition = .region(
+                            MKCoordinateRegion(
+                                center: home.coordinate,
+                                span: defaultSpan
+                            )
+                        )
+                    }
+                }
             }
         }
     }
