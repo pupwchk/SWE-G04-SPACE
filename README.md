@@ -19,8 +19,7 @@ Through Smart Health Home, we demonstrate a practical approach to creating adapt
 
 ## Architecture
 
-<img width="1497" height="951" alt="image" src="https://github.com/user-attachments/assets/53d7f0a2-bdce-4ff6-a778-492ca97ef0c7" />
-
+<img width="852" height="556" alt="Architecture" src="https://github.com/user-attachments/assets/72318f6c-a3f7-40fe-ad8e-2b6d709872ec" />
 
 ---
 
@@ -32,6 +31,7 @@ Through Smart Health Home, we demonstrate a practical approach to creating adapt
 | Yeonseong Shin | Department of Data Science, Hanyang University | dustjd2651@gmail.com |
 | Dogyeom Kim | Department of Computer Science, Hanyang University | dogyeom74@hanyang.ac.kr |
 | Donghyun Lim | Department of Computer Science, Hanyang University | limdongxian1207@gmail.com |
+
 
 
 
