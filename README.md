@@ -1,5 +1,5 @@
-# SPACE
-**AI-Driven Multimodal Smart Home Manager**
+# HARU
+**Home Adaptive Routine Understanding**
 
 ---
 
@@ -11,11 +11,9 @@ In this study, we propose an intelligent home automation framework that continuo
 
 The system collects real-time health metrics including heart rate, heart rate variability (HRV), sleep patterns, and activity levels, combined with contextual data such as GPS location and weather conditions.
 
-An XGBoost-based neural network with attention mechanisms predicts stress levels, fatigue, and sleep readiness, which are then processed through OpenAI's GPT API to generate natural language commands for controlling temperature, lighting, humidity, and other smart home devices.
+An Strict Rule-based Home appliance Recommandation is operated by OpenAI's GPT API to generate natural language commands for controlling temperature, lighting, humidity, and other smart home devices.
 
 Through Smart Health Home, we demonstrate a practical approach to creating adaptive living environments that proactively respond to users' health conditions, enhancing comfort, wellness, and quality of life.
-
-AWS EC2 connect completed.
 
 ---
 
@@ -34,5 +32,6 @@ AWS EC2 connect completed.
 | Yeonseong Shin | Department of Data Science, Hanyang University | dustjd2651@gmail.com |
 | Dogyeom Kim | Department of Computer Science, Hanyang University | dogyeom74@hanyang.ac.kr |
 | Donghyun Lim | Department of Computer Science, Hanyang University | limdongxian1207@gmail.com |
+
 
 
