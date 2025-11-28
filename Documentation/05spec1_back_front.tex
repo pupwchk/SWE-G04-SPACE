@@ -88,7 +88,7 @@ Each location update is timestamped and locally cached until successful transmis
 \end{adjustwidth}
 
 \subsubsection{Map Visualization and Routine Pattern Analysis}
-\begin{adjustwidth}{1em}{0em}
+% \begin{adjustwidth}{1em}{0em}
 \setlength{\parindent}{1em}
 The MapKit framework is utilized to visualize spatial trajectories and reconstruct the user’s daily movement timeline.  
 GPS samples are rendered as polylines on a map interface, where clusters of frequent stops are highlighted as potential key places (home, workplace, gym, etc.).  
@@ -115,7 +115,7 @@ The entire flow ensures high modularity and real-time responsiveness:
 This modular integration enables continuous synchronization between the user’s wearable, smartphone, and backend analytics system, forming the foundation of personalized health and behavior intelligence.
 \end{adjustwidth}
 
-\subsection{AI-Driven User State Prediction Model}
+\subsection{User State Prediction Flow}
 \subsubsection{Model Architecture and Design Principles}
 \begin{adjustwidth}{1em}{0em}
 \setlength{\parindent}{1em}
@@ -135,7 +135,17 @@ Contextual features capture temporal, spatial, and environmental dimensions that
 \subsubsection{Real-Time Inference and LLM Integration}
 \begin{adjustwidth}{1em}{0em}
 \setlength{\parindent}{1em}
-The pipeline executes continuously with configurable prediction intervals, typically ranging from 15 to 60 minutes depending on computational constraints and user preferences. When triggered, the feature engineering module queries the MySQL database to extract recent health samples, GPS locations, and weather observations, constructing the input tensors required by the neural network. The trained model performs forward propagation in under 100 milliseconds on the server, producing state predictions that are immediately formatted into a structured natural language prompt for the OpenAI API.
+The pipeline executes continuously with configurable prediction intervals, typically ranging from 15 to 60 minutes depending on computational constraints and user preferences. When triggered, the feature engineering module queries the PostgreSQL database to extract recent health samples, GPS locations, and weather observations, constructing the input tensors required by the neural network. The trained model performs forward propagation in under 100 milliseconds on the server, producing state predictions that are immediately formatted into a structured natural language prompt for the OpenAI API.
 
 The LLM prompt includes the predicted stress level, fatigue level, sleep readiness, and current contextual information such as time of day, location type, outdoor weather conditions, and current indoor environment settings. The prompt instructs the agent to generate a JSON-formatted response containing recommended adjustments for temperature, lighting intensity, humidity control, and any additional appliance actions. The LLM's reasoning capability enables contextually appropriate decisions. The parsed JSON commands are then transmitted to the smart home controller for execution, with confirmation feedback sent to the iOS interface for user transparency and manual override capability.
+\end{adjustwidth}
+
+\subsubsection{Limitation of ML Model}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+Despite the advances in AI models, securing appropriate training datasets remained a major challenge during development. To obtain more reliable data, I contacted the researcher who created PMData, a dataset for fatigue prediction based on diverse biometric signals from participants. Through this inquiry, I confirmed that the experiment was conducted in Oslo, after which I collected Oslo weather data to use for training.
+
+However, because the fatigue scores were subjective ratings on a 1–5 scale, the resulting model performance was inevitably poor. As part of broader experimentation, I trained and evaluated several models—including XGBoost, a tree ensemble model with soft voting, and an LSTM with data transformations—using dummy data. These models reached approximately 0.7 accuracy, but the results were dismissed due to their lack of real-world interpretability.
+
+After multiple rounds of discussion, we established a feedback loop that uses real-time weather information to determine whether home appliances should operate, combined with each user’s personalized home-appliance preference values. The user can review the recommended appliances and settings through an LLM, and then accept, modify, or reject them. Based on the user’s decisions, both the operating conditions and preference values are continuously updated.
 \end{adjustwidth}

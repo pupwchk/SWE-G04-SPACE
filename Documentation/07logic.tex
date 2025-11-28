@@ -1,0 +1,43 @@
+\subsection{LLM-Based Conversational Smart Home Control System}
+\subsubsection{Introduction}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+This system provides an intelligent, dialogue-driven smart home control interface that integrates natural language understanding with context-aware automation. Its core innovation lies in combining multiple data sources—biometric indicators (HRV), environmental conditions (weather), and learned user preferences—to enable personalized conversational appliance management.
+
+The system addresses three major challenges in modern smart home automation:
+Natural Interaction, Users can express discomfort naturally (e.g., “It’s hot in here”) without issuing explicit control commands. Context Awareness, The AI evaluates fatigue levels, weather, and past behavior to recommend appropriate appliance actions. Adaptive Learning. User modifications are continually incorporated to refine future recommendations.
+\end{adjustwidth}
+
+\subsubsection{System Architecture}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+
+The system operates through two main scenarios:
+
+Scenario 1: Geofence-Triggered Proactive Assistance
+GPS detects that the user is within a 100m radius of their home.
+The system automatically initiates a voice call via the OpenAI Realtime API.
+The user may request pre-arrival actions (e.g., “Turn on the AC before I get home”).
+Commands are executed immediately to prepare the home environment.
+
+Scenario 2: User-Initiated Conversational Control
+The user expresses discomfort through text.
+The AI analyzes intent and queries current weather and fatigue conditions.
+The system proposes personalized appliance actions.
+The user may approve, modify, or reject the plan.
+Approved commands are executed and used to update user preference data.
+\end{adjustwidth}
+
+\subsubsection{Intent Recognition System}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+
+The intent parser uses GPT-4o to classify messages into three categories which are Intent Types environment complaint, Temperature - "It’s hot", Humidity - "dry", "humid", Air quality - "stuck", appliance request, Direct control requests - "Turn on the AC", Specific settings - "Set the temp to 24", general chat, Greetings or small talk - "How are you?" Output Format includes intent type, issues, condition, needs condition, needs control, summary.
+
+
+The engine integrates multiple sources to determine optimal appliance operations. Weather API Data consists of Temperature, humidity, PM10, PM2.5. Fatigue Level(from HRV analysis) consists of Level 1 - Good, Level 2 - Normal, Level 3 - Bad, Level 4 - Very Bad. User Preferences are Learned from previous modifications and stored per fatigue level and appliance type. Preference Priority System has Priority Order UserAppliancePreference and Default ApplianceConditionRule.
+
+Natural Language Generation Template is "Present [weather description]. How about [recommended appliance actions]?" Example Output is "Present temperature is 28 degrees, and your fatigue level is 3. Would you like me to turn on the air conditioner at 23°C and also activate the air purifier?"
+
+We used GPT-4o Primary Model and is used for all tasks due to: excellent multilingual support, reliable JSON-structured outputs, fast inference, no fine-tuning required. The system eliminates the need for fine-tuning or annotated datasets.
+\end{adjustwidth}

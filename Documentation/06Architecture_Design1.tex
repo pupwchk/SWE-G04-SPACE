@@ -1,0 +1,296 @@
+\section{Architecture Design}
+
+\subsection{Overall Architecture}
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.5\textwidth]{junho/SPACE UI_UX.png}
+    \caption{Architecture}
+\end{figure}
+
+\subsection{Directory Organization}
+
+\begin{table}[htbp]
+\caption{DIRECTORY-ORGANIZATION-IOS-APP}
+\label{tab:dir_ios_app}
+\begin{tabularx}{\linewidth}{|p{3.8cm}|X|}
+\hline
+\textbf{Directory} & \textbf{File Name} \\
+\hline
+\texttt{space/ (Root)} &
+spaceApp.swift \newline
+TimelineDataModel.swift \newline
+FastAPIService.swift \newline
+DeviceManager.swift \newline
+FontSizeManager.swift \newline
+CallHistoryManager.swift \newline
+WatchConnectivityManager.swift \newline
+HealthKitManager.swift \newline
+SupabaseManager.swift \newline
+LocationManager.swift \\
+\hline
+\end{tabularx}
+\end{table}
+
+\begin{table}[htbp]
+\begin{tabularx}{\linewidth}{|p{3.8cm}|X|}
+\hline
+\texttt{space/Views/Auth} &
+LoginView.swift \newline
+SignUpView.swift \newline
+SocialLoginButton.swift \\
+\hline
+
+\texttt{space/Views/Chat} &
+CallErrorHistoryView.swift \newline
+ChatView.swift \newline
+PhoneCallView.swift \\
+\hline
+
+\texttt{space/Views/Common} &
+ContentView.swift \newline
+MainTabView.swift \newline
+PersonalTestView.swift \\
+\hline
+
+\texttt{space/Views/Device} &
+AddItemWidget.swift \newline
+ApplianceCard.swift \newline
+ApplianceItemCard.swift \newline
+ApplianceView.swift \newline
+DeviceCard.swift \newline
+DeviceDetailView.swift \newline
+DeviceView.swift \\
+\hline
+
+\texttt{space/Views/Home} &
+HomeLocationSetupView.swift \newline
+HomeView.swift \newline
+LocationTagSheet.swift \newline
+SplashView.swift \\
+\hline
+
+\texttt{space/Views/Persona} &
+AdjectiveTagView.swift \newline
+PersonaBubbleWidgetNew.swift \newline
+PersonaChatView.swift \newline
+PersonaEditView.swift \newline
+PersonaListView.swift \newline
+PersonaWidget.swift \\
+\hline
+
+\texttt{space/Views/Settings} &
+DoNotDisturbView.swift \newline
+EmergencyCallView.swift \newline
+FontSizeView.swift \newline
+GeneralView.swift \newline
+MenuRow.swift \newline
+MenuView.swift \newline
+MyPageView.swift \newline
+NotificationMethodView.swift \newline
+SpaceNotificationView.swift \\
+\hline
+
+\texttt{space/Views/Timeline} &
+StateDetailView.swift \newline
+StateWidget.swift \newline
+TimelineDetailView.swift \newline
+TimelineWidget.swift \\
+\hline
+
+\texttt{space/Models} &
+AdjectiveModels.swift \newline
+TaggedLocation.swift \\
+\hline
+
+\texttt{space/Managers} &
+TaggedLocationManager.swift \\
+\hline
+
+\texttt{space/Repositories} &
+PersonaRepository.swift \\
+\hline
+
+\texttt{space/Services} &
+SupabaseService.swift \\
+\hline
+\end{tabularx}
+\end{table}
+
+
+\begin{table}[h]
+\caption{DIRECTORY-ORGANIZATION-WATCH-APP}
+\label{tab:dir_watch_app}
+\centering
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabularx}{\linewidth}{|p{4.2cm}|X|}
+\hline
+\textbf{Directory} & \textbf{File Name} \\
+\hline
+\texttt{space Watch App/ (Root)} &
+space\_Watch\_AppApp.swift \newline
+ContentView.swift \newline
+MapView.swift \newline
+WatchConnectivityManager.swift \newline
+WatchHealthKitManager.swift \newline
+WatchLocationManager.swift \\
+\hline
+
+\texttt{space Watch App/Assets.xcassets} &
+AppIcon.appiconset/ \newline
+AccentColor.colorset/ \newline
+Contents.json \\
+\hline
+\end{tabularx}
+\end{table}
+
+\begin{table}[htbp]
+\caption{DIRECTORY ORGANIZATION - BACKEND}
+\label{tab:dir_backend}
+\centering
+\small
+\renewcommand{\arraystretch}{2}
+\begin{tabularx}{\linewidth}{|p{3.8cm}|X|}
+\hline
+\textbf{Directory} & \textbf{File Name} \\
+\hline
+\texttt{app/ (Root)} &
+\_\_init\_\_.py \newline
+main.py \newline
+models.py \newline
+schemas.py \\
+\hline
+
+\texttt{app/api} &
+\_\_init\_\_.py \newline
+users.py \newline
+chat.py \newline
+hrv.py \newline
+weather.py \newline
+location.py \newline
+appliance.py \newline
+voice.py \newline
+voice\_realtime.py \newline
+characters.py \newline
+sendbird\_webhook.py \newline
+tracking.py \\
+\hline
+
+\texttt{app/models} &
+\_\_init\_\_.py \newline
+user.py \newline
+hrv.py \newline
+appliance.py \newline
+weather.py \newline
+location.py \newline
+info.py \newline
+tracking.py \\
+\hline
+
+\texttt{app/schemas} &
+\_\_init\_\_.py \newline
+user.py \newline
+info.py \newline
+tracking.py \\
+\hline
+
+\texttt{app/cruds} &
+\_\_init\_\_.py \newline
+user.py \newline
+info.py \newline
+tracking.py \\
+\hline
+
+\texttt{app/services} &
+llm\_service.py \newline
+appliance\_rule\_engine.py \newline
+appliance\_control\_service.py \newline
+hrv\_service.py \newline
+weather\_service.py \newline
+geofence\_service.py \newline
+fatigue\_predictor.py \newline
+sendbird\_client.py \newline
+voice\_service.py \newline
+realtime\_voice\_agent.py \\
+\hline
+
+\texttt{app/config} &
+\_\_init\_\_.py \newline
+db.py \newline
+env.py \newline
+sendbird.py \\
+\hline
+
+\texttt{app/migrations} &
+env.py \\
+\hline
+\end{tabularx}
+\end{table}
+
+
+\begin{table}[htbp]
+\caption{DIRECTORY ORGANIZATION - AI MODULE}
+\label{tab:dir_ai}
+\centering
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabularx}{\linewidth}{|p{4.2cm}|X|}
+\hline
+\textbf{Directory/Component} & \textbf{Description} \\
+\hline
+\texttt{app/services/ llm\_service.py} &
+\textbf{LLMService} class: \newline
+- \_\_init\_\_() \newline
+- \_build\_system\_prompt() \newline
+- parse\_user\_intent() \newline
+- generate\_appliance\_suggestion() \newline
+- detect\_modification() \newline
+- generate\_response() \newline
+- generate\_geofence\_trigger() \newline
+\newline
+\textbf{MemoryService} class: \newline
+- add\_message() \newline
+- get\_history() \newline
+- update\_long\_term\_memory() \newline
+- get\_long\_term\_memory() \newline
+\newline
+\textbf{LLMAction} enum: \newline
+- NONE \newline
+- CALL \newline
+- AUTO\_CALL \\
+\hline
+
+\texttt{app/api/chat.py} &
+\textbf{RESTful Endpoints}: \newline
+- POST /chat/\{user\_id\}/message \newline
+- POST /chat/\{user\_id\}/approve \newline
+- GET /chat/\{user\_id\}/history \newline
+- DELETE /chat/\{user\_id\}/session \newline
+\newline
+\textbf{Request/Response Models}: \newline
+- ChatMessageRequest \newline
+- ChatMessageResponse \newline
+- ApplianceApprovalRequest \newline
+- ApplianceApprovalResponse \newline
+\newline
+\textbf{Session Management}: \newline
+- chat\_sessions (dict) \newline
+- get\_or\_create\_session() \\
+\hline
+
+\texttt{app/services/realtime \_voice\_agent.py} &
+\textbf{Voice Integration}: \newline
+- OpenAI Realtime API WebSocket handler \newline
+- Audio streaming management \newline
+- Real-time voice conversation \newline
+- Geofence-triggered call support \\
+\hline
+
+\texttt{app/api/voice \_realtime.py} &
+\textbf{WebSocket Endpoint}: \newline
+- WS /voice/realtime/\{user\_id\} \newline
+- Bidirectional audio streaming \newline
+- Integration with llm\_service \\
+\hline
+\end{tabularx}
+\end{table}
