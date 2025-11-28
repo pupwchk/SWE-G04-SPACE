@@ -232,9 +232,34 @@ struct TimelineWidget: View {
                 } else {
                     print("⚠️ Weather info not available")
                 }
+
+                // Upload to FastAPI
+                await uploadTimelineToFastAPI(timeline)
             }
 
             locationManager.resetTracking()
+        }
+    }
+
+    // MARK: - FastAPI Upload
+
+    /// Upload timeline data to FastAPI tracking endpoints
+    private func uploadTimelineToFastAPI(_ timeline: TimelineRecord) async {
+        // Get FastAPI user ID
+        guard let userId = UserDefaults.standard.string(forKey: "fastapi_user_id") else {
+            print("⚠️ [Upload] No FastAPI user ID, skipping upload")
+            return
+        }
+
+        print("🔄 [Upload] Starting FastAPI upload for user: \(userId)")
+
+        // Use the new complete upload method from FastAPIService
+        let success = await FastAPIService.shared.uploadTimelineComplete(userId: userId, timeline: timeline)
+
+        if success {
+            print("✅ [Upload] All timeline data uploaded successfully!")
+        } else {
+            print("⚠️ [Upload] Upload failed or partial - data saved to offline queue")
         }
     }
 }

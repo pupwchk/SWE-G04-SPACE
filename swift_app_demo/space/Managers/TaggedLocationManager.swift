@@ -118,6 +118,11 @@ class TaggedLocationManager: ObservableObject {
             throw TaggedLocationError.notAuthenticated
         }
 
+        // DELETE existing homes before creating new one
+        if isHome {
+            try await deleteOtherHomeLocations()
+        }
+
         let newLocation = TaggedLocation(
             userId: userId,
             coordinate: coordinate,
@@ -189,7 +194,37 @@ class TaggedLocationManager: ObservableObject {
         taggedLocations.insert(created, at: 0)
 
         print(" Created tagged location: \(created.fullDisplayName)")
+
+        // Also create Place in FastAPI
+        Task {
+            let category = mapLocationTagToCategory(created.tag)
+            _ = await AutoTrackingManager.shared.createPlaceFromLocation(
+                label: created.fullDisplayName,
+                category: category,
+                coordinate: coordinate,
+                radiusMeters: Double(notificationRadius)
+            )
+        }
+
         return created
+    }
+
+    /// Map LocationTag to FastAPI place category
+    private func mapLocationTagToCategory(_ tag: LocationTag) -> String? {
+        switch tag {
+        case .home:
+            return "HOME"
+        case .dormitory:
+            return "DORMITORY"
+        case .office:
+            return "WORK"
+        case .school:
+            return "SCHOOL"
+        case .cafe:
+            return "CAFE"
+        case .custom:
+            return "OTHER"
+        }
     }
 
     // MARK: - Update Tagged Location
@@ -426,6 +461,43 @@ class TaggedLocationManager: ObservableObject {
 
     func locations(with tag: LocationTag) -> [TaggedLocation] {
         taggedLocations.filter { $0.tag == tag }
+    }
+
+    // MARK: - Delete Other Home Locations
+
+    /// Deletes all home locations except the specified one
+    private func deleteOtherHomeLocations(except locationId: UUID? = nil) async throws {
+        let homesToDelete = homeLocations.filter { location in
+            if let exceptId = locationId {
+                return location.id != exceptId
+            }
+            return true
+        }
+
+        for home in homesToDelete {
+            try await deleteTaggedLocation(home)
+        }
+    }
+
+    /// Clean up duplicate home locations, keeping only the most recent one
+    func cleanupDuplicateHomes() async throws {
+        let homes = homeLocations
+
+        guard homes.count > 1 else {
+            print("✅ No duplicate homes to clean up")
+            return
+        }
+
+        // Keep the first one (most recent due to created_at.desc ordering)
+        let homesToDelete = Array(homes.dropFirst())
+
+        print("🧹 Cleaning up \(homesToDelete.count) duplicate home(s)")
+
+        for home in homesToDelete {
+            try await deleteTaggedLocation(home)
+        }
+
+        print("✅ Cleanup complete. Only 1 home location remains.")
     }
 
     // MARK: - Clear Cache

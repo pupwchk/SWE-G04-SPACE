@@ -92,7 +92,10 @@ class SupabaseManager: ObservableObject {
 
                 // Register user with FastAPI backend
                 Task {
-                    await FastAPIService.shared.registerUser(email: userObj.email)
+                    if let fastAPIUserId = await FastAPIService.shared.registerUser(email: userObj.email) {
+                        UserDefaults.standard.set(fastAPIUserId, forKey: "fastapi_user_id")
+                        print("✅ [FastAPI] User registered with ID: \(fastAPIUserId)")
+                    }
                 }
 
                 await MainActor.run {
@@ -217,7 +220,10 @@ class SupabaseManager: ObservableObject {
 
             // Register user with FastAPI backend (or ensure they exist)
             Task {
-                await FastAPIService.shared.registerUser(email: userObj.email)
+                if let fastAPIUserId = await FastAPIService.shared.registerUser(email: userObj.email) {
+                    UserDefaults.standard.set(fastAPIUserId, forKey: "fastapi_user_id")
+                    print("✅ [FastAPI] User registered with ID: \(fastAPIUserId)")
+                }
             }
 
             await MainActor.run {
@@ -751,7 +757,10 @@ class SupabaseManager: ObservableObject {
 
             // Ensure user exists in FastAPI backend
             Task {
-                await FastAPIService.shared.registerUser(email: userObj.email)
+                if let fastAPIUserId = await FastAPIService.shared.registerUser(email: userObj.email) {
+                    UserDefaults.standard.set(fastAPIUserId, forKey: "fastapi_user_id")
+                    print("✅ [FastAPI] User registered with ID: \(fastAPIUserId)")
+                }
             }
 
             await MainActor.run {

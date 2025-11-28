@@ -59,6 +59,12 @@ struct HaruApp: App {
                 }
             }
         }
+
+        // Initialize auto-tracking manager for background health data uploads
+        // This will start hourly health uploads and daily sleep uploads
+        let autoTracking = AutoTrackingManager.shared
+        autoTracking.startAutoTracking()
+        print("📱 Auto-tracking initialized - hourly health & daily sleep uploads enabled")
     }
 
     var body: some Scene {

@@ -558,3 +558,64 @@ class TimelineManager: ObservableObject {
     }
 
 }
+
+// MARK: - FastAPI Conversion Extensions
+
+extension TimelineRecord {
+    /// Convert to WorkoutSessionData for FastAPI upload
+    func toWorkoutSessionData() -> WorkoutSessionData {
+        let formatter = ISO8601DateFormatter()
+
+        // Calculate total steps from checkpoints
+        let totalSteps = checkpoints.compactMap { $0.steps }.reduce(0, +)
+
+        // Calculate total calories from checkpoints
+        let totalCalories = checkpoints.compactMap { $0.calories }.reduce(0.0, +)
+
+        // Calculate average heart rate from checkpoints with valid data
+        let heartRates = checkpoints.compactMap { $0.heartRate }
+        let avgHeartRate = heartRates.isEmpty ? nil : heartRates.reduce(0.0, +) / Double(heartRates.count)
+
+        return WorkoutSessionData(
+            startAt: formatter.string(from: startTime),
+            endAt: formatter.string(from: endTime),
+            workoutType: "WALKING",  // Default to walking for timeline tracking
+            stepCount: totalSteps > 0 ? totalSteps : nil,
+            distanceKm: totalDistance > 0 ? totalDistance / 1000.0 : nil,  // meters to km
+            activeEnergyKcal: totalCalories > 0 ? totalCalories : nil,
+            exerciseMin: duration > 0 ? duration / 60.0 : nil,  // seconds to minutes
+            avgHr: avgHeartRate,
+            walkingSpeedKmh: averageSpeed > 0 ? averageSpeed : nil,
+            source: "SPACE_APP",
+            deviceModel: WorkoutSessionData.currentDeviceModel,
+            osVersion: WorkoutSessionData.currentOSVersion
+        )
+    }
+}
+
+extension Checkpoint {
+    /// Convert to TimeSlotData for FastAPI upload
+    func toTimeSlotData() -> TimeSlotData {
+        let formatter = ISO8601DateFormatter()
+
+        // Round timestamp to nearest hour
+        let calendar = Calendar.current
+        let hourComponents = calendar.dateComponents([.year, .month, .day, .hour], from: timestamp)
+        let hourTimestamp = calendar.date(from: hourComponents) ?? timestamp
+
+        return TimeSlotData(
+            tsHour: formatter.string(from: hourTimestamp),
+            latitude: coordinate.latitude,
+            longitude: coordinate.longitude,
+            altitude: nil,  // Not available from checkpoint
+            horizontalAccuracy: nil,  // Not available from checkpoint
+            verticalAccuracy: nil,  // Not available from checkpoint
+            placeId: nil,  // Can be linked later
+            gridNx: nil,  // Weather grid coordinates (optional)
+            gridNy: nil,  // Weather grid coordinates (optional)
+            weatherProvider: nil,  // Not available from checkpoint
+            status: "COMPLETE"  // Checkpoint is complete data
+        )
+    }
+}
+
