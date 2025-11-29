@@ -28,6 +28,7 @@ from app.models.info import (
     HumidifierConfig,
     Character
 )
+from app.models.chat import ChatSession, ChatMessage
 
 __all__ = [
     # User models
@@ -65,4 +66,7 @@ __all__ = [
     "LightConfig",
     "HumidifierConfig",
     "Character",
+    # Chat models
+    "ChatSession",
+    "ChatMessage",
 ]

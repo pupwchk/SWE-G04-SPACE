@@ -21,6 +21,7 @@ from app.services.supabase_service import supabase_persona_service
 from app.models.user import User
 from app.models.location import UserLocation
 from app.models.appliance import UserAppliancePreference
+from app.cruds import chat as chat_cruds
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/chat", tags=["Chat"])
@@ -159,8 +160,17 @@ async def send_chat_message(
         }
     """
     try:
+        # 메모리 세션 (빠른 응답용)
         session_id = get_or_create_session(user_id)
         session = chat_sessions[session_id]
+
+        # DB 세션 (영구 저장용)
+        db_session = chat_cruds.get_or_create_session(
+            db=db,
+            user_id=UUID(user_id),
+            persona_id=request.character_id,
+            persona_nickname=None  # 나중에 업데이트
+        )
 
         # 페르소나 로드 (character_id가 있으면)
         persona = None
@@ -194,7 +204,7 @@ async def send_chat_message(
 
         logger.info(f"📝 Intent: {intent_result}")
 
-        # 대화 히스토리 저장 (최대 개수 제한)
+        # 대화 히스토리 저장 (메모리 - 최대 개수 제한)
         session["conversation_history"].append({
             "role": "user",
             "message": request.message,
@@ -207,6 +217,16 @@ async def send_chat_message(
         intent_type = intent_result.get("intent_type")
         needs_control = intent_result.get("needs_control", False)
 
+        # ✅ DB에 사용자 메시지 저장
+        chat_cruds.save_message(
+            db=db,
+            session_id=db_session.id,
+            role="user",
+            content=request.message,
+            intent_type=intent_type,
+            needs_control=needs_control
+        )
+
         # LLM이 잘못 판단할 수 있으므로, environment_complaint나 appliance_request는 무조건 제어 필요
         if intent_type in ["environment_complaint", "appliance_request"]:
             needs_control = True
@@ -218,10 +238,20 @@ async def send_chat_message(
                 persona=persona  # 페르소나 적용
             )
             ai_response = llm_result.get("response", "죄송합니다. 응답을 생성할 수 없습니다.")
+
+            # 메모리 저장
             session["conversation_history"].append({
                 "role": "assistant",
                 "message": ai_response
             })
+
+            # ✅ DB에 AI 응답 저장
+            chat_cruds.save_message(
+                db=db,
+                session_id=db_session.id,
+                role="assistant",
+                content=ai_response
+            )
 
             return ChatMessageResponse(
                 user_message=request.message,
@@ -293,11 +323,21 @@ async def send_chat_message(
             "timestamp": None  # TODO: 타임스탬프 추가
         }
 
+        # 메모리 저장
         session["conversation_history"].append({
             "role": "assistant",
             "message": ai_response,
             "suggestions": recommendations
         })
+
+        # ✅ DB에 AI 응답 저장 (가전 제어 제안 포함)
+        chat_cruds.save_message(
+            db=db,
+            session_id=db_session.id,
+            role="assistant",
+            content=ai_response,
+            suggestions=recommendations
+        )
 
         logger.info(f"✅ Suggestions generated: {len(recommendations)} appliances")
 

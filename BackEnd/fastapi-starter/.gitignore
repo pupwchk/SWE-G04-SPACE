@@ -1,5 +1,5 @@
 *.pyc
-
+.claude
 .env
 .env.*
 
