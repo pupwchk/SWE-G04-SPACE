@@ -25,24 +25,34 @@ async def sendbird_chat_webhook(
 ):
     """
     Sendbird 채팅 웹훅 수신
-    
+
     Webhook 설정:
     - Dashboard > Settings > Chat > Webhooks
     - URL: https://your-domain.com/webhook/sendbird/chat
     - Events: message:send
     """
     try:
-        payload = await request.json()
-        
+        # JSON 파싱 에러 처리
+        try:
+            payload = await request.json()
+        except Exception as json_error:
+            logger.warning(f"⚠️ Invalid JSON in webhook request: {str(json_error)}")
+            return {"status": "ignored", "reason": "invalid_json"}
+
+        # 빈 payload 처리
+        if not payload:
+            logger.warning("⚠️ Empty payload received")
+            return {"status": "ignored", "reason": "empty_payload"}
+
         # 웹훅 카테고리 확인
         category = payload.get("category")
-        
+
         if category == "group_channel:message_send":
             # 메시지 전송 이벤트
             await handle_message_send(payload, background_tasks)
-        
+
         return {"status": "ok"}
-    
+
     except Exception as e:
         logger.error(f"❌ Webhook error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -168,25 +178,35 @@ async def process_and_respond(
 async def sendbird_calls_webhook(request: Request):
     """
     Sendbird Calls 웹훅 수신
-    
+
     Webhook 설정:
     - Dashboard > Calls > Settings > Webhooks
     - Events: call.ended, call.established 등
     """
     try:
-        payload = await request.json()
-        
+        # JSON 파싱 에러 처리
+        try:
+            payload = await request.json()
+        except Exception as json_error:
+            logger.warning(f"⚠️ Invalid JSON in calls webhook request: {str(json_error)}")
+            return {"status": "ignored", "reason": "invalid_json"}
+
+        # 빈 payload 처리
+        if not payload:
+            logger.warning("⚠️ Empty payload received in calls webhook")
+            return {"status": "ignored", "reason": "empty_payload"}
+
         event_type = payload.get("type")
         call_id = payload.get("call_id")
-        
+
         logger.info(f"📞 Calls webhook: {event_type} - {call_id}")
-        
+
         # 통화 종료 시 요약 생성 등
         if event_type == "call.ended":
             await handle_call_ended(payload)
-        
+
         return {"status": "ok"}
-    
+
     except Exception as e:
         logger.error(f"❌ Calls webhook error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

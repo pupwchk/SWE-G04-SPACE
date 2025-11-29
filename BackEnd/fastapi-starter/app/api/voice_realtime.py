@@ -18,6 +18,7 @@ from app.services.appliance_control_service import appliance_control_service
 from app.services.appliance_rule_engine import appliance_rule_engine
 from app.services.weather_service import weather_service
 from app.services.hrv_service import hrv_service
+from app.services.supabase_service import supabase_persona_service
 import app.cruds.info as infoCruds
 
 logger = logging.getLogger(__name__)
@@ -178,14 +179,25 @@ class VoiceRealtimeHandler:
             # 페르소나 로드 (character_id가 있으면)
             persona_instructions = None
             if character_id:
-                from app.cruds import info as infoCruds
-                from uuid import UUID
-                character = infoCruds.get_character(self.db, UUID(character_id))
-                if character:
-                    persona_instructions = character.persona
-                    logger.info(f"✅ Loaded persona: {character.nickname}")
-                else:
-                    logger.warning(f"⚠️ Character not found: {character_id}")
+                # 1순위: Supabase 페르소나 시스템 시도
+                if supabase_persona_service.is_available():
+                    persona_data = supabase_persona_service.get_persona_for_llm(character_id)
+                    if persona_data:
+                        persona_instructions = persona_data["description"]
+                        logger.info(f"✅ Loaded Supabase persona: {persona_data['nickname']}")
+                    else:
+                        logger.warning(f"⚠️ Supabase persona not found: {character_id}, falling back to FastAPI Character")
+
+                # 2순위: FastAPI Character 테이블 (fallback)
+                if not persona_instructions:
+                    from app.cruds import info as infoCruds
+                    from uuid import UUID
+                    character = infoCruds.get_character(self.db, UUID(character_id))
+                    if character:
+                        persona_instructions = character.persona
+                        logger.info(f"✅ Loaded FastAPI persona: {character.nickname}")
+                    else:
+                        logger.warning(f"⚠️ Character not found in both Supabase and FastAPI DB: {character_id}")
 
             # Realtime API 세션 생성
             # voice 옵션: alloy(중성), echo(남성/낮음), fable(표현력), onyx(남성/깊음), nova(여성/밝음), shimmer(여성/부드러움)
@@ -326,8 +338,15 @@ class VoiceRealtimeHandler:
                     break
 
             # 정리
-            event_task.cancel()
-            await realtime_agent.close_session(user_id)
+            try:
+                event_task.cancel()
+                await event_task  # 태스크가 완전히 종료될 때까지 대기
+            except asyncio.CancelledError:
+                logger.info(f"✅ Event task cancelled for user {user_id}")
+            except Exception as e:
+                logger.error(f"❌ Event task cleanup error: {str(e)}")
+            finally:
+                await realtime_agent.close_session(user_id)
 
         except Exception as e:
             logger.error(f"❌ WebSocket handler error: {str(e)}")

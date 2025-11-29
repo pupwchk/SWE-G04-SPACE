@@ -17,6 +17,7 @@ from app.services.appliance_control_service import appliance_control_service
 from app.services.appliance_rule_engine import appliance_rule_engine
 from app.services.weather_service import weather_service
 from app.services.hrv_service import hrv_service
+from app.services.supabase_service import supabase_persona_service
 from app.models.user import User
 from app.models.location import UserLocation
 from app.models.appliance import UserAppliancePreference
@@ -62,18 +63,60 @@ class ApplianceApprovalResponse(BaseModel):
 
 # ========== 메모리 관리 (임시) ==========
 # TODO: DB로 이관 필요
-chat_sessions: Dict[str, Dict[str, Any]] = {}
+from collections import OrderedDict
+from datetime import datetime, timedelta
+
+# 최대 세션 수와 타임아웃 설정
+MAX_SESSIONS = 100
+SESSION_TIMEOUT = timedelta(hours=2)
+MAX_HISTORY_PER_SESSION = 50
+
+chat_sessions: OrderedDict[str, Dict[str, Any]] = OrderedDict()
+
+
+def cleanup_old_sessions():
+    """오래된 세션 정리"""
+    now = datetime.now()
+    to_delete = []
+
+    for session_id, session in chat_sessions.items():
+        last_accessed = session.get("last_accessed", now)
+        if now - last_accessed > SESSION_TIMEOUT:
+            to_delete.append(session_id)
+
+    for session_id in to_delete:
+        del chat_sessions[session_id]
+        logger.info(f"🗑️ Cleaned up old session: {session_id}")
+
+    # 최대 개수 초과 시 오래된 것부터 삭제 (LRU)
+    while len(chat_sessions) > MAX_SESSIONS:
+        oldest_session_id = next(iter(chat_sessions))
+        del chat_sessions[oldest_session_id]
+        logger.info(f"🗑️ Evicted session (max limit): {oldest_session_id}")
 
 
 def get_or_create_session(user_id: str) -> str:
     """세션 ID 생성 또는 조회"""
     session_id = f"session_{user_id}"
+
+    # 주기적 정리 (10% 확률로 실행)
+    import random
+    if random.random() < 0.1:
+        cleanup_old_sessions()
+
     if session_id not in chat_sessions:
         chat_sessions[session_id] = {
             "user_id": user_id,
             "conversation_history": [],
-            "pending_suggestions": None
+            "pending_suggestions": None,
+            "last_accessed": datetime.now()
         }
+    else:
+        # 세션 접근 시간 갱신 (LRU)
+        chat_sessions[session_id]["last_accessed"] = datetime.now()
+        # OrderedDict에서 최신 항목으로 이동
+        chat_sessions.move_to_end(session_id)
+
     return session_id
 
 
@@ -122,16 +165,26 @@ async def send_chat_message(
         # 페르소나 로드 (character_id가 있으면)
         persona = None
         if request.character_id:
-            from app.cruds import info as infoCruds
-            character = infoCruds.get_character(db, UUID(request.character_id))
-            if character:
-                persona = {
-                    "nickname": character.nickname,
-                    "description": character.persona
-                }
-                logger.info(f"✅ Loaded persona: {character.nickname}")
-            else:
-                logger.warning(f"⚠️ Character not found: {request.character_id}")
+            # 1순위: Supabase 페르소나 시스템 시도
+            if supabase_persona_service.is_available():
+                persona = supabase_persona_service.get_persona_for_llm(request.character_id)
+                if persona:
+                    logger.info(f"✅ Loaded Supabase persona: {persona['nickname']}")
+                else:
+                    logger.warning(f"⚠️ Supabase persona not found: {request.character_id}, falling back to FastAPI Character")
+
+            # 2순위: FastAPI Character 테이블 (fallback)
+            if not persona:
+                from app.cruds import info as infoCruds
+                character = infoCruds.get_character(db, UUID(request.character_id))
+                if character:
+                    persona = {
+                        "nickname": character.nickname,
+                        "description": character.persona
+                    }
+                    logger.info(f"✅ Loaded FastAPI persona: {character.nickname}")
+                else:
+                    logger.warning(f"⚠️ Character not found in both Supabase and FastAPI DB: {request.character_id}")
 
         # 1. 의도 파싱
         intent_result = await llm_service.parse_user_intent(
@@ -141,12 +194,15 @@ async def send_chat_message(
 
         logger.info(f"📝 Intent: {intent_result}")
 
-        # 대화 히스토리 저장
+        # 대화 히스토리 저장 (최대 개수 제한)
         session["conversation_history"].append({
             "role": "user",
             "message": request.message,
             "intent": intent_result
         })
+        # 히스토리 제한
+        if len(session["conversation_history"]) > MAX_HISTORY_PER_SESSION:
+            session["conversation_history"] = session["conversation_history"][-MAX_HISTORY_PER_SESSION:]
 
         intent_type = intent_result.get("intent_type")
         needs_control = intent_result.get("needs_control", False)
