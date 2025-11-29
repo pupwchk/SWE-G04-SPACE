@@ -442,41 +442,109 @@ class LLMService:
 
 class MemoryService:
     """대화 메모리 관리"""
-    
+
     def __init__(self):
         # 실제로는 DB에 저장해야 함
-        self.short_term_memory: Dict[str, List[Dict]] = {}
-        self.long_term_memory: Dict[str, Dict] = {}
-    
+        from collections import OrderedDict
+        from datetime import datetime, timedelta
+
+        self.short_term_memory: OrderedDict[str, List[Dict]] = OrderedDict()
+        self.long_term_memory: OrderedDict[str, Dict] = OrderedDict()
+
+        # 메모리 제한 설정
+        self.MAX_USERS = 200  # 최대 사용자 수
+        self.MAX_MESSAGES_PER_USER = 50  # 사용자당 최대 메시지 수
+        self.MEMORY_TIMEOUT = timedelta(hours=6)  # 6시간 동안 접근 없으면 삭제
+        self.last_access: Dict[str, datetime] = {}
+
+    def _cleanup_old_memories(self):
+        """오래된 메모리 정리"""
+        from datetime import datetime
+        now = datetime.now()
+        to_delete = []
+
+        for user_id in list(self.short_term_memory.keys()):
+            last_time = self.last_access.get(user_id, now)
+            if now - last_time > self.MEMORY_TIMEOUT:
+                to_delete.append(user_id)
+
+        for user_id in to_delete:
+            self.short_term_memory.pop(user_id, None)
+            self.long_term_memory.pop(user_id, None)
+            self.last_access.pop(user_id, None)
+            logger.info(f"🗑️ Cleaned up memory for user: {user_id}")
+
+        # 최대 사용자 수 초과 시 오래된 것부터 삭제 (LRU)
+        while len(self.short_term_memory) > self.MAX_USERS:
+            oldest_user = next(iter(self.short_term_memory))
+            self.short_term_memory.pop(oldest_user, None)
+            self.long_term_memory.pop(oldest_user, None)
+            self.last_access.pop(oldest_user, None)
+            logger.info(f"🗑️ Evicted memory (max limit): {oldest_user}")
+
     def add_message(self, user_id: str, role: str, content: str):
         """대화 히스토리에 메시지 추가"""
+        from datetime import datetime
+        import random
+
+        # 10% 확률로 정리 실행
+        if random.random() < 0.1:
+            self._cleanup_old_memories()
+
         if user_id not in self.short_term_memory:
             self.short_term_memory[user_id] = []
-        
+
         self.short_term_memory[user_id].append({
             "role": role,
             "content": content
         })
-        
-        # 최근 50개만 유지
-        if len(self.short_term_memory[user_id]) > 50:
-            self.short_term_memory[user_id] = self.short_term_memory[user_id][-50:]
-    
+
+        # 최근 메시지만 유지
+        if len(self.short_term_memory[user_id]) > self.MAX_MESSAGES_PER_USER:
+            self.short_term_memory[user_id] = self.short_term_memory[user_id][-self.MAX_MESSAGES_PER_USER:]
+
+        # 접근 시간 갱신 (LRU)
+        self.last_access[user_id] = datetime.now()
+        # OrderedDict에서 최신 항목으로 이동
+        if user_id in self.short_term_memory:
+            self.short_term_memory.move_to_end(user_id)
+
     def get_history(self, user_id: str, limit: int = 10) -> List[Dict]:
         """대화 히스토리 조회"""
+        from datetime import datetime
+
         if user_id not in self.short_term_memory:
             return []
+
+        # 접근 시간 갱신
+        self.last_access[user_id] = datetime.now()
+        self.short_term_memory.move_to_end(user_id)
+
         return self.short_term_memory[user_id][-limit:]
-    
+
     def update_long_term_memory(self, user_id: str, key: str, value: Any):
         """장기 메모리 업데이트"""
+        from datetime import datetime
+
         if user_id not in self.long_term_memory:
             self.long_term_memory[user_id] = {}
-        
+
         self.long_term_memory[user_id][key] = value
-    
+
+        # 접근 시간 갱신
+        self.last_access[user_id] = datetime.now()
+        if user_id in self.long_term_memory:
+            self.long_term_memory.move_to_end(user_id)
+
     def get_long_term_memory(self, user_id: str) -> Dict:
         """장기 메모리 조회"""
+        from datetime import datetime
+
+        if user_id in self.last_access:
+            self.last_access[user_id] = datetime.now()
+        if user_id in self.long_term_memory:
+            self.long_term_memory.move_to_end(user_id)
+
         return self.long_term_memory.get(user_id, {})
 
 

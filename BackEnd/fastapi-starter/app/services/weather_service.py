@@ -74,6 +74,12 @@ class WeatherService:
             }
         """
         try:
+            # 좌표 검증: 한국 영역만 허용
+            # 대한민국 범위: 위도 33~39, 경도 124~132
+            if not (33 <= latitude <= 39 and 124 <= longitude <= 132):
+                logger.warning(f"⚠️ Coordinates outside Korea: lat={latitude}, lon={longitude}")
+                return None
+
             # 격자 좌표 변환
             nx, ny = self._convert_to_grid(latitude, longitude)
 

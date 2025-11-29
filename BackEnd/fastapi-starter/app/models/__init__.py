@@ -9,19 +9,60 @@ from app.models.appliance import (
 )
 from app.models.weather import WeatherCache
 from app.models.location import UserLocation, GeofenceTracking, GeofenceEvent
+from app.models.tracking import (
+    StressAssessment,
+    FatiguePrediction,
+    Place,
+    TimeSlot,
+    WeatherObservation,
+    SleepSession,
+    WorkoutSession,
+    HealthHourly
+)
+from app.models.info import (
+    Appliance,
+    AirConditionerConfig,
+    TvConfig,
+    AirPurifierConfig,
+    LightConfig,
+    HumidifierConfig,
+    Character
+)
 
 __all__ = [
+    # User models
     "User",
     "UserPhone",
     "UserDevice",
+    # HRV models
     "HRVLog",
     "FatigueHistory",
+    # Appliance rule models
     "ApplianceConditionRule",
     "UserAppliancePreference",
     "ApplianceStatus",
     "ApplianceCommandLog",
+    # Weather models
     "WeatherCache",
+    # Location models
     "UserLocation",
     "GeofenceTracking",
     "GeofenceEvent",
+    # Tracking models
+    "StressAssessment",
+    "FatiguePrediction",
+    "Place",
+    "TimeSlot",
+    "WeatherObservation",
+    "SleepSession",
+    "WorkoutSession",
+    "HealthHourly",
+    # Info models (Appliances & Character)
+    "Appliance",
+    "AirConditionerConfig",
+    "TvConfig",
+    "AirPurifierConfig",
+    "LightConfig",
+    "HumidifierConfig",
+    "Character",
 ]
