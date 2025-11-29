@@ -3,6 +3,7 @@
 시나리오 2: 사용자 주도형 대화 API
 사용자가 불편함을 표현하면 AI가 가전 제어를 제안하고, 사용자 승인 후 실행
 """
+import os
 import logging
 from uuid import UUID
 from typing import Optional, Dict, Any, List
@@ -277,7 +278,7 @@ async def send_chat_message(
             db=db,
             latitude=home_lat,
             longitude=home_lng,
-            sido_name="서울"
+            sido_name=os.getenv("DEFAULT_SIDO_NAME", "서울")
         )
 
         # 피로도

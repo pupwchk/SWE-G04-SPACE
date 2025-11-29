@@ -3,6 +3,7 @@
 OpenAI Realtime API WebSocket 엔드포인트
 Speech-to-Speech 양방향 음성 스트림 처리
 """
+import os
 import logging
 import json
 import asyncio
@@ -404,7 +405,9 @@ async def websocket_voice_endpoint(
     };
     ```
     """
-    # 현재는 테스트용 수동 커밋 모드 활성화
-    # 실제 서비스: use_manual_commit=False (Server VAD 자동 처리)
-    handler = VoiceRealtimeHandler(db, use_manual_commit=True)
+    # 환경 변수로 수동 커밋 모드 설정
+    # VOICE_MANUAL_COMMIT=true: 수동 커밋 (테스트용)
+    # VOICE_MANUAL_COMMIT=false: Server VAD 자동 처리 (실제 서비스)
+    use_manual_commit = os.getenv("VOICE_MANUAL_COMMIT", "true").lower() == "true"
+    handler = VoiceRealtimeHandler(db, use_manual_commit=use_manual_commit)
     await handler.handle_websocket(websocket, user_id, character_id)
