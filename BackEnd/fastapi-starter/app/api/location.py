@@ -2,6 +2,7 @@
 Location API
 GPS 위치 수신 및 Geofence 처리
 """
+import os
 import logging
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
 from pydantic import BaseModel, Field
@@ -143,7 +144,7 @@ async def trigger_auto_call(user_id: str, distance: float, event_type: str):
                 db=db,
                 latitude=user_location.home_latitude,
                 longitude=user_location.home_longitude,
-                sido_name="서울"  # TODO: 위경도로부터 시도 추출
+                sido_name=os.getenv("DEFAULT_SIDO_NAME", "서울")
             )
 
             logger.info(f"🌤️ Weather: {weather_data.get('temperature')}°C, {weather_data.get('humidity')}%")

@@ -111,6 +111,11 @@ def get_or_create_session(user_id: str) -> str:
             "user_id": user_id,
             "conversation_history": [],
             "pending_suggestions": None,
+            "dialogue_state": {  # DST: 대화 상태 추적
+                "intent": None,
+                "slots": {},  # 현재 제어 중인 가전 정보 {"appliance": "에어컨", "temperature": 24}
+                "appliance_states": {}  # 가전 현재 상태 캐시
+            },
             "last_accessed": datetime.now()
         }
     else:
@@ -232,11 +237,34 @@ async def send_chat_message(
         if intent_type in ["environment_complaint", "appliance_request"]:
             needs_control = True
 
+        # DST 상태 업데이트
+        session["dialogue_state"]["intent"] = intent_type
+        if intent_type == "appliance_request" and intent_result.get("issues"):
+            # 가전 제어 요청인 경우 슬롯 추출
+            for issue in intent_result["issues"]:
+                session["dialogue_state"]["slots"][issue.get("type")] = issue.get("condition")
+
+        # 현재 가전 상태 조회 (DST에 포함)
+        appliance_states = appliance_control_service.get_appliance_status(
+            db=db,
+            user_id=user_id
+        )
+        session["dialogue_state"]["appliance_states"] = appliance_states
+
         # 2. 일반 대화인 경우
         if intent_type == "general_chat" or not needs_control:
+            # 대화 히스토리를 OpenAI 포맷으로 변환
+            history_for_llm = [
+                {"role": msg["role"], "content": msg["message"]}
+                for msg in session["conversation_history"][-10:]  # 최근 10개
+            ]
+
             llm_result = await llm_service.generate_response(
                 user_message=request.message,
-                persona=persona  # 페르소나 적용
+                conversation_history=history_for_llm,  # ← 대화 히스토리 전달
+                persona=persona,
+                appliance_states=appliance_states,  # ← 현재 가전 상태 전달
+                dialogue_state=session["dialogue_state"]  # ← DST 상태 전달
             )
             ai_response = llm_result.get("response", "죄송합니다. 응답을 생성할 수 없습니다.")
 
@@ -308,12 +336,19 @@ async def send_chat_message(
             )
 
         # 3-3. 자연어 제안 생성
+        history_for_llm = [
+            {"role": msg["role"], "content": msg["message"]}
+            for msg in session["conversation_history"][-10:]
+        ]
+
         ai_response = await llm_service.generate_appliance_suggestion(
             appliances=recommendations,
             weather=weather_data,
             fatigue_level=fatigue_level,
             user_message=request.message,
-            persona=persona  # 페르소나 적용
+            persona=persona,  # 페르소나 적용
+            appliance_states=appliance_states,  # ← 현재 가전 상태 전달
+            conversation_history=history_for_llm  # ← 대화 히스토리 전달
         )
 
         # 3-4. 세션에 저장
@@ -451,6 +486,10 @@ async def approve_appliance_control(
             })
             session["pending_suggestions"] = None
 
+            # DST 상태 초기화 (거절)
+            session["dialogue_state"]["intent"] = None
+            session["dialogue_state"]["slots"] = {}
+
             return ApplianceApprovalResponse(
                 approved=False,
                 has_modification=False,
@@ -559,6 +598,17 @@ async def approve_appliance_control(
             "execution_results": execution_results
         })
         session["pending_suggestions"] = None
+
+        # DST 상태 초기화 (가전 제어 완료)
+        session["dialogue_state"]["intent"] = None
+        session["dialogue_state"]["slots"] = {}
+
+        # 가전 상태 갱신
+        updated_appliance_states = appliance_control_service.get_appliance_status(
+            db=db,
+            user_id=user_id
+        )
+        session["dialogue_state"]["appliance_states"] = updated_appliance_states
 
         return ApplianceApprovalResponse(
             approved=True,

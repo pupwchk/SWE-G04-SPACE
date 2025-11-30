@@ -81,17 +81,21 @@ class LLMService:
         user_message: str,
         conversation_history: Optional[List[Dict]] = None,
         persona: Optional[Dict] = None,
-        context: Optional[Dict] = None
+        context: Optional[Dict] = None,
+        appliance_states: Optional[List[Dict]] = None,
+        dialogue_state: Optional[Dict] = None
     ) -> Dict[str, Any]:
         """
         LLM 응답 생성
-        
+
         Args:
             user_message: 사용자 메시지
             conversation_history: 대화 히스토리
             persona: 페르소나 정보
             context: 추가 컨텍스트 (위치, 시간, 상태 등)
-        
+            appliance_states: 현재 가전 상태 리스트
+            dialogue_state: DST 상태 (intent, slots)
+
         Returns:
             {
                 "action": "NONE" | "CALL" | "AUTO_CALL",
@@ -104,16 +108,36 @@ class LLMService:
             messages = [
                 {"role": "system", "content": self._build_system_prompt(persona)}
             ]
-            
+
             # 대화 히스토리 추가
             if conversation_history:
                 messages.extend(conversation_history[-10:])  # 최근 10개만
-            
+
+            # DST 상태 추가 (현재 대화 맥락)
+            if dialogue_state and (dialogue_state.get("intent") or dialogue_state.get("slots")):
+                dst_str = f"\n\n**대화 맥락 (DST):**\n"
+                if dialogue_state.get("intent"):
+                    dst_str += f"- 현재 의도: {dialogue_state['intent']}\n"
+                if dialogue_state.get("slots"):
+                    dst_str += f"- 대화 중인 주제: {json.dumps(dialogue_state['slots'], ensure_ascii=False)}\n"
+                messages.append({"role": "system", "content": dst_str})
+
+            # 가전 상태 추가
+            if appliance_states:
+                appliance_str = "\n\n**현재 가전 상태:**\n"
+                for app in appliance_states:
+                    status = "켜짐" if app.get("is_on") else "꺼짐"
+                    appliance_str += f"- {app['appliance_type']}: {status}"
+                    if app.get("is_on") and app.get("current_settings"):
+                        appliance_str += f" (설정: {json.dumps(app['current_settings'], ensure_ascii=False)})"
+                    appliance_str += "\n"
+                messages.append({"role": "system", "content": appliance_str})
+
             # 컨텍스트 추가
             if context:
                 context_str = f"\n\n**현재 상황:**\n{json.dumps(context, ensure_ascii=False, indent=2)}"
                 messages.append({"role": "system", "content": context_str})
-            
+
             # 사용자 메시지 추가
             messages.append({"role": "user", "content": user_message})
             
@@ -292,7 +316,9 @@ class LLMService:
         weather: Dict[str, Any],
         fatigue_level: int,
         user_message: str,
-        persona: Optional[Dict] = None
+        persona: Optional[Dict] = None,
+        appliance_states: Optional[List[Dict]] = None,
+        conversation_history: Optional[List[Dict]] = None
     ) -> str:
         """
         가전 제어 제안 메시지 생성 (시나리오 2용)
@@ -303,6 +329,8 @@ class LLMService:
             fatigue_level: 피로도 레벨
             user_message: 사용자 원본 메시지
             persona: 페르소나 정보 (nickname, description)
+            appliance_states: 현재 가전 상태 리스트
+            conversation_history: 대화 히스토리
 
         Returns:
             제안 메시지 (예: "현재 온도가 28도로 높고, 피로도가 3이에요. 에어컨을 23도로 켜고, 공기청정기도 켤까요?")
@@ -325,7 +353,19 @@ class LLMService:
 
 **추천 가전 제어:**
 {chr(10).join(appliance_info)}
+"""
 
+            # 현재 가전 상태 추가
+            if appliance_states:
+                prompt += "\n**현재 가전 상태:**\n"
+                for app in appliance_states:
+                    status = "켜짐" if app.get("is_on") else "꺼짐"
+                    prompt += f"- {app['appliance_type']}: {status}"
+                    if app.get("is_on") and app.get("current_settings"):
+                        prompt += f" (설정: {app['current_settings']})"
+                    prompt += "\n"
+
+            prompt += """
 위 정보를 바탕으로 사용자에게 자연스럽게 가전 제어를 제안하는 메시지를 생성하세요.
 형식: "현재 [날씨 설명]. [가전 제어 제안]할까요?"
 반드시 일반 텍스트로만 응답하세요 (JSON 아님).
