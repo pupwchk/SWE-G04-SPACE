@@ -310,6 +310,117 @@ class LLMService:
                 "summary": "파싱 실패"
             }
 
+    async def generate_user_request_suggestion(
+        self,
+        user_message: str,
+        appliance_states: List[Dict[str, Any]],
+        weather: Dict[str, Any],
+        fatigue_level: int,
+        persona: Optional[Dict] = None,
+        conversation_history: Optional[List[Dict]] = None
+    ) -> Dict[str, Any]:
+        """
+        사용자 요청 기반 가전 제어 제안 (조건 테이블 없이 LLM 판단)
+
+        사용자가 "춥다", "덥다" 등을 말했을 때, 현재 가전 상태를 보고 제어 제안
+
+        Args:
+            user_message: 사용자 메시지
+            appliance_states: 현재 가전 상태 리스트
+            weather: 날씨 데이터
+            fatigue_level: 피로도 레벨
+            persona: 페르소나 정보
+            conversation_history: 대화 히스토리
+
+        Returns:
+            {
+                "response": "제안 메시지",
+                "appliances": [
+                    {
+                        "appliance_type": "에어컨",
+                        "action": "off",
+                        "settings": {},
+                        "reason": "사용자가 춥다고 했으므로"
+                    },
+                    ...
+                ]
+            }
+        """
+        try:
+            # 현재 가전 상태 요약
+            appliance_status_str = ""
+            if appliance_states:
+                appliance_status_str = "\n**현재 가전 상태:**\n"
+                for app in appliance_states:
+                    status = "켜짐" if app.get("is_on") else "꺼짐"
+                    appliance_status_str += f"- {app['appliance_type']}: {status}"
+                    if app.get("is_on") and app.get("current_settings"):
+                        appliance_status_str += f" (설정: {json.dumps(app['current_settings'], ensure_ascii=False)})"
+                    appliance_status_str += "\n"
+
+            prompt = f"""사용자가 "{user_message}"라고 말했습니다.
+
+**현재 상황:**
+- 온도: {weather.get('temperature')}°C
+- 습도: {weather.get('humidity')}%
+- 미세먼지: {weather.get('pm10')} ㎍/㎥
+- 피로도 레벨: {fatigue_level} (1:좋음, 2:보통, 3:나쁨, 4:매우나쁨)
+
+{appliance_status_str}
+
+사용자의 요청을 바탕으로 **현재 켜진 가전을 끄거나, 꺼진 가전을 켜는 등** 적절한 제어를 제안하세요.
+
+예시:
+- "춥다" → 에어컨 냉방이 켜져있으면 끄기 제안, 에어컨 난방 모드로 켜기 제안
+- "덥다" → 에어컨 난방이 켜져있으면 끄기 제안, 에어컨 냉방 모드로 켜기 제안
+- "건조하다" → 가습기 켜기 제안
+- "공기 나쁘다" → 공기청정기 켜기 제안
+
+다음 JSON 형식으로 응답하세요:
+{{
+  "response": "사용자에게 보낼 자연스러운 제안 메시지",
+  "appliances": [
+    {{
+      "appliance_type": "가전 종류 (에어컨, 가습기, 제습기, 공기청정기, 조명 등)",
+      "action": "on 또는 off",
+      "settings": {{"mode": "cool|heat", "target_temp_c": 22, ...}},
+      "reason": "제어 이유"
+    }}
+  ]
+}}
+
+**중요:**
+- 사용자 메시지에서 불편함을 파악하고 그에 맞는 제어를 제안하세요
+- appliances 배열이 비어있으면 제어 제안이 없는 것입니다
+- settings는 action이 "on"일 때만 필요합니다
+"""
+
+            # 시스템 프롬프트 생성 (페르소나 적용)
+            system_prompt = self._build_system_prompt(persona)
+
+            response = await client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.7,
+                response_format={"type": "json_object"}
+            )
+
+            content = response.choices[0].message.content
+            result = json.loads(content)
+
+            logger.info(f"✅ User request suggestion generated: {len(result.get('appliances', []))} appliances")
+            return result
+
+        except Exception as e:
+            logger.error(f"❌ User request suggestion error: {str(e)}")
+            return {
+                "response": "죄송해요, 현재 제어 가능한 가전을 찾지 못했어요.",
+                "appliances": []
+            }
+
     async def generate_appliance_suggestion(
         self,
         appliances: List[Dict[str, Any]],

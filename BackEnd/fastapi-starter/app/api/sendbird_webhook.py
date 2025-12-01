@@ -311,7 +311,7 @@ async def process_and_respond(
         else:
             logger.info(f"   Fatigue level: {fatigue_level}")
 
-        # 피로도 기반 가전 제어 추천 생성
+        # 피로도 기반 가전 제어 추천 생성 (자동 조건 기반)
         logger.info("🔧 [RESPONSE-DEBUG] Generating appliance recommendations based on fatigue...")
         recommendations = appliance_rule_engine.get_appliances_to_control(
             db=db,
@@ -320,29 +320,50 @@ async def process_and_respond(
             fatigue_level=fatigue_level
         )
 
+        # 사용자가 직접 불편을 표현한 경우, LLM이 판단하도록 함
+        # 조건 테이블에 맞지 않더라도 사용자 요청을 우선
         if not recommendations:
-            logger.info("ℹ️ [RESPONSE-DEBUG] No appliance control needed")
-            response_text = "현재 집안 환경은 적절한 상태입니다. 다른 도움이 필요하신가요?"
-            memory_service.add_message(user_id, "assistant", response_text)
-            await chat_client.send_message(
-                channel_url=channel_url,
-                message=response_text,
-                user_id=user_id
+            logger.info("ℹ️ [RESPONSE-DEBUG] No rule-based recommendations, asking LLM to suggest based on user message...")
+            # LLM에게 사용자 메시지와 현재 가전 상태를 주고 제안 요청
+            response_result = await llm_service.generate_user_request_suggestion(
+                user_message=message,
+                appliance_states=appliance_states,
+                weather=weather_data,
+                fatigue_level=fatigue_level,
+                persona=persona,
+                conversation_history=history
             )
-            logger.info("=" * 80)
-            return
 
-        # 자연어 제안 생성 (피로도 기반 설정값 포함)
-        logger.info(f"💡 [RESPONSE-DEBUG] Generating suggestion message for {len(recommendations)} appliances...")
-        response_text = await llm_service.generate_appliance_suggestion(
-            appliances=recommendations,
-            weather=weather_data,
-            fatigue_level=fatigue_level,
-            user_message=message,
-            persona=persona,
-            appliance_states=appliance_states,
-            conversation_history=history
-        )
+            response_text = response_result.get("response", "")
+            suggested_appliances = response_result.get("appliances", [])
+
+            if not suggested_appliances:
+                # LLM도 제안이 없으면 일반 응답
+                logger.info("ℹ️ [RESPONSE-DEBUG] LLM also suggests no changes")
+                memory_service.add_message(user_id, "assistant", response_text)
+                await chat_client.send_message(
+                    channel_url=channel_url,
+                    message=response_text,
+                    user_id=user_id
+                )
+                logger.info("=" * 80)
+                return
+
+            # LLM 제안을 recommendations로 사용
+            recommendations = suggested_appliances
+            logger.info(f"✅ [RESPONSE-DEBUG] LLM suggested {len(recommendations)} appliances")
+        else:
+            # 자연어 제안 생성 (피로도 기반 설정값 포함)
+            logger.info(f"💡 [RESPONSE-DEBUG] Generating suggestion message for {len(recommendations)} appliances...")
+            response_text = await llm_service.generate_appliance_suggestion(
+                appliances=recommendations,
+                weather=weather_data,
+                fatigue_level=fatigue_level,
+                user_message=message,
+                persona=persona,
+                appliance_states=appliance_states,
+                conversation_history=history
+            )
 
         logger.info(f"✅ [RESPONSE-DEBUG] Suggestion generated!")
         logger.info(f"   Response: {response_text[:100]}...")

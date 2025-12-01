@@ -172,7 +172,19 @@ class ApplianceRuleEngine:
 
                 if preference:
                     # 학습된 선호 세팅 사용
-                    settings = preference.settings_json
+                    settings_json = preference.settings_json
+
+                    # 에어컨의 경우 냉방/난방 모드 선택
+                    if rule.appliance_type == "에어컨" and isinstance(settings_json, dict):
+                        mode = rule.condition_json.get("mode", "cool")
+                        if mode in settings_json:
+                            settings = settings_json[mode]
+                        else:
+                            # cool/heat 중 하나만 있거나 직접 설정인 경우
+                            settings = settings_json
+                    else:
+                        settings = settings_json
+
                     logger.info(f"📚 Using learned preference for {rule.appliance_type} at fatigue {fatigue_level}")
                 else:
                     # 기본 규칙 세팅 사용
@@ -268,21 +280,31 @@ class ApplianceRuleEngine:
             {
                 "fatigue_level": 1,
                 "appliance_type": "에어컨",
-                "condition_json": {"temp_threshold": 28, "operator": ">="}
+                "action": "on",
+                "condition_json": {"temp_threshold": 28, "operator": ">=", "mode": "cool"}
+            },
+            {
+                "fatigue_level": 1,
+                "appliance_type": "에어컨",
+                "action": "on",
+                "condition_json": {"temp_threshold": 10, "operator": "<=", "mode": "heat"}
             },
             {
                 "fatigue_level": 1,
                 "appliance_type": "가습기",
+                "action": "on",
                 "condition_json": {"humidity_threshold": 30, "operator": "<="}
             },
             {
                 "fatigue_level": 1,
                 "appliance_type": "제습기",
+                "action": "on",
                 "condition_json": {"humidity_threshold": 70, "operator": ">="}
             },
             {
                 "fatigue_level": 1,
                 "appliance_type": "공기청정기",
+                "action": "on",
                 "condition_json": {"pm10_threshold": 50, "operator": ">="}
             },
 
@@ -290,21 +312,31 @@ class ApplianceRuleEngine:
             {
                 "fatigue_level": 2,
                 "appliance_type": "에어컨",
-                "condition_json": {"temp_threshold": 27, "operator": ">="}
+                "action": "on",
+                "condition_json": {"temp_threshold": 27, "operator": ">=", "mode": "cool"}
+            },
+            {
+                "fatigue_level": 2,
+                "appliance_type": "에어컨",
+                "action": "on",
+                "condition_json": {"temp_threshold": 10, "operator": "<=", "mode": "heat"}
             },
             {
                 "fatigue_level": 2,
                 "appliance_type": "가습기",
+                "action": "on",
                 "condition_json": {"humidity_threshold": 35, "operator": "<="}
             },
             {
                 "fatigue_level": 2,
                 "appliance_type": "제습기",
+                "action": "on",
                 "condition_json": {"humidity_threshold": 65, "operator": ">="}
             },
             {
                 "fatigue_level": 2,
                 "appliance_type": "공기청정기",
+                "action": "on",
                 "condition_json": {"pm10_threshold": 40, "operator": ">="}
             },
 
@@ -312,26 +344,37 @@ class ApplianceRuleEngine:
             {
                 "fatigue_level": 3,
                 "appliance_type": "에어컨",
-                "condition_json": {"temp_threshold": 26, "operator": ">="}
+                "action": "on",
+                "condition_json": {"temp_threshold": 26, "operator": ">=", "mode": "cool"}
+            },
+            {
+                "fatigue_level": 3,
+                "appliance_type": "에어컨",
+                "action": "on",
+                "condition_json": {"temp_threshold": 10, "operator": "<=", "mode": "heat"}
             },
             {
                 "fatigue_level": 3,
                 "appliance_type": "가습기",
+                "action": "on",
                 "condition_json": {"humidity_threshold": 40, "operator": "<="}
             },
             {
                 "fatigue_level": 3,
                 "appliance_type": "제습기",
+                "action": "on",
                 "condition_json": {"humidity_threshold": 60, "operator": ">="}
             },
             {
                 "fatigue_level": 3,
                 "appliance_type": "공기청정기",
+                "action": "on",
                 "condition_json": {"pm10_threshold": 30, "operator": ">="}
             },
             {
                 "fatigue_level": 3,
                 "appliance_type": "조명",
+                "action": "on",
                 "condition_json": {}  # 항상 켜기
             },
 
@@ -339,53 +382,77 @@ class ApplianceRuleEngine:
             {
                 "fatigue_level": 4,
                 "appliance_type": "에어컨",
-                "condition_json": {"temp_threshold": 25, "operator": ">="}
+                "action": "on",
+                "condition_json": {"temp_threshold": 25, "operator": ">=", "mode": "cool"}
+            },
+            {
+                "fatigue_level": 4,
+                "appliance_type": "에어컨",
+                "action": "on",
+                "condition_json": {"temp_threshold": 10, "operator": "<=", "mode": "heat"}
             },
             {
                 "fatigue_level": 4,
                 "appliance_type": "가습기",
+                "action": "on",
                 "condition_json": {"humidity_threshold": 45, "operator": "<="}
             },
             {
                 "fatigue_level": 4,
                 "appliance_type": "제습기",
+                "action": "on",
                 "condition_json": {"humidity_threshold": 55, "operator": ">="}
             },
             {
                 "fatigue_level": 4,
                 "appliance_type": "공기청정기",
+                "action": "on",
                 "condition_json": {"pm10_threshold": 20, "operator": ">="}
             },
             {
                 "fatigue_level": 4,
                 "appliance_type": "조명",
+                "action": "on",
                 "condition_json": {}  # 항상 켜기
             },
         ]
 
         # 피로도별 기본 선호 세팅
+        # 에어컨의 경우 냉방/난방 모드를 settings_json에 포함하여 구분
         default_preferences = [
             # 피로도 1
-            {"fatigue_level": 1, "appliance_type": "에어컨", "settings_json": {"target_temp_c": 25, "fan_speed": "low", "swing_mode": "off"}},
+            {"fatigue_level": 1, "appliance_type": "에어컨", "settings_json": {
+                "cool": {"mode": "cool", "target_temp_c": 25, "fan_speed": "low", "swing_mode": "off"},
+                "heat": {"mode": "heat", "target_temp_c": 22, "fan_speed": "low", "swing_mode": "off"}
+            }},
             {"fatigue_level": 1, "appliance_type": "가습기", "settings_json": {"mode": "auto", "target_humidity_pct": 50}},
             {"fatigue_level": 1, "appliance_type": "제습기", "settings_json": {"mode": "auto", "target_humidity_pct": 50}},
             {"fatigue_level": 1, "appliance_type": "공기청정기", "settings_json": {"mode": "auto", "fan_speed": "low"}},
 
             # 피로도 2
-            {"fatigue_level": 2, "appliance_type": "에어컨", "settings_json": {"target_temp_c": 24, "fan_speed": "mid", "swing_mode": "vertical"}},
+            {"fatigue_level": 2, "appliance_type": "에어컨", "settings_json": {
+                "cool": {"mode": "cool", "target_temp_c": 24, "fan_speed": "mid", "swing_mode": "vertical"},
+                "heat": {"mode": "heat", "target_temp_c": 23, "fan_speed": "mid", "swing_mode": "vertical"}
+            }},
             {"fatigue_level": 2, "appliance_type": "가습기", "settings_json": {"mode": "auto", "target_humidity_pct": 55}},
             {"fatigue_level": 2, "appliance_type": "제습기", "settings_json": {"mode": "auto", "target_humidity_pct": 45}},
             {"fatigue_level": 2, "appliance_type": "공기청정기", "settings_json": {"mode": "auto", "fan_speed": "mid"}},
 
             # 피로도 3
-            {"fatigue_level": 3, "appliance_type": "에어컨", "settings_json": {"target_temp_c": 23, "fan_speed": "mid", "swing_mode": "both"}},
+            {"fatigue_level": 3, "appliance_type": "에어컨", "settings_json": {
+                "cool": {"mode": "cool", "target_temp_c": 23, "fan_speed": "mid", "swing_mode": "both"},
+                "heat": {"mode": "heat", "target_temp_c": 24, "fan_speed": "high", "swing_mode": "both"}
+            }},
             {"fatigue_level": 3, "appliance_type": "가습기", "settings_json": {"mode": "high", "target_humidity_pct": 60}},
             {"fatigue_level": 3, "appliance_type": "제습기", "settings_json": {"mode": "high", "target_humidity_pct": 40}},
             {"fatigue_level": 3, "appliance_type": "공기청정기", "settings_json": {"mode": "turbo", "fan_speed": "high"}},
             {"fatigue_level": 3, "appliance_type": "조명", "settings_json": {"brightness_pct": 70, "color_temp": "warm"}},
 
             # 피로도 4
-            {"fatigue_level": 4, "appliance_type": "에어컨", "settings_json": {"target_temp_c": 22, "fan_speed": "high", "swing_mode": "both"}},
+            {"fatigue_level": 4, "appliance_type": "에어컨", "settings_json": {
+                "cool": {"mode": "cool", "target_temp_c": 22, "fan_speed": "high", "swing_mode": "both"},
+                "heat": {"mode": "heat", "target_temp_c": 25, "fan_speed": "high", "swing_mode": "both"}
+            }},
             {"fatigue_level": 4, "appliance_type": "가습기", "settings_json": {"mode": "high", "target_humidity_pct": 60}},
             {"fatigue_level": 4, "appliance_type": "제습기", "settings_json": {"mode": "high", "target_humidity_pct": 40}},
             {"fatigue_level": 4, "appliance_type": "공기청정기", "settings_json": {"mode": "turbo", "fan_speed": "high"}},
