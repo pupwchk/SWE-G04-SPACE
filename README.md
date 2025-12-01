@@ -12,6 +12,20 @@ HARU is an intelligent smart-home automation platform that integrates wearable h
 
 <img width="1112" height="680" alt="archi" src="https://github.com/user-attachments/assets/8ef7a965-4e6c-4752-84e3-689b64984b1a" />
 
+---
+
+## System Workflow
+
+1. Apple Watch collects HRV, HR, sleep, and activity data.
+2. Client app sends metrics to FastAPI backend.
+3. Backend estimates fatigue level using HRV ranges.
+4. Context data (weather, GPS, timeslot) is integrated.
+5. LLM (GPT) generates natural-language appliance control policies.
+6. Policies are parsed and executed (AC, lights, humidifier, etc.).
+7. Actions are logged and used to update user preferences.
+8. Sendbird chatbot allows conversation-based control and feedback.
+
+---
 
 ## Key Features
 
@@ -133,11 +147,15 @@ docker-compose down
 
 | Name | Organization | Email |
 |------|-------------|--------|
-| Dogyeom Kim | Department of Computer Science, Hanyang University | dogyeom74@hanyang.ac.kr |
-| Yeonseong Shin | Department of Data Science, Hanyang University | dustjd2651@gmail.com |
+
 | Junho Uh | Department of Information Systems, Hanyang University | djwnsgh0248@hanyang.ac.kr |
+| Yeonseong Shin | Department of Data Science, Hanyang University | dustjd2651@gmail.com |
 | Donghyun Lim | Department of Computer Science, Hanyang University | limdongxian1207@gmail.com |
+| Dogyeom Kim | Department of Computer Science, Hanyang University | dogyeom74@hanyang.ac.kr |
+
 ---
 
+## License
 
-
+Copyright (c) 2025 HARU
+This project is licensed under the MIT License — see the [LICENSE](./LICENSE) file for details.
