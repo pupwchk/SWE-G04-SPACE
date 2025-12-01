@@ -101,7 +101,8 @@ Modular service-layer design for maintainability
 
 ## Architecture
 
-<img width="984" height="626" alt="Architecture" src="https://github.com/user-attachments/assets/683cfb21-6f4d-4ca1-a63b-5c5cc4cadb07" />
+<img width="1112" height="680" alt="archi" src="https://github.com/user-attachments/assets/8ef7a965-4e6c-4752-84e3-689b64984b1a" />
+
 
 The HARU system is designed as a modular, cloud-based smart-home automation platform that seamlessly connects wearable devices, backend services, external APIs, and LLM-powered chat interaction.
 
@@ -167,7 +168,7 @@ Workflow:
 - URLSession / async networking
 
 ### Backend
-- Python 3.11
+- Python 3.10
 - FastAPI (REST API)
 - SQLAlchemy ORM
 - Pydantic
@@ -186,7 +187,6 @@ Workflow:
 
 ### External APIs
 - KMA Weather API (Ultra-short-term forecast)
-- LG ThinQ API (smart appliance control)
 
 ### DevOps / Tools
 - GitHub Actions (optional future CI)
@@ -293,4 +293,5 @@ docker-compose down
 ---
 
 ## Demo Section
+
 
