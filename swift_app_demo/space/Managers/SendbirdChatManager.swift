@@ -171,9 +171,20 @@ class SendbirdChatManager: ObservableObject {
         let params = UserMessageCreateParams(message: text)
 
         // Add persona context as metadata for backend webhook
-        if let context = personaContext {
-            params.data = "{\"persona_context\":\"\(context)\"}"
-            print("📋 [SendbirdChatManager-DEBUG] Added persona context to message params")
+        if let context = personaContext, !context.isEmpty {
+            // ✅ Use JSONEncoder to safely create JSON with escaped special characters
+            let dataDict: [String: String] = ["persona_context": context]
+            if let jsonData = try? JSONEncoder().encode(dataDict),
+               let jsonString = String(data: jsonData, encoding: .utf8) {
+                params.data = jsonString
+                print("📋 [SendbirdChatManager-DEBUG] Added persona context to message params")
+                print("   Persona context preview: \(context.prefix(100))...")
+                print("   JSON data: \(jsonString.prefix(150))...")
+            } else {
+                print("⚠️ [SendbirdChatManager-DEBUG] Failed to encode persona context as JSON")
+            }
+        } else {
+            print("⚠️ [SendbirdChatManager-DEBUG] No persona context provided")
         }
 
         print("🚀 [SendbirdChatManager-DEBUG] Calling sendUserMessage...")
