@@ -16,17 +16,6 @@ HARU aims to shift the paradigm from “a user controlling a smart home” to �
 
 ---
 
-## Group Members
-
-| Name | Organization | Email |
-|------|-------------|--------|
-| Junho Uh | Department of Information Systems, Hanyang University | djwnsgh0248@hanyang.ac.kr |
-| Yeonseong Shin | Department of Data Science, Hanyang University | dustjd2651@gmail.com |
-| Dogyeom Kim | Department of Computer Science, Hanyang University | dogyeom74@hanyang.ac.kr |
-| Donghyun Lim | Department of Computer Science, Hanyang University | limdongxian1207@gmail.com |
-
----
-
 ## Key Features
 
 ### 🔹 1) Wellness State Analysis from Wearable HRV
@@ -291,7 +280,16 @@ docker ps -a
 docker-compose down
 
 ---
-
 ## Demo Section
+
+---
+## Group Members
+
+| Name | Organization | Email |
+|------|-------------|--------|
+| Dogyeom Kim | Department of Computer Science, Hanyang University | dogyeom74@hanyang.ac.kr |
+| Yeonseong Shin | Department of Data Science, Hanyang University | dustjd2651@gmail.com |
+| Junho Uh | Department of Information Systems, Hanyang University | djwnsgh0248@hanyang.ac.kr |
+| Donghyun Lim | Department of Computer Science, Hanyang University | limdongxian1207@gmail.com |
 
 
