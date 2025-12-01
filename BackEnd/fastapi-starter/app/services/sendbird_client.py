@@ -21,7 +21,9 @@ class SendbirdChatClient:
         channel_url: str,
         message: str,
         sender_id: Optional[str] = None,
-        user_id: Optional[str] = None
+        user_id: Optional[str] = None,
+        data: Optional[str] = None,
+        custom_type: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         채널에 메시지 전송 (채널이 없으면 자동 생성)
@@ -31,6 +33,8 @@ class SendbirdChatClient:
             message: 메시지 내용
             sender_id: 발신자 ID (기본값: AI assistant)
             user_id: 채널에 추가할 사용자 ID (채널 생성 시 필요)
+            data: 메시지 메타데이터 (JSON 문자열)
+            custom_type: 메시지 커스텀 타입 (예: "appliance_suggestion")
 
         Returns:
             API 응답
@@ -45,6 +49,12 @@ class SendbirdChatClient:
             "user_id": sender_id,
             "message": message
         }
+
+        # 메타데이터 추가
+        if data:
+            payload["data"] = data
+        if custom_type:
+            payload["custom_type"] = custom_type
 
         try:
             async with httpx.AsyncClient() as client:

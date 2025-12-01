@@ -148,9 +148,91 @@ def test_webhook_chat():
     print(f"Status: {response.status_code}")
     print(f"Response: {json.dumps(response.json(), indent=2, ensure_ascii=False)}")
 
+def test_chat_message_endpoint():
+    """채팅 메시지 API 테스트"""
+    print_section("6. 채팅 메시지 API 테스트")
+
+    message_request = {
+        "message": "집이 너무 덥고 건조해요",
+        "context": None
+    }
+
+    print(f"\n💬 메시지 전송: {message_request['message']}")
+    response = requests.post(f"{BASE_URL}/api/chat/{TEST_USER_ID}/message", json=message_request)
+    print(f"Status: {response.status_code}")
+
+    if response.status_code == 200:
+        data = response.json()
+        print(f"✅ AI 응답: {data.get('ai_response')}")
+        print(f"   의도: {data.get('intent_type')}")
+        print(f"   제어 필요: {data.get('needs_control')}")
+
+        if data.get('suggestions'):
+            print(f"   가전 제안 개수: {len(data['suggestions'])}")
+            for suggestion in data['suggestions']:
+                print(f"     - {suggestion.get('appliance_type')}: {suggestion.get('action')} ({suggestion.get('settings', {})})")
+
+            return data  # Return for approval test
+    else:
+        print(f"❌ Error: {response.text}")
+
+    return None
+
+def test_chat_approval_endpoint(chat_response):
+    """가전 제어 승인 API 테스트"""
+    print_section("7. 가전 제어 승인 API 테스트")
+
+    if not chat_response or not chat_response.get('suggestions'):
+        print("⚠️ 승인할 가전 제안이 없습니다. 이전 테스트를 먼저 실행하세요.")
+        return
+
+    approval_request = {
+        "user_response": "좋아요, 그렇게 해주세요",
+        "original_plan": {
+            "recommendations": chat_response['suggestions']
+        }
+    }
+
+    print(f"\n✅ 승인 요청: {approval_request['user_response']}")
+    response = requests.post(f"{BASE_URL}/api/chat/{TEST_USER_ID}/approve", json=approval_request)
+    print(f"Status: {response.status_code}")
+
+    if response.status_code == 200:
+        data = response.json()
+        print(f"✅ 승인 완료!")
+        print(f"   승인됨: {data.get('approved')}")
+        print(f"   수정 여부: {data.get('has_modification')}")
+        print(f"   AI 응답: {data.get('ai_response')}")
+
+        if data.get('execution_results'):
+            print(f"   실행 결과:")
+            for result in data['execution_results']:
+                status_icon = "✅" if result.get('status') == 'success' else "❌"
+                print(f"     {status_icon} {result.get('appliance')}: {result.get('action')}")
+    else:
+        print(f"❌ Error: {response.text}")
+
+def test_chat_history_endpoint():
+    """채팅 히스토리 조회 API 테스트"""
+    print_section("8. 채팅 히스토리 조회 API 테스트")
+
+    response = requests.get(f"{BASE_URL}/api/chat/{TEST_USER_ID}/history?limit=10")
+    print(f"Status: {response.status_code}")
+
+    if response.status_code == 200:
+        data = response.json()
+        history = data.get('conversation_history', [])
+        print(f"✅ 대화 기록 {len(history)}개 조회됨")
+
+        for i, msg in enumerate(history[-5:], 1):  # 최근 5개만 출력
+            role = "👤 사용자" if msg.get('role') == 'user' else "🤖 AI"
+            print(f"   [{i}] {role}: {msg.get('message')[:50]}...")
+    else:
+        print(f"❌ Error: {response.text}")
+
 def test_sendbird_user():
     """SendBird AI 사용자 확인"""
-    print_section("6. SendBird AI 사용자 확인")
+    print_section("9. SendBird AI 사용자 확인")
 
     print("\n🔍 home_ai_assistant 사용자 확인 중...")
     print("   이 테스트는 SendBird API를 직접 호출합니다.")
@@ -181,7 +263,17 @@ def main():
         # 5. 채팅 웹훅 테스트
         test_webhook_chat()
 
-        # 6. SendBird 사용자 확인
+        # 6. 채팅 메시지 API 테스트
+        chat_response = test_chat_message_endpoint()
+
+        # 7. 가전 제어 승인 API 테스트
+        if chat_response:
+            test_chat_approval_endpoint(chat_response)
+
+        # 8. 채팅 히스토리 조회 API 테스트
+        test_chat_history_endpoint()
+
+        # 9. SendBird 사용자 확인
         test_sendbird_user()
 
         print("\n" + "✅ 모든 테스트 완료".center(60, "=") + "\n")

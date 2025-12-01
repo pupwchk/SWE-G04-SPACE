@@ -237,12 +237,16 @@ struct ChatMessage: Identifiable {
     let text: String
     let isFromUser: Bool
     let timestamp: Date
+    let customType: String?
+    let data: String?
 
-    init(id: String = UUID().uuidString, text: String, isFromUser: Bool, timestamp: Date = Date()) {
+    init(id: String = UUID().uuidString, text: String, isFromUser: Bool, timestamp: Date = Date(), customType: String? = nil, data: String? = nil) {
         self.id = id
         self.text = text
         self.isFromUser = isFromUser
         self.timestamp = timestamp
+        self.customType = customType
+        self.data = data
     }
 }
 
@@ -283,6 +287,9 @@ class PersonaChatViewModel: ObservableObject {
     // Current persona context
     private var currentPersonaId: String?
     private var currentPersonaContext: String?
+
+    // Store metadata for approval
+    private var currentMetadata: MessageMetadata?
 
     init() {
         // Set delegate to receive real-time messages
@@ -392,6 +399,15 @@ class PersonaChatViewModel: ObservableObject {
         if !changes.isEmpty {
             self.applianceChanges = changes
             self.showChangeSummary = true
+
+            // Store metadata for later approval
+            if let dataString = message.data,
+               let jsonData = dataString.data(using: .utf8),
+               let metadata = try? JSONDecoder().decode(MessageMetadata.self, from: jsonData) {
+                self.currentMetadata = metadata
+                print("✅ [PersonaChatViewModel] Stored metadata for approval")
+            }
+
             print("✅ [PersonaChatViewModel] Parsed \(changes.count) appliance changes")
         }
     }
@@ -403,7 +419,9 @@ class PersonaChatViewModel: ObservableObject {
             do {
                 let success = try await chatService.approveChanges(
                     userId: userId,
-                    changes: applianceChanges
+                    changes: applianceChanges,
+                    userResponse: "좋아",
+                    metadata: currentMetadata
                 )
 
                 if success {
@@ -413,6 +431,7 @@ class PersonaChatViewModel: ObservableObject {
                     await MainActor.run {
                         self.showChangeSummary = false
                         self.applianceChanges = []
+                        self.currentMetadata = nil
                     }
                 }
             } catch {

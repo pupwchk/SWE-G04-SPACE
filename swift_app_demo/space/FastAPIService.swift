@@ -592,9 +592,10 @@ class FastAPIService {
     /// Approve/modify appliance changes from chat suggestion
     /// - Parameters:
     ///   - userId: User ID
-    ///   - approvals: Dictionary of approved/modified appliance changes
-    /// - Returns: Success boolean
-    func approveChatChanges(userId: String, approvals: [[String: Any]]) async -> ApplianceApprovalResponse? {
+    ///   - userResponse: User's approval response text (e.g., "좋아", "에어컨은 24도로")
+    ///   - originalPlan: Original appliance control plan from suggestions
+    /// - Returns: ApplianceApprovalResponse
+    func approveChatChanges(userId: String, userResponse: String, originalPlan: [String: Any]) async -> ApplianceApprovalResponse? {
         guard let url = URL(string: "\(baseURL)/api/chat/\(userId)/approve") else {
             print("❌ [FastAPI] Invalid URL for approve chat changes")
             return nil
@@ -604,7 +605,10 @@ class FastAPIService {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
-        let body: [String: Any] = ["approvals": approvals]
+        let body: [String: Any] = [
+            "user_response": userResponse,
+            "original_plan": originalPlan
+        ]
 
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: body)

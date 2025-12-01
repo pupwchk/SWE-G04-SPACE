@@ -114,111 +114,139 @@ class ChatService: ObservableObject {
     ///   - limit: Number of messages to load
     /// - Returns: Array of chat messages or nil if failed
     private func loadHistoryFromBackend(userId: String, limit: Int) async -> [ChatMessage]? {
-        // NOTE: This will be implemented when FastAPI chat endpoints are added
-        // For now, return nil to fall back to Sendbird
+        print("📥 [ChatService] Attempting to load history from backend...")
 
-        /*
-        // Example implementation (uncomment when FastAPI methods are added):
         guard let historyItems = await fastAPIService.getChatHistory(
             userId: userId,
             limit: limit
         ) else {
+            print("⚠️ [ChatService] Failed to load history from backend, will fallback to Sendbird")
             return nil
         }
 
         let messages = historyItems.map { item -> ChatMessage in
-            ChatMessage(
-                id: item.messageId,
+            // Parse timestamp (ISO8601 format expected)
+            let timestamp: Date
+            if let timestampStr = item.timestamp,
+               let date = ISO8601DateFormatter().date(from: timestampStr) {
+                timestamp = date
+            } else {
+                timestamp = Date()
+            }
+
+            // Generate unique ID from timestamp and role
+            let messageId = "\(item.role)_\(timestamp.timeIntervalSince1970)"
+
+            return ChatMessage(
+                id: messageId,
                 text: item.message,
-                isFromUser: item.sender == "user",
-                timestamp: ISO8601DateFormatter().date(from: item.timestamp) ?? Date()
+                isFromUser: item.role == "user",
+                timestamp: timestamp
             )
         }
 
         print("✅ [ChatService] Loaded \(messages.count) messages from backend")
         return messages
-        */
-
-        print("ℹ️ [ChatService] Backend history loading not yet implemented")
-        return nil
     }
 
     /// Parse appliance changes from AI message
     /// - Parameter message: Chat message to parse
     /// - Returns: Array of appliance changes
     func parseApplianceChanges(from message: ChatMessage) -> [ApplianceChange] {
-        // NOTE: This will parse metadata from Sendbird message or FastAPI response
-        // The backend should include appliance suggestions in a structured format
-
-        // For now, return empty array - will be implemented with real backend integration
-        // The backend webhook should attach appliance suggestions as message metadata
-
-        /*
-        // Example implementation:
-        guard let metadata = message.metadata,
-              let suggestions = metadata.applianceSuggestions else {
+        // Check if message has appliance suggestion metadata
+        guard message.customType == "appliance_suggestion",
+              let dataString = message.data else {
+            print("ℹ️ [ChatService] No appliance suggestions in message")
             return []
         }
 
-        let changes = suggestions.map { suggestion -> ApplianceChange in
-            ApplianceChange(
-                applianceName: suggestion.applianceName,
-                icon: iconForAppliance(suggestion.applianceType),
-                action: suggestion.action,
-                detail: detailForSettings(suggestion.settings),
-                isModified: false
-            )
+        do {
+            // Parse JSON metadata
+            guard let jsonData = dataString.data(using: .utf8) else {
+                print("❌ [ChatService] Failed to convert data string to Data")
+                return []
+            }
+
+            let metadata = try JSONDecoder().decode(MessageMetadata.self, from: jsonData)
+
+            print("✅ [ChatService] Parsed metadata with \(metadata.applianceSuggestions.count) appliance suggestions")
+
+            // Convert to ApplianceChange objects
+            let changes = metadata.applianceSuggestions.map { suggestion -> ApplianceChange in
+                ApplianceChange(
+                    applianceName: suggestion.applianceType,
+                    icon: iconForAppliance(suggestion.applianceType),
+                    action: suggestion.action,
+                    detail: detailForSettings(suggestion.settings),
+                    isModified: false
+                )
+            }
+
+            print("✅ [ChatService] Converted to \(changes.count) ApplianceChange objects")
+            return changes
+
+        } catch {
+            print("❌ [ChatService] Failed to parse appliance metadata: \(error)")
+            return []
         }
-
-        print("✅ [ChatService] Parsed \(changes.count) appliance changes")
-        return changes
-        */
-
-        // Temporary: return empty array
-        return []
     }
 
     /// Approve appliance changes via backend
     /// - Parameters:
     ///   - userId: Current user ID
     ///   - changes: Array of appliance changes to approve
+    ///   - userResponse: User's approval message (e.g., "좋아", "에어컨은 24도로")
+    ///   - metadata: Original message metadata containing suggestions
     /// - Returns: Success status
-    func approveChanges(userId: String, changes: [ApplianceChange]) async throws -> Bool {
-        // NOTE: This will be implemented when FastAPI approve endpoint is added
-
-        /*
-        // Example implementation (uncomment when FastAPI methods are added):
-        let changesDict = changes.map { change -> [String: Any] in
-            [
-                "appliance_name": change.applianceName,
-                "action": change.action,
-                "modified": change.isModified
-                // Add more fields as needed
-            ]
-        }
-
-        let success = await fastAPIService.approveChatChanges(
-            userId: userId,
-            changes: ["changes": changesDict]
-        )
-
-        if success {
-            print("✅ [ChatService] Appliance changes approved")
-        } else {
-            print("❌ [ChatService] Failed to approve appliance changes")
-        }
-
-        return success
-        */
-
-        // Temporary simulation
-        print("ℹ️ [ChatService] Simulating appliance changes approval for user: \(userId)")
+    func approveChanges(userId: String, changes: [ApplianceChange], userResponse: String = "좋아", metadata: MessageMetadata?) async throws -> Bool {
+        print("📤 [ChatService] Approving appliance changes for user: \(userId)")
         print("   Changes: \(changes.count) appliances")
+        print("   User response: \(userResponse)")
 
-        try await Task.sleep(nanoseconds: 1_000_000_000)
+        guard let metadata = metadata else {
+            print("❌ [ChatService] No metadata available for approval")
+            throw ChatServiceError.parseError
+        }
 
-        print("✅ [ChatService] Simulated approval successful")
-        return true
+        // Convert ApplianceSuggestion to original_plan format
+        let recommendations = metadata.applianceSuggestions.map { suggestion -> [String: Any] in
+            var dict: [String: Any] = [
+                "appliance_type": suggestion.applianceType,
+                "action": suggestion.action
+            ]
+
+            // Add settings if available
+            if let settings = suggestion.settings {
+                var settingsDict: [String: Any] = [:]
+                for (key, value) in settings {
+                    settingsDict[key] = value.value
+                }
+                dict["settings"] = settingsDict
+            }
+
+            return dict
+        }
+
+        let originalPlan: [String: Any] = [
+            "recommendations": recommendations
+        ]
+
+        // Call FastAPI approval endpoint
+        guard let response = await fastAPIService.approveChatChanges(
+            userId: userId,
+            userResponse: userResponse,
+            originalPlan: originalPlan
+        ) else {
+            print("❌ [ChatService] Failed to approve appliance changes")
+            return false
+        }
+
+        print("✅ [ChatService] Appliance changes approved")
+        print("   Approved: \(response.approved)")
+        print("   Has modification: \(response.hasModification)")
+        print("   AI response: \(response.aiResponse)")
+
+        return response.approved
     }
 
     /// Clear chat session
@@ -324,13 +352,37 @@ extension ChatMessage {
     }
 }
 
+/// Message metadata model from Sendbird
+struct MessageMetadata: Codable {
+    let applianceSuggestions: [ApplianceSuggestion]
+    let weather: WeatherInfo?
+    let fatigueLevel: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case applianceSuggestions = "appliance_suggestions"
+        case weather
+        case fatigueLevel = "fatigue_level"
+    }
+}
+
+/// Weather info from metadata
+struct WeatherInfo: Codable {
+    let temperature: Double?
+    let humidity: Double?
+    let pm10: Double?
+}
+
 /// Appliance suggestion model from backend
 struct ApplianceSuggestion: Codable {
-    let applianceId: String
-    let applianceName: String
     let applianceType: String
     let action: String
     let settings: [String: AnyCodable]?
+
+    enum CodingKeys: String, CodingKey {
+        case applianceType = "appliance_type"
+        case action
+        case settings
+    }
 }
 
 /// Helper for encoding/decoding Any values in Codable

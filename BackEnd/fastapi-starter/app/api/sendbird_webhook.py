@@ -4,10 +4,11 @@ Sendbird Webhook API
 """
 import logging
 from fastapi import APIRouter, Request, HTTPException, BackgroundTasks
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from app.services.sendbird_client import SendbirdChatClient, SendbirdCallsClient
 from app.services.llm_service import llm_service, memory_service, LLMAction
+from app.services.supabase_service import supabase_persona_service
 from app.config.sendbird import SendbirdConfig
 
 logger = logging.getLogger(__name__)
@@ -77,11 +78,26 @@ async def handle_message_send(payload: Dict[str, Any], background_tasks: Backgro
         channel_url = payload.get("channel", {}).get("channel_url")
         sender = payload.get("sender", {})
         sender_id = sender.get("user_id")
-        message = payload.get("payload", {}).get("message", "")
+        message_payload = payload.get("payload", {})
+        message = message_payload.get("message", "")
+
+        # 메시지 데이터에서 persona_context 추출 (프론트엔드에서 전송)
+        persona_context = None
+        message_data = message_payload.get("data")
+        if message_data:
+            try:
+                import json
+                data_dict = json.loads(message_data) if isinstance(message_data, str) else message_data
+                persona_context = data_dict.get("persona_context")
+                if persona_context:
+                    logger.info(f"📋 [WEBHOOK-DEBUG] Persona context from message data: {persona_context[:100]}...")
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to parse message data: {e}")
 
         logger.info(f"   Channel URL: {channel_url}")
         logger.info(f"   Sender ID: {sender_id}")
         logger.info(f"   Message: {message}")
+        logger.info(f"   Has persona context: {persona_context is not None}")
         logger.info(f"   AI User ID: {SendbirdConfig.AI_USER_ID}")
 
         # AI 자신의 메시지는 무시
@@ -101,7 +117,8 @@ async def handle_message_send(payload: Dict[str, Any], background_tasks: Backgro
             process_and_respond,
             channel_url,
             sender_id,
-            message
+            message,
+            persona_context
         )
         logger.info("✅ [WEBHOOK-DEBUG] Background task added successfully")
 
@@ -113,7 +130,8 @@ async def handle_message_send(payload: Dict[str, Any], background_tasks: Backgro
 async def process_and_respond(
     channel_url: str,
     user_id: str,
-    message: str
+    message: str,
+    persona_context: Optional[str] = None
 ):
     """메시지 처리 및 응답"""
     from app.config.db import SessionLocal
@@ -143,6 +161,33 @@ async def process_and_respond(
         long_term = memory_service.get_long_term_memory(user_id)
         logger.info(f"💭 [RESPONSE-DEBUG] Long-term memory: {long_term.get('persona', 'default')}")
 
+        # 페르소나 로드
+        # 1순위: 프론트엔드에서 전송한 persona_context 사용
+        # 2순위: Supabase에서 조회
+        persona = None
+        if persona_context:
+            # 프론트엔드에서 받은 persona_context를 LLM 형식으로 변환
+            persona = {
+                "nickname": "User Selected Persona",
+                "description": persona_context
+            }
+            logger.info(f"✅ [RESPONSE-DEBUG] Using persona context from frontend: {persona_context[:100]}...")
+        elif supabase_persona_service.is_available():
+            # Supabase에서 페르소나 조회
+            selected_personas = supabase_persona_service.get_user_selected_personas(user_id, limit=1)
+            if selected_personas and len(selected_personas) > 0:
+                persona_id = selected_personas[0].get("persona_id")
+                if persona_id:
+                    persona = supabase_persona_service.get_persona_for_llm(persona_id)
+                    if persona:
+                        logger.info(f"✅ [RESPONSE-DEBUG] Loaded persona from Supabase: {persona['nickname']}")
+                    else:
+                        logger.warning(f"⚠️ [RESPONSE-DEBUG] Persona not found in Supabase: {persona_id}")
+            else:
+                logger.info("ℹ️ [RESPONSE-DEBUG] No selected persona for user")
+        else:
+            logger.warning("⚠️ [RESPONSE-DEBUG] No persona context and Supabase not available")
+
         # 1. 의도 파싱
         logger.info("🧠 [RESPONSE-DEBUG] Parsing user intent...")
         intent_result = await llm_service.parse_user_intent(
@@ -170,7 +215,7 @@ async def process_and_respond(
             response = await llm_service.generate_response(
                 user_message=message,
                 conversation_history=history,
-                persona=long_term.get("persona"),
+                persona=persona,
                 appliance_states=appliance_states,
                 context={
                     "user_id": user_id,
@@ -294,7 +339,7 @@ async def process_and_respond(
             weather=weather_data,
             fatigue_level=fatigue_level,
             user_message=message,
-            persona=long_term.get("persona"),
+            persona=persona,
             appliance_states=appliance_states,
             conversation_history=history
         )
@@ -307,14 +352,29 @@ async def process_and_respond(
         memory_service.add_message(user_id, "assistant", response_text)
         logger.info("💾 [RESPONSE-DEBUG] AI response saved to memory")
 
-        # Sendbird로 메시지 전송
+        # 가전 제안을 메타데이터로 구성
+        import json
+        message_metadata = {
+            "appliance_suggestions": recommendations,
+            "weather": {
+                "temperature": weather_data.get("temperature"),
+                "humidity": weather_data.get("humidity"),
+                "pm10": weather_data.get("pm10")
+            },
+            "fatigue_level": fatigue_level
+        }
+
+        # Sendbird로 메시지 전송 (메타데이터 포함)
         logger.info("📤 [RESPONSE-DEBUG] Sending appliance suggestion via Sendbird...")
         await chat_client.send_message(
             channel_url=channel_url,
             message=response_text,
-            user_id=user_id
+            user_id=user_id,
+            data=json.dumps(message_metadata),
+            custom_type="appliance_suggestion"
         )
-        logger.info(f"✅ [RESPONSE-DEBUG] Appliance suggestion sent to {user_id} successfully!")
+        logger.info(f"✅ [RESPONSE-DEBUG] Appliance suggestion sent to {user_id} with metadata!")
+        logger.info(f"   Metadata: {len(recommendations)} appliances")
         logger.info("=" * 80)
 
     except Exception as e:

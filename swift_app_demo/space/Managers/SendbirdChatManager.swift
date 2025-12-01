@@ -206,7 +206,9 @@ class SendbirdChatManager: ObservableObject {
                         id: String(message.messageId),
                         text: message.message,
                         isFromUser: message.sender?.userId != SendbirdManager.shared.getAIUserId(),
-                        timestamp: Date(timeIntervalSince1970: TimeInterval(message.createdAt) / 1000)
+                        timestamp: Date(timeIntervalSince1970: TimeInterval(message.createdAt) / 1000),
+                        customType: message.customType,
+                        data: message.data
                     )
 
                     continuation.resume(returning: chatMessage)
@@ -282,7 +284,9 @@ class SendbirdChatManager: ObservableObject {
                             id: String(userMessage.messageId),
                             text: userMessage.message,
                             isFromUser: userMessage.sender?.userId != SendbirdManager.shared.getAIUserId(),
-                            timestamp: Date(timeIntervalSince1970: TimeInterval(userMessage.createdAt) / 1000)
+                            timestamp: Date(timeIntervalSince1970: TimeInterval(userMessage.createdAt) / 1000),
+                            customType: userMessage.customType,
+                            data: userMessage.data
                         )
                     }
 
@@ -345,7 +349,9 @@ extension SendbirdChatManager: GroupChannelDelegate {
             id: String(userMessage.messageId),
             text: userMessage.message,
             isFromUser: userMessage.sender?.userId != SendbirdManager.shared.getAIUserId(),
-            timestamp: Date(timeIntervalSince1970: TimeInterval(userMessage.createdAt) / 1000)
+            timestamp: Date(timeIntervalSince1970: TimeInterval(userMessage.createdAt) / 1000),
+            customType: userMessage.customType,
+            data: userMessage.data
         )
 
         print("✅ [SendbirdChatManager] Received message: \(chatMessage.text)")
