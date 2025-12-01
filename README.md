@@ -12,7 +12,6 @@ HARU is an intelligent smart-home automation platform that integrates wearable h
 
 <img width="1112" height="680" alt="archi" src="https://github.com/user-attachments/assets/8ef7a965-4e6c-4752-84e3-689b64984b1a" />
 
-HARU is designed as a modular, cloud-based smart-home automation platform that seamlessly connects wearable devices, backend services, external APIs, and LLM-powered chat interaction. The architecture ensures scalability, low latency, and clear separation of concerns across each component.
 
 ## Key Features
 
@@ -139,5 +138,6 @@ docker-compose down
 | Junho Uh | Department of Information Systems, Hanyang University | djwnsgh0248@hanyang.ac.kr |
 | Donghyun Lim | Department of Computer Science, Hanyang University | limdongxian1207@gmail.com |
 ---
+
 
 
