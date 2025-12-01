@@ -115,20 +115,27 @@ class SendbirdChatClient:
     
     async def create_channel(
         self,
-        channel_url: str,
+        channel_url: Optional[str],
         user_ids: list[str],
         name: Optional[str] = None
     ) -> Dict[str, Any]:
-        """채널 생성"""
+        """
+        채널 생성 또는 기존 채널 조회
+
+        is_distinct=True이면 같은 멤버 조합의 채널이 이미 있으면 그 채널을 반환
+        """
         url = f"{self.base_url}/group_channels"
-        
+
         payload = {
-            "channel_url": channel_url,
             "user_ids": user_ids,
             "is_distinct": True,
             "name": name or f"Chat with {SendbirdConfig.AI_USER_NAME}"
         }
-        
+
+        # channel_url이 지정되면 사용
+        if channel_url:
+            payload["channel_url"] = channel_url
+
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.post(
@@ -138,10 +145,12 @@ class SendbirdChatClient:
                     timeout=10.0
                 )
                 response.raise_for_status()
-                
-                logger.info(f"✅ Channel created: {channel_url}")
-                return response.json()
-                
+
+                channel_data = response.json()
+                created_channel_url = channel_data.get("channel_url")
+                logger.info(f"✅ Channel ready: {created_channel_url}")
+                return channel_data
+
         except Exception as e:
             logger.error(f"❌ Error creating channel: {str(e)}")
             raise

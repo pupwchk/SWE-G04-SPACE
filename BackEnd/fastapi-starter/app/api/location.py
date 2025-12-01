@@ -172,21 +172,27 @@ async def trigger_auto_call(user_id: str, distance: float, event_type: str):
                 logger.info(f"✅ Controlled {success_count}/{len(appliances_to_control)} appliances")
 
             # 6. Sendbird 채팅 메시지
-            channel_url = SendbirdConfig.get_channel_url(user_id)
-
-            # 메시지 생성
-            appliance_names = [a["appliance_type"] for a in appliances_to_control]
-            if appliances_to_control:
-                message = f"집에 거의 도착하셨네요! 피로도를 고려해서 {', '.join(appliance_names)}을(를) 켜드렸어요. 잠시 후 전화로 자세히 안내해드릴게요."
-            else:
-                message = "집에 거의 도착하셨네요! 현재 날씨와 피로도 상태가 괜찮아서 따로 켤 가전은 없어요. 잠시 후 전화드릴게요."
-
+            # distinct 채널 생성 또는 가져오기
             try:
+                channel_data = await chat_client.create_channel(
+                    channel_url=None,  # 자동 생성
+                    user_ids=[user_id, SendbirdConfig.AI_USER_ID]
+                )
+                channel_url = channel_data.get("channel_url")
+
+                # 메시지 생성
+                appliance_names = [a["appliance_type"] for a in appliances_to_control]
+                if appliances_to_control:
+                    message = f"집에 거의 도착하셨네요! 피로도를 고려해서 {', '.join(appliance_names)}을(를) 켜드렸어요. 잠시 후 전화로 자세히 안내해드릴게요."
+                else:
+                    message = "집에 거의 도착하셨네요! 현재 날씨와 피로도 상태가 괜찮아서 따로 켤 가전은 없어요. 잠시 후 전화드릴게요."
+
                 await chat_client.send_message(
                     channel_url=channel_url,
-                    message=message
+                    message=message,
+                    user_id=user_id
                 )
-                logger.info(f"💬 Chat message sent")
+                logger.info(f"💬 Chat message sent to {channel_url}")
             except Exception as e:
                 logger.warning(f"⚠️ Failed to send chat: {str(e)}")
 
