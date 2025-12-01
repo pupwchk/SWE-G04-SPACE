@@ -349,14 +349,20 @@ class LLMService:
         try:
             # 현재 가전 상태 요약
             appliance_status_str = ""
+            registered_appliances = []
+
             if appliance_states:
-                appliance_status_str = "\n**현재 가전 상태:**\n"
+                appliance_status_str = "\n**사용자가 등록한 가전 목록 및 현재 상태:**\n"
                 for app in appliance_states:
                     status = "켜짐" if app.get("is_on") else "꺼짐"
-                    appliance_status_str += f"- {app['appliance_type']}: {status}"
+                    appliance_type = app['appliance_type']
+                    registered_appliances.append(appliance_type)
+                    appliance_status_str += f"- {appliance_type}: {status}"
                     if app.get("is_on") and app.get("current_settings"):
                         appliance_status_str += f" (설정: {json.dumps(app['current_settings'], ensure_ascii=False)})"
                     appliance_status_str += "\n"
+            else:
+                appliance_status_str = "\n**사용자가 등록한 가전이 없습니다.**\n"
 
             prompt = f"""사용자가 "{user_message}"라고 말했습니다.
 
@@ -368,20 +374,26 @@ class LLMService:
 
 {appliance_status_str}
 
-사용자의 요청을 바탕으로 **현재 켜진 가전을 끄거나, 꺼진 가전을 켜는 등** 적절한 제어를 제안하세요.
+**중요 규칙:**
+1. **오직 위에 나열된 등록된 가전만** 제어 제안할 수 있습니다
+2. 등록되지 않은 가전은 절대 추천하지 마세요
+3. 등록된 가전이 없으면 appliances를 빈 배열로 반환하세요
+
+사용자의 요청을 바탕으로 **등록된 가전 중에서만** 적절한 제어를 제안하세요.
 
 예시:
-- "춥다" → 에어컨 냉방이 켜져있으면 끄기 제안, 에어컨 난방 모드로 켜기 제안
-- "덥다" → 에어컨 난방이 켜져있으면 끄기 제안, 에어컨 냉방 모드로 켜기 제안
-- "건조하다" → 가습기 켜기 제안
-- "공기 나쁘다" → 공기청정기 켜기 제안
+- "춥다" + 에어컨이 등록되어 있음 → 에어컨 냉방이 켜져있으면 끄기 제안, 에어컨 난방 모드로 켜기 제안
+- "덥다" + 에어컨이 등록되어 있음 → 에어컨 난방이 켜져있으면 끄기 제안, 에어컨 냉방 모드로 켜기 제안
+- "건조하다" + 가습기가 등록되어 있음 → 가습기 켜기 제안
+- "건조하다" + 가습기가 등록되어 있지 않음 → appliances: [] (빈 배열)
+- "공기 나쁘다" + 공기청정기가 등록되어 있음 → 공기청정기 켜기 제안
 
 다음 JSON 형식으로 응답하세요:
 {{
   "response": "사용자에게 보낼 자연스러운 제안 메시지",
   "appliances": [
     {{
-      "appliance_type": "가전 종류 (에어컨, 가습기, 제습기, 공기청정기, 조명 등)",
+      "appliance_type": "등록된 가전의 정확한 이름 (위 목록에서만 선택)",
       "action": "on 또는 off",
       "settings": {{"mode": "cool|heat", "target_temp_c": 22, ...}},
       "reason": "제어 이유"
@@ -389,10 +401,11 @@ class LLMService:
   ]
 }}
 
-**중요:**
-- 사용자 메시지에서 불편함을 파악하고 그에 맞는 제어를 제안하세요
-- appliances 배열이 비어있으면 제어 제안이 없는 것입니다
-- settings는 action이 "on"일 때만 필요합니다
+**다시 한번 강조:**
+- **반드시 등록된 가전만** appliances에 포함시키세요
+- 등록되지 않은 가전을 추천하면 안 됩니다
+- appliance_type은 위 목록의 가전 이름과 정확히 일치해야 합니다
+- 등록된 가전이 없거나 적절한 가전이 없으면 appliances를 빈 배열로 하고 response에서 등록된 가전이 없다고 안내하세요
 """
 
             # 시스템 프롬프트 생성 (페르소나 적용)
@@ -462,13 +475,13 @@ class LLMService:
 - 미세먼지: {weather.get('pm10')} ㎍/㎥
 - 피로도 레벨: {fatigue_level} (1:좋음, 2:보통, 3:나쁨, 4:매우나쁨)
 
-**추천 가전 제어:**
+**추천 가전 제어 (등록된 가전만):**
 {chr(10).join(appliance_info)}
 """
 
             # 현재 가전 상태 추가
             if appliance_states:
-                prompt += "\n**현재 가전 상태:**\n"
+                prompt += "\n**사용자가 등록한 가전의 현재 상태:**\n"
                 for app in appliance_states:
                     status = "켜짐" if app.get("is_on") else "꺼짐"
                     prompt += f"- {app['appliance_type']}: {status}"
@@ -478,6 +491,11 @@ class LLMService:
 
             prompt += """
 위 정보를 바탕으로 사용자에게 자연스럽게 가전 제어를 제안하는 메시지를 생성하세요.
+
+**중요:**
+- 위에 나열된 등록된 가전만 언급하세요
+- 등록되지 않은 가전은 절대 언급하지 마세요
+
 형식: "현재 [날씨 설명]. [가전 제어 제안]할까요?"
 반드시 일반 텍스트로만 응답하세요 (JSON 아님).
 """
