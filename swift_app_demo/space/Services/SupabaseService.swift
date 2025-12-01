@@ -67,7 +67,7 @@ class SupabaseService: SupabaseServiceProtocol {
 
         // Debug: Print raw response
         if let jsonString = String(data: data, encoding: .utf8) {
-            print("📦 Raw API Response: \(jsonString.prefix(200))...")
+            print(" Raw API Response: \(jsonString.prefix(200))...")
         }
 
         let decoder = JSONDecoder()

@@ -142,7 +142,7 @@ class FastAPIService {
             if httpResponse.statusCode == 200 {
                 // Print raw response for debugging
                 if let jsonString = String(data: data, encoding: .utf8) {
-                    print("📦 [FastAPI] Weather API Response: \(jsonString)")
+                    print(" [FastAPI] Weather API Response: \(jsonString)")
                 }
 
                 if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
@@ -525,5 +525,350 @@ class FastAPIService {
         }
 
         return workoutSuccess && allSlotsSuccess
+    }
+
+    // MARK: - Chat API
+
+    /// Send chat message and get AI response with appliance suggestions
+    /// - Parameters:
+    ///   - userId: User ID
+    ///   - message: User's message text
+    ///   - personaContext: Optional persona context (final prompt)
+    ///   - characterId: Optional character/persona ID
+    /// - Returns: Chat response with AI message and suggestions
+    func sendChatMessage(
+        userId: String,
+        message: String,
+        personaContext: String? = nil,
+        characterId: String? = nil
+    ) async -> ChatResponse? {
+        guard let url = URL(string: "\(baseURL)/api/chat/\(userId)/message") else {
+            print("❌ [FastAPI] Invalid URL for send chat message")
+            return nil
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        var body: [String: Any] = ["message": message]
+
+        if let context = personaContext {
+            body["context"] = context
+        }
+
+        if let charId = characterId {
+            body["character_id"] = charId
+        }
+
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                print("❌ [FastAPI] Invalid response for chat message")
+                return nil
+            }
+
+            if httpResponse.statusCode == 200 {
+                let decoder = JSONDecoder()
+                let chatResponse = try decoder.decode(ChatResponse.self, from: data)
+                print("✅ [FastAPI] Chat message sent successfully")
+                return chatResponse
+            } else {
+                if let errorString = String(data: data, encoding: .utf8) {
+                    print("❌ [FastAPI] Chat message failed (\(httpResponse.statusCode)): \(errorString)")
+                }
+                return nil
+            }
+
+        } catch {
+            print("❌ [FastAPI] Network error sending chat message: \(error.localizedDescription)")
+            return nil
+        }
+    }
+
+    /// Approve/modify appliance changes from chat suggestion
+    /// - Parameters:
+    ///   - userId: User ID
+    ///   - approvals: Dictionary of approved/modified appliance changes
+    /// - Returns: Success boolean
+    func approveChatChanges(userId: String, approvals: [[String: Any]]) async -> ApplianceApprovalResponse? {
+        guard let url = URL(string: "\(baseURL)/api/chat/\(userId)/approve") else {
+            print("❌ [FastAPI] Invalid URL for approve chat changes")
+            return nil
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let body: [String: Any] = ["approvals": approvals]
+
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                print("❌ [FastAPI] Invalid response for approve changes")
+                return nil
+            }
+
+            if httpResponse.statusCode == 200 {
+                let decoder = JSONDecoder()
+                let approvalResponse = try decoder.decode(ApplianceApprovalResponse.self, from: data)
+                print("✅ [FastAPI] Appliance changes approved successfully")
+                return approvalResponse
+            } else {
+                if let errorString = String(data: data, encoding: .utf8) {
+                    print("❌ [FastAPI] Approve changes failed (\(httpResponse.statusCode)): \(errorString)")
+                }
+                return nil
+            }
+
+        } catch {
+            print("❌ [FastAPI] Network error approving changes: \(error.localizedDescription)")
+            return nil
+        }
+    }
+
+    /// Get chat conversation history
+    /// - Parameters:
+    ///   - userId: User ID
+    ///   - limit: Maximum number of messages to retrieve (default 50)
+    /// - Returns: Array of chat history items
+    func getChatHistory(userId: String, limit: Int = 50) async -> [ChatHistoryItem]? {
+        guard let url = URL(string: "\(baseURL)/api/chat/\(userId)/history?limit=\(limit)") else {
+            print("❌ [FastAPI] Invalid URL for chat history")
+            return nil
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                print("❌ [FastAPI] Invalid response for chat history")
+                return nil
+            }
+
+            if httpResponse.statusCode == 200 {
+                let decoder = JSONDecoder()
+                let historyResponse = try decoder.decode(ChatHistoryResponse.self, from: data)
+                print("✅ [FastAPI] Retrieved \(historyResponse.conversationHistory.count) chat messages")
+                return historyResponse.conversationHistory
+            } else {
+                if let errorString = String(data: data, encoding: .utf8) {
+                    print("❌ [FastAPI] Get chat history failed (\(httpResponse.statusCode)): \(errorString)")
+                }
+                return nil
+            }
+
+        } catch {
+            print("❌ [FastAPI] Network error getting chat history: \(error.localizedDescription)")
+            return nil
+        }
+    }
+
+    /// Clear chat session
+    /// - Parameter userId: User ID
+    /// - Returns: Success boolean
+    func clearChatSession(userId: String) async -> Bool {
+        guard let url = URL(string: "\(baseURL)/api/chat/\(userId)/session") else {
+            print("❌ [FastAPI] Invalid URL for clear session")
+            return false
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                print("❌ [FastAPI] Invalid response for clear session")
+                return false
+            }
+
+            if httpResponse.statusCode == 200 {
+                print("✅ [FastAPI] Chat session cleared successfully")
+                return true
+            } else {
+                if let errorString = String(data: data, encoding: .utf8) {
+                    print("❌ [FastAPI] Clear session failed (\(httpResponse.statusCode)): \(errorString)")
+                }
+                return false
+            }
+
+        } catch {
+            print("❌ [FastAPI] Network error clearing session: \(error.localizedDescription)")
+            return false
+        }
+    }
+
+    // MARK: - Calls API
+
+    /// Trigger auto-call when user approaches home (GPS-based)
+    /// - Parameter userId: User ID
+    /// - Returns: Success boolean
+    func triggerAutoCall(userId: String) async -> Bool {
+        guard let url = URL(string: "\(baseURL)/api/calls/trigger/\(userId)") else {
+            print("❌ [FastAPI] Invalid URL for trigger auto-call")
+            return false
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                print("❌ [FastAPI] Invalid response for trigger auto-call")
+                return false
+            }
+
+            if httpResponse.statusCode == 200 {
+                print("✅ [FastAPI] Auto-call triggered successfully")
+                return true
+            } else {
+                if let errorString = String(data: data, encoding: .utf8) {
+                    print("❌ [FastAPI] Trigger auto-call failed (\(httpResponse.statusCode)): \(errorString)")
+                }
+                return false
+            }
+
+        } catch {
+            print("❌ [FastAPI] Network error triggering auto-call: \(error.localizedDescription)")
+            return false
+        }
+    }
+}
+
+// MARK: - Chat Response Models
+
+/// Response from send chat message endpoint
+struct ChatResponse: Codable {
+    let aiMessage: String
+    let intentType: String?
+    let needsControl: Bool?
+    let suggestions: [ApplianceSuggestionResponse]?
+
+    enum CodingKeys: String, CodingKey {
+        case aiMessage = "ai_response"
+        case intentType = "intent_type"
+        case needsControl = "needs_control"
+        case suggestions
+    }
+}
+
+/// Appliance suggestion from AI
+struct ApplianceSuggestionResponse: Codable {
+    let applianceType: String
+    let action: String
+    let settings: [String: AnyCodableValue]?
+
+    enum CodingKeys: String, CodingKey {
+        case applianceType = "appliance_type"
+        case action
+        case settings
+    }
+}
+
+/// Response from approve endpoint
+struct ApplianceApprovalResponse: Codable {
+    let status: String
+    let message: String
+    let results: [ApplianceControlResult]?
+}
+
+/// Result of appliance control operation
+struct ApplianceControlResult: Codable {
+    let applianceType: String
+    let success: Bool
+    let message: String?
+
+    enum CodingKeys: String, CodingKey {
+        case applianceType = "appliance_type"
+        case success
+        case message
+    }
+}
+
+/// Chat history response
+struct ChatHistoryResponse: Codable {
+    let userId: String
+    let sessionId: String
+    let conversationHistory: [ChatHistoryItem]
+
+    enum CodingKeys: String, CodingKey {
+        case userId = "user_id"
+        case sessionId = "session_id"
+        case conversationHistory = "conversation_history"
+    }
+}
+
+/// Individual chat history item
+struct ChatHistoryItem: Codable {
+    let role: String  // "user" or "assistant"
+    let message: String
+    let intent: [String: AnyCodableValue]?
+    let suggestions: [ApplianceSuggestionResponse]?
+    let timestamp: String?
+}
+
+/// Helper for decoding Any values in JSON
+struct AnyCodableValue: Codable {
+    let value: Any
+
+    init(_ value: Any) {
+        self.value = value
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+
+        if let intValue = try? container.decode(Int.self) {
+            value = intValue
+        } else if let doubleValue = try? container.decode(Double.self) {
+            value = doubleValue
+        } else if let stringValue = try? container.decode(String.self) {
+            value = stringValue
+        } else if let boolValue = try? container.decode(Bool.self) {
+            value = boolValue
+        } else if let arrayValue = try? container.decode([AnyCodableValue].self) {
+            value = arrayValue.map { $0.value }
+        } else if let dictValue = try? container.decode([String: AnyCodableValue].self) {
+            value = dictValue.mapValues { $0.value }
+        } else {
+            value = NSNull()
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+
+        if let intValue = value as? Int {
+            try container.encode(intValue)
+        } else if let doubleValue = value as? Double {
+            try container.encode(doubleValue)
+        } else if let stringValue = value as? String {
+            try container.encode(stringValue)
+        } else if let boolValue = value as? Bool {
+            try container.encode(boolValue)
+        } else if let arrayValue = value as? [Any] {
+            let codableArray = arrayValue.map { AnyCodableValue($0) }
+            try container.encode(codableArray)
+        } else if let dictValue = value as? [String: Any] {
+            let codableDict = dictValue.mapValues { AnyCodableValue($0) }
+            try container.encode(codableDict)
+        } else {
+            try container.encodeNil()
+        }
     }
 }

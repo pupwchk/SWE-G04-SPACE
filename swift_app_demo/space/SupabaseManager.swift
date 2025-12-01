@@ -244,6 +244,16 @@ class SupabaseManager: ObservableObject {
                 await TaggedLocationManager.shared.loadTaggedLocations()
             }
 
+            // Connect to Sendbird Chat
+            Task {
+                do {
+                    try await SendbirdManager.shared.connect(userId: user.id)
+                    print("✅ [Sendbird] Connected after login")
+                } catch {
+                    print("⚠️ [Sendbird] Failed to connect: \(error)")
+                }
+            }
+
             print(" Returning user: \(user.email)")
             return user
         } catch let error as AuthError {
@@ -613,6 +623,157 @@ class SupabaseManager: ObservableObject {
         print(" Selected personas updated successfully")
     }
 
+    // MARK: - Persona Channel Management
+
+    /// Get Sendbird channel URL for a persona
+    /// - Parameter personaId: Persona ID
+    /// - Returns: Sendbird channel URL if exists, nil otherwise
+    func getPersonaChannelUrl(personaId: String) async throws -> String? {
+        guard let accessToken = getAccessToken() else {
+            throw AuthError.notAuthenticated
+        }
+
+        guard let userId = currentUser?.id else {
+            throw AuthError.notAuthenticated
+        }
+
+        guard let url = URL(string: "\(supabaseURL)/rest/v1/persona_channels?user_id=eq.\(userId)&persona_id=eq.\(personaId)&select=channel_url") else {
+            throw AuthError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw AuthError.invalidResponse
+        }
+
+        if httpResponse.statusCode != 200 {
+            if let responseString = String(data: data, encoding: .utf8) {
+                print("  Fetch persona channel failed: \(responseString)")
+            }
+            throw AuthError.serverError("Failed to fetch persona channel")
+        }
+
+        struct ChannelResponse: Codable {
+            let channelUrl: String
+
+            enum CodingKeys: String, CodingKey {
+                case channelUrl = "channel_url"
+            }
+        }
+
+        let channels = try JSONDecoder().decode([ChannelResponse].self, from: data)
+        return channels.first?.channelUrl
+    }
+
+    /// Save Sendbird channel URL for a persona
+    /// - Parameters:
+    ///   - personaId: Persona ID
+    ///   - channelUrl: Sendbird channel URL
+    func savePersonaChannelUrl(personaId: String, channelUrl: String) async throws {
+        guard let accessToken = getAccessToken() else {
+            throw AuthError.notAuthenticated
+        }
+
+        guard let userId = currentUser?.id else {
+            throw AuthError.notAuthenticated
+        }
+
+        guard let url = URL(string: "\(supabaseURL)/rest/v1/persona_channels") else {
+            throw AuthError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("return=minimal", forHTTPHeaderField: "Prefer")
+        // Use upsert to handle duplicate key conflicts
+        request.setValue("resolution=merge-duplicates", forHTTPHeaderField: "Prefer")
+
+        let body: [String: String] = [
+            "user_id": userId,
+            "persona_id": personaId,
+            "channel_url": channelUrl
+        ]
+
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (responseData, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw AuthError.invalidResponse
+        }
+
+        // Accept both 201 (created) and 409 (conflict - already exists)
+        if httpResponse.statusCode != 201 && httpResponse.statusCode != 409 {
+            if let responseString = String(data: responseData, encoding: .utf8) {
+                print("  Save persona channel failed: \(responseString)")
+            }
+
+            // If conflict, try updating instead
+            if httpResponse.statusCode == 409 {
+                try await updatePersonaChannelUrl(personaId: personaId, channelUrl: channelUrl)
+                return
+            }
+
+            throw AuthError.serverError("Failed to save persona channel")
+        }
+
+        print(" Persona channel URL saved successfully")
+    }
+
+    /// Update Sendbird channel URL for a persona
+    /// - Parameters:
+    ///   - personaId: Persona ID
+    ///   - channelUrl: Sendbird channel URL
+    private func updatePersonaChannelUrl(personaId: String, channelUrl: String) async throws {
+        guard let accessToken = getAccessToken() else {
+            throw AuthError.notAuthenticated
+        }
+
+        guard let userId = currentUser?.id else {
+            throw AuthError.notAuthenticated
+        }
+
+        guard let url = URL(string: "\(supabaseURL)/rest/v1/persona_channels?user_id=eq.\(userId)&persona_id=eq.\(personaId)") else {
+            throw AuthError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "PATCH"
+        request.setValue(supabaseAnonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let body: [String: String] = [
+            "channel_url": channelUrl
+        ]
+
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (responseData, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw AuthError.invalidResponse
+        }
+
+        if httpResponse.statusCode != 200 && httpResponse.statusCode != 204 {
+            if let responseString = String(data: responseData, encoding: .utf8) {
+                print("  Update persona channel failed: \(responseString)")
+            }
+            throw AuthError.serverError("Failed to update persona channel")
+        }
+
+        print(" Persona channel URL updated successfully")
+    }
+
     /// Create user profile in database
     private func createUserProfile(userId: String, email: String, name: String, accessToken: String) async throws {
         // Create user profile
@@ -778,6 +939,16 @@ class SupabaseManager: ObservableObject {
             // Load tagged locations for proximity detection
             Task {
                 await TaggedLocationManager.shared.loadTaggedLocations()
+            }
+
+            // Connect to Sendbird Chat (session restore)
+            Task {
+                do {
+                    try await SendbirdManager.shared.connect(userId: user.id)
+                    print("✅ [Sendbird] Connected on session restore")
+                } catch {
+                    print("⚠️ [Sendbird] Failed to connect: \(error)")
+                }
             }
 
             print(" Session validated, user: \(user.email)")

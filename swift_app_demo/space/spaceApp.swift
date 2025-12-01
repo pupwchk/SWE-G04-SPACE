@@ -11,6 +11,10 @@ import SwiftUI
 struct HaruApp: App {
     // Initialize managers on app launch
     init() {
+        // Initialize Sendbird Chat SDK
+        SendbirdManager.shared.initializeChat()
+        print("📱 Sendbird Chat SDK initialized")
+
         // Initialize WatchConnectivityManager singleton
         _ = WatchConnectivityManager.shared
         print("📱 iOS App initialized with WatchConnectivity")

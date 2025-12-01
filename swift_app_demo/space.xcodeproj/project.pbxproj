@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		AEDDAC052EDD5EF000C05B3A /* SendbirdChatSDK in Frameworks */ = {isa = PBXBuildFile; productRef = AEDDAC042EDD5EF000C05B3A /* SendbirdChatSDK */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		AE21B5252ED54B2000839646 /* space Watch App Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "space Watch App Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		AE715CBB2EB8DF470054A54F /* space.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = space.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -49,6 +53,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AEDDAC052EDD5EF000C05B3A /* SendbirdChatSDK in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -115,6 +120,7 @@
 			);
 			name = space;
 			packageProductDependencies = (
+				AEDDAC042EDD5EF000C05B3A /* SendbirdChatSDK */,
 			);
 			productName = space;
 			productReference = AE715CBB2EB8DF470054A54F /* space.app */;
@@ -147,6 +153,10 @@
 			);
 			mainGroup = AE715CB22EB8DF470054A54F;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				AEF406C42EDD569400AF245B /* XCRemoteSwiftPackageReference "sendbird-chat-sdk-ios" */,
+				AEF406C52EDD56B200AF245B /* XCRemoteSwiftPackageReference "sendbird-calls-ios" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = AE715CBC2EB8DF470054A54F /* Products */;
 			projectDirPath = "";
@@ -319,7 +329,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
@@ -376,7 +386,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
@@ -465,6 +475,33 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		AEF406C42EDD569400AF245B /* XCRemoteSwiftPackageReference "sendbird-chat-sdk-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sendbird/sendbird-chat-sdk-ios";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 4.34.1;
+			};
+		};
+		AEF406C52EDD56B200AF245B /* XCRemoteSwiftPackageReference "sendbird-calls-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sendbird/sendbird-calls-ios";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.11.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		AEDDAC042EDD5EF000C05B3A /* SendbirdChatSDK */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AEF406C42EDD569400AF245B /* XCRemoteSwiftPackageReference "sendbird-chat-sdk-ios" */;
+			productName = SendbirdChatSDK;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = AE715CB32EB8DF470054A54F /* Project object */;
 }

@@ -21,9 +21,55 @@ struct PersonaChatView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 12) {
+                        // Loading indicator
+                        if viewModel.isLoading && viewModel.messages.isEmpty {
+                            ProgressView("대화 기록을 불러오는 중...")
+                                .padding()
+                        }
+
+                        // Messages
                         ForEach(viewModel.messages) { message in
                             MessageBubble(message: message, personaName: persona.nickname)
                                 .id(message.id)
+                        }
+
+                        // Typing indicator
+                        if viewModel.isLoading && !viewModel.messages.isEmpty {
+                            HStack(alignment: .bottom, spacing: 8) {
+                                Circle()
+                                    .fill(LinearGradient(
+                                        gradient: Gradient(colors: [Color(hex: "A50034"), Color(hex: "A50034").opacity(0.7)]),
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ))
+                                    .frame(width: 32, height: 32)
+                                    .overlay(
+                                        Text(String(persona.nickname.prefix(1)))
+                                            .font(.system(size: 14, weight: .bold))
+                                            .foregroundColor(.white)
+                                    )
+
+                                HStack(spacing: 4) {
+                                    ForEach(0..<3) { index in
+                                        Circle()
+                                            .fill(Color.gray.opacity(0.6))
+                                            .frame(width: 8, height: 8)
+                                            .scaleEffect(viewModel.isLoading ? 1.0 : 0.5)
+                                            .animation(
+                                                Animation.easeInOut(duration: 0.6)
+                                                    .repeatForever()
+                                                    .delay(Double(index) * 0.2),
+                                                value: viewModel.isLoading
+                                            )
+                                    }
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 10)
+                                .background(Color.white)
+                                .cornerRadius(18)
+
+                                Spacer()
+                            }
                         }
                     }
                     .padding(.horizontal, 16)
@@ -38,11 +84,37 @@ struct PersonaChatView: View {
                 }
             }
 
+            // Error message
+            if let error = viewModel.errorMessage {
+                HStack {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundColor(.red)
+                    Text(error)
+                        .font(.system(size: 14))
+                        .foregroundColor(.red)
+                    Spacer()
+                    Button("닫기") {
+                        viewModel.errorMessage = nil
+                    }
+                    .font(.system(size: 14, weight: .medium))
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(Color.red.opacity(0.1))
+            }
+
             // 가전 수정사항 위젯
             if viewModel.showChangeSummary && !viewModel.applianceChanges.isEmpty {
                 ApplianceChangeSummaryWidget(
                     changes: viewModel.applianceChanges,
-                    isExpanded: $viewModel.isWidgetExpanded
+                    isExpanded: $viewModel.isWidgetExpanded,
+                    onApprove: {
+                        viewModel.approveChanges()
+                    },
+                    onReject: {
+                        viewModel.showChangeSummary = false
+                        viewModel.applianceChanges = []
+                    }
                 )
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
@@ -201,127 +273,182 @@ class PersonaChatViewModel: ObservableObject {
     @Published var applianceChanges: [ApplianceChange] = []
     @Published var showChangeSummary: Bool = false
     @Published var isWidgetExpanded: Bool = true
+    @Published var errorMessage: String?
+
+    // MARK: - Dependencies
+    private let chatService = ChatService.shared
+    private let chatManager = SendbirdChatManager.shared
+    private let supabaseManager = SupabaseManager.shared
+
+    // Current persona context
+    private var currentPersonaId: String?
+    private var currentPersonaContext: String?
+
+    init() {
+        // Set delegate to receive real-time messages
+        chatManager.delegate = self
+    }
+
+    // MARK: - Load Messages
 
     func loadMessages(for personaId: String, personaName: String) {
-        // "하루" 페르소나인 경우 더미 데이터 로드
-        if personaName == "하루" {
-            loadDemoMessages()
-            loadDemoApplianceChanges()
-        } else {
-            // 다른 페르소나는 빈 배열로 시작
-            messages = []
-            applianceChanges = []
-            showChangeSummary = false
+        self.currentPersonaId = personaId
+
+        // Load persona context (final prompt)
+        Task {
+            await loadPersonaContext(personaId: personaId)
+            await loadChatHistory(personaId: personaId)
         }
     }
 
-    private func loadDemoMessages() {
-        let now = Date()
+    private func loadPersonaContext(personaId: String) async {
+        // Get persona details from Supabase to retrieve final_prompt
+        do {
+            let personas = try await supabaseManager.fetchPersonas()
+            guard let persona = personas.first(where: { $0.id == personaId }) else {
+                print("⚠️ [PersonaChatViewModel] Persona not found: \(personaId)")
+                return
+            }
 
-        messages = [
-            ChatMessage(
-                text: "곧 집에 도착하시네요! 오늘 운동하시느라 고생 많으셨어요~ 지금 날씨가 많이 춥던데 괜찮으세요? 😊",
-                isFromUser: false,
-                timestamp: now.addingTimeInterval(-600)
-            ),
-            ChatMessage(
-                text: "응 진짜 춥다ㅠㅠ 집 도착하기 전에 미리 따뜻하게 해놔줄래?",
-                isFromUser: true,
-                timestamp: now.addingTimeInterval(-540)
-            ),
-            ChatMessage(
-                text: "알겠어요! 지금 상태 확인해볼게요. 현재 실내 온도는 10°C네요. 제가 이렇게 준비해드릴까요?\n\n• 난방 켜기 (22°C로 설정)\n• 공기청정기 켜기\n• 가습기 켜기 (습도 50%)\n• 거실 조명 50% 밝기로 켜기\n\n어떻게 하면 좋을까요?",
-                isFromUser: false,
-                timestamp: now.addingTimeInterval(-480)
-            ),
-            ChatMessage(
-                text: "좋은데 난방은 24도로 해주고, 조명은 30%만 켜줘",
-                isFromUser: true,
-                timestamp: now.addingTimeInterval(-360)
-            ),
-            ChatMessage(
-                text: "네, 알겠어요! 수정해드릴게요 👍\n\n• 난방 24°C로 조정\n• 조명 30% 밝기로 변경\n\n나머지는 그대로 적용할게요. 이대로 진행해도 될까요?",
-                isFromUser: false,
-                timestamp: now.addingTimeInterval(-300)
-            ),
-            ChatMessage(
-                text: "응 좋아!",
-                isFromUser: true,
-                timestamp: now.addingTimeInterval(-240)
-            ),
-            ChatMessage(
-                text: "설정 완료했어요! 집에 도착하시면 따뜻하게 준비되어 있을 거예요 😊 안전하게 들어오세요!",
-                isFromUser: false,
-                timestamp: now.addingTimeInterval(-180)
-            ),
-            ChatMessage(
-                text: "고마워~",
-                isFromUser: true,
-                timestamp: now.addingTimeInterval(-120)
-            )
-        ]
+            self.currentPersonaContext = persona.finalPrompt
+            print("✅ [PersonaChatViewModel] Loaded persona context: \(persona.finalPrompt?.prefix(50) ?? "nil")")
+        } catch {
+            print("❌ [PersonaChatViewModel] Failed to load persona context: \(error)")
+        }
     }
 
-    private func loadDemoApplianceChanges() {
-        applianceChanges = [
-            ApplianceChange(
-                applianceName: "난방",
-                icon: "flame.fill",
-                action: "켜기",
-                detail: "24°C",
-                isModified: true
-            ),
-            ApplianceChange(
-                applianceName: "조명",
-                icon: "lightbulb.fill",
-                action: "켜기",
-                detail: "30% 밝기",
-                isModified: true
-            ),
-            ApplianceChange(
-                applianceName: "공기청정기",
-                icon: "wind",
-                action: "켜기",
-                detail: nil,
-                isModified: false
-            ),
-            ApplianceChange(
-                applianceName: "가습기",
-                icon: "humidity.fill",
-                action: "켜기",
-                detail: "습도 50%",
-                isModified: false
-            )
-        ]
-        showChangeSummary = true
+    private func loadChatHistory(personaId: String) async {
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            // Load message history from ChatService
+            let history = try await chatService.loadHistory(personaId: personaId, limit: 50)
+
+            self.messages = history
+            print("✅ [PersonaChatViewModel] Loaded \(history.count) messages")
+
+        } catch {
+            print("❌ [PersonaChatViewModel] Failed to load history: \(error)")
+            self.errorMessage = "대화 기록을 불러올 수 없습니다."
+            self.messages = []
+        }
+
+        isLoading = false
     }
+
+    // MARK: - Send Message
 
     func sendMessage(text: String, personaId: String, personaName: String) {
-        // 사용자 메시지 추가
+        guard supabaseManager.currentUser != nil else {
+            errorMessage = "로그인이 필요합니다."
+            return
+        }
+
+        // Add user message to UI immediately
         let userMessage = ChatMessage(text: text, isFromUser: true)
         messages.append(userMessage)
 
-        // TODO: 실제로 API 호출해서 페르소나의 응답 받기
-        // 지금은 임시로 자동 응답 생성
+        // Send via ChatService
         Task {
-            try? await Task.sleep(nanoseconds: 1_000_000_000) // 1초 대기
+            do {
+                isLoading = true
 
-            let responseText = generateDummyResponse(for: text, personaName: personaName)
-            let personaMessage = ChatMessage(text: responseText, isFromUser: false)
-            messages.append(personaMessage)
+                // Send message with persona context
+                _ = try await chatService.sendMessage(
+                    text: text,
+                    personaId: personaId,
+                    personaContext: currentPersonaContext ?? ""
+                )
+
+                print("✅ [PersonaChatViewModel] Message sent successfully")
+
+                // AI response will arrive via SendbirdChatDelegate
+
+            } catch {
+                print("❌ [PersonaChatViewModel] Failed to send message: \(error)")
+
+                // Show error message
+                await MainActor.run {
+                    self.errorMessage = "메시지 전송에 실패했습니다."
+
+                    // Remove user message on error
+                    if let index = self.messages.firstIndex(where: { $0.id == userMessage.id }) {
+                        self.messages.remove(at: index)
+                    }
+                }
+            }
+
+            isLoading = false
         }
     }
 
-    private func generateDummyResponse(for userMessage: String, personaName: String) -> String {
-        // 임시 응답 생성
-        let responses = [
-            "안녕하세요! \(personaName)입니다.",
-            "그렇군요. 더 자세히 말씀해주시겠어요?",
-            "좋은 질문이네요!",
-            "제 생각에는...",
-            "이해했습니다!"
-        ]
-        return responses.randomElement() ?? "메시지를 받았습니다."
+    // MARK: - Appliance Changes
+
+    private func parseApplianceChanges(from message: ChatMessage) {
+        // Parse appliance changes from AI message
+        let changes = chatService.parseApplianceChanges(from: message)
+
+        if !changes.isEmpty {
+            self.applianceChanges = changes
+            self.showChangeSummary = true
+            print("✅ [PersonaChatViewModel] Parsed \(changes.count) appliance changes")
+        }
+    }
+
+    func approveChanges() {
+        guard let userId = supabaseManager.currentUser?.id else { return }
+
+        Task {
+            do {
+                let success = try await chatService.approveChanges(
+                    userId: userId,
+                    changes: applianceChanges
+                )
+
+                if success {
+                    print("✅ [PersonaChatViewModel] Appliance changes approved")
+
+                    // Hide widget after approval
+                    await MainActor.run {
+                        self.showChangeSummary = false
+                        self.applianceChanges = []
+                    }
+                }
+            } catch {
+                print("❌ [PersonaChatViewModel] Failed to approve changes: \(error)")
+                self.errorMessage = "가전 제어에 실패했습니다."
+            }
+        }
+    }
+}
+
+// MARK: - SendbirdChatDelegate
+
+extension PersonaChatViewModel: SendbirdChatDelegate {
+    nonisolated func didReceiveMessage(_ message: ChatMessage, channelUrl: String) {
+        print("✅ [PersonaChatViewModel] Received message: \(message.text)")
+
+        Task { @MainActor in
+            // Add AI message to UI
+            self.messages.append(message)
+
+            // Parse appliance changes if this is an AI message
+            if !message.isFromUser {
+                self.parseApplianceChanges(from: message)
+            }
+        }
+    }
+
+    nonisolated func didUpdateChannel(_ channelUrl: String) {
+        print("ℹ️ [PersonaChatViewModel] Channel updated: \(channelUrl)")
+    }
+
+    nonisolated func didReceiveError(_ error: Error) {
+        print("❌ [PersonaChatViewModel] Received error: \(error)")
+        Task { @MainActor in
+            self.errorMessage = error.localizedDescription
+        }
     }
 }
 
@@ -329,6 +456,8 @@ class PersonaChatViewModel: ObservableObject {
 struct ApplianceChangeSummaryWidget: View {
     let changes: [ApplianceChange]
     @Binding var isExpanded: Bool
+    let onApprove: () -> Void
+    let onReject: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -359,6 +488,43 @@ struct ApplianceChangeSummaryWidget: View {
                 // 변경 사항 리스트
                 ForEach(changes) { change in
                     ApplianceChangeRow(change: change)
+                }
+
+                Divider()
+
+                // Action buttons
+                HStack(spacing: 12) {
+                    // Reject button
+                    Button(action: onReject) {
+                        HStack {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 16))
+                            Text("거부")
+                                .font(.system(size: 15, weight: .medium))
+                        }
+                        .foregroundColor(.gray)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Color.gray.opacity(0.1))
+                        .cornerRadius(8)
+                    }
+                    .buttonStyle(.plain)
+
+                    // Approve button
+                    Button(action: onApprove) {
+                        HStack {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 16))
+                            Text("승인")
+                                .font(.system(size: 15, weight: .medium))
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Color(hex: "A50034"))
+                        .cornerRadius(8)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }
