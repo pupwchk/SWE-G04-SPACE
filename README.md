@@ -30,47 +30,71 @@ HARU aims to shift the paradigm from “a user controlling a smart home” to �
 ## Key Features
 
 ### 🔹 1) Wellness State Analysis from Wearable HRV
+
 Real-time streaming of HRV (RMSSD, SDNN), heart rate, sleep data, and activity levels
+
 Fatigue and stress levels estimated on a 0–4 scale
+
 Time-slot-based pattern recognition of daily behavior
+
 Support for anomaly detection in physiological signals
 
 ### 🔹 2) LLM-Powered Smart Appliance Control
 GPT models generate natural-language policies such as “dim the lights,” “set AC to 24°C,” or “increase humidity to 40%”
+
 Hybrid rule-based + LLM reasoning control architecture
+
 Natural-language policies are parsed into executable device-control commands
+
 Appliance recommendations are logged and fed back into the user preference model
 
 ### 🔹 3) Context-Aware Multi-Modal Data Fusion
 HARU combines multiple data sources to understand the user’s situation holistically:
+
 HRV, heart rate, sleep, and activity (wearable)
+
 Weather forecasts (KMA, nx/ny grid)
+
 GPS-based indoor/outdoor classification
+
 Time-of-day behavioral patterns
+
 Detailed appliance usage logs
+
 This enables a highly adaptive environment that goes beyond simple “if tired → dim lights” logic and considers contextual and environmental factors simultaneously.
 
 ### 🔹 4) Adaptive User Preference Learning
 Learns user preferences based on historical device interactions
+
 Predicts preferred appliance states for each fatigue level
+
 Continuously refines lighting, temperature, and humidity settings over time
+
 Improves accuracy and personalization as more data is collected
 
 ### 🔹 5) Natural Chat-Based Interaction (Sendbird)
 Users can interact via chat: “Turn on the AC,” “How’s my condition right now?”
+
 HARU processes the message through GPT and replies naturally
+
 Chat-based control integrates seamlessly with automated control flows
 
 ### 🔹 6) Weather-Aware Environmental Automation
 Weather API integration with caching for performance
+
 Contextual decisions based on outside temperature, humidity, and rainfall
+
 Enables predictive behaviors such as pre-cooling before temperature rises
 
 ### 🔹 7) Modular FastAPI + Docker Backend
 FastAPI RESTful architecture
+
 PostgreSQL database with SQLAlchemy ORM
+
 Docker Compose for environment reproducibility
+
 NGINX reverse proxy for stable deployment
+
 Modular service-layer design for maintainability
 
 ---
@@ -80,6 +104,7 @@ Modular service-layer design for maintainability
 <img width="984" height="626" alt="Architecture" src="https://github.com/user-attachments/assets/683cfb21-6f4d-4ca1-a63b-5c5cc4cadb07" />
 
 The HARU system is designed as a modular, cloud-based smart-home automation platform that seamlessly connects wearable devices, backend services, external APIs, and LLM-powered chat interaction.
+
 The architecture ensures scalability, low latency, and clear separation of concerns across each component.
 
 ### 1. User / Client Layer (iOS + watchOS)
@@ -87,10 +112,12 @@ The client application runs on iPhone and Apple Watch, built with SwiftUI and in
 - HealthKit: Collects HRV, heart rate, sleep, and activity metrics
 - MapKit: Provides location information and indoor/outdoor context
 - Watch Connectivity: Syncs data between Apple Watch and iPhone in real time
+  
 This layer continuously streams physiological and contextual data to the backend and receives personalized appliance recommendations or automated control actions.
 
 ### 2. Backend Layer (FastAPI on AWS EC2)
 The backend is built using FastAPI, containerized with Docker, and deployed behind an NGINX reverse proxy on AWS EC2.
+
 Key responsibilities:
 - Processing HRV and biometric submissions
 - Predicting fatigue/stress levels
@@ -112,12 +139,14 @@ Supabase hosts a managed PostgreSQL instance used for:
 
 ### 4. External APIs
 HARU integrates several external systems to enrich user context and support real-world device automation:
-KMA (Korea Meteorological Agency): Retrieves short-term weather forecasts (nx/ny grid)
-LG ThinQ API: Enables control and monitoring of actual home appliances (AC, humidifier, washer, etc.)
+- KMA (Korea Meteorological Agency): Retrieves short-term weather forecasts (nx/ny grid)
+- LG ThinQ API: Enables control and monitoring of actual home appliances (AC, humidifier, washer, etc.)
+  
 These APIs allow the system to make context-aware predictions and control real smart devices.
 
 ### 5. Chat Server (Sendbird + OpenAI)
 Sendbird handles all messaging between the user and HARU’s backend.
+
 Workflow:
 - User sends a message in the chat app
 - Sendbird triggers a webhook to the FastAPI backend
@@ -167,6 +196,7 @@ Workflow:
 ---
 
 ## Database Structure
+```
 User
  ├── UserPhone (1:1)
  ├── UserDevice (1:1)
@@ -185,11 +215,13 @@ TimeSlot
 
 WeatherObservation
  └── Cached for all time-based logic
+```
 
 ---
 
 ## Installation & Run Guide
 This guide explains how to run the HARU backend system using Docker, either locally or on an AWS EC2 instance.
+
 The backend includes FastAPI, PostgreSQL, NGINX, Sendbird webhooks, and integration with external APIs such as OpenAI and KMA.
 
 ### Prerequisites
@@ -207,14 +239,18 @@ Required API Keys
 - Supabase Project URL / Service Role Key	-> Managed PostgreSQL database
 
 ### Clone the Repository
+```
 git clone https://github.com/pupwchk/SWE-G04-SPACE.git
 cd SWE-G04-SPACE
+```
 
 ### Create a .env File
 Create an .env file in the project root and fill it with your credentials:
 
 POSTGRES_USER=postgres
+
 POSTGRES_PASSWORD=yourpassword
+
 POSTGRES_DB=haru
 
 And set Sendbird, OpenAI, KMA API Key on .env File.
@@ -226,20 +262,35 @@ HARU uses the following Dockerized components:
 - NGINX reverse proxy
 - Alembic auto-migrations
 
+**Default exposed ports:**
+
+FastAPI	8000
+
+NGINX	80
+
+PostgreSQL 5432
+
 **Start System:**
+
 docker-compose up --build
 
 **Run in detached mode:**
+
 docker-compose up -d
 
-**Default exposed ports:**
-FastAPI	8000
-NGINX	80
-PostgreSQL 5432
+**View Running Containers:**
 
-**Stop Containers**
+docker ps
+
+**View All Containers(including stopped):**
+
+docker ps -a
+
+**Stop Containers:**
+
 docker-compose down
 
 ---
 
 ## Demo Section
+
