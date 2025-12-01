@@ -65,7 +65,7 @@ This enables a highly adaptive environment that goes beyond simple “if tired �
 | **AI / Chat** | OpenAI GPT APIs, Sendbird Chat Platform |
 | **External APIs** | KMA Weather API (Ultra-short-term forecast) |
 | **DevOps / Tools** | GitHub Actions (optional future CI), Postman / Bruno (API testing), VSCode Remote SSH |
----
+
 ---
 ## 🎥 Video
 
@@ -147,15 +147,14 @@ docker-compose down
 
 | Name | Organization | Email |
 |------|-------------|--------|
-
 | Junho Uh | Department of Information Systems, Hanyang University | djwnsgh0248@hanyang.ac.kr |
 | Yeonseong Shin | Department of Data Science, Hanyang University | dustjd2651@gmail.com |
 | Donghyun Lim | Department of Computer Science, Hanyang University | limdongxian1207@gmail.com |
 | Dogyeom Kim | Department of Computer Science, Hanyang University | dogyeom74@hanyang.ac.kr |
-
 ---
 
 ## License
 
 Copyright (c) 2025 HARU
 This project is licensed under the MIT License — see the [LICENSE](./LICENSE) file for details.
+
