@@ -159,23 +159,37 @@ class SendbirdChatManager: ObservableObject {
         text: String,
         personaContext: String? = nil
     ) async throws -> ChatMessage {
+        print("📤 [SendbirdChatManager-DEBUG] Attempting to send message...")
+        print("   Channel URL: \(channelUrl)")
+        print("   Message text: \(text)")
+        print("   Has persona context: \(personaContext != nil)")
+
         // Get channel first
         let channel = try await getChannel(channelUrl: channelUrl)
+        print("✅ [SendbirdChatManager-DEBUG] Channel retrieved successfully")
 
         let params = UserMessageCreateParams(message: text)
 
         // Add persona context as metadata for backend webhook
         if let context = personaContext {
             params.data = "{\"persona_context\":\"\(context)\"}"
+            print("📋 [SendbirdChatManager-DEBUG] Added persona context to message params")
         }
 
+        print("🚀 [SendbirdChatManager-DEBUG] Calling sendUserMessage...")
         return try await withCheckedThrowingContinuation { continuation in
             channel.sendUserMessage(params: params) { message, error in
                 if let error = error {
                     print("❌ [SendbirdChatManager] Message send failed: \(error)")
+                    print("   Error details: \(error.localizedDescription)")
                     continuation.resume(throwing: SendbirdChatError.messageSendFailed)
                 } else if let message = message {
-                    print("✅ [SendbirdChatManager] Message sent: \(message.messageId)")
+                    print("✅ [SendbirdChatManager] Message sent successfully!")
+                    print("   Message ID: \(message.messageId)")
+                    print("   Message text: \(message.message)")
+                    print("   Channel URL: \(message.channelURL)")
+                    print("   Sender ID: \(message.sender?.userId ?? "nil")")
+                    print("⏳ [SendbirdChatManager-DEBUG] Waiting for AI response via delegate callback...")
 
                     let chatMessage = ChatMessage(
                         id: String(message.messageId),
@@ -300,7 +314,21 @@ class SendbirdChatManager: ObservableObject {
 
 extension SendbirdChatManager: GroupChannelDelegate {
     nonisolated func channel(_ channel: BaseChannel, didReceive message: BaseMessage) {
-        guard let userMessage = message as? UserMessage else { return }
+        print("🔔 [SendbirdChatManager-DEBUG] didReceive callback triggered!")
+        print("   Channel URL: \(channel.channelURL)")
+        print("   Message type: \(type(of: message))")
+
+        guard let userMessage = message as? UserMessage else {
+            print("⚠️ [SendbirdChatManager-DEBUG] Message is not UserMessage, skipping")
+            return
+        }
+
+        print("📨 [SendbirdChatManager-DEBUG] UserMessage details:")
+        print("   Message ID: \(userMessage.messageId)")
+        print("   Message text: \(userMessage.message)")
+        print("   Sender ID: \(userMessage.sender?.userId ?? "nil")")
+        print("   AI User ID: \(SendbirdManager.shared.getAIUserId())")
+        print("   Is from AI: \(userMessage.sender?.userId == SendbirdManager.shared.getAIUserId())")
 
         let chatMessage = ChatMessage(
             id: String(userMessage.messageId),
@@ -310,14 +338,23 @@ extension SendbirdChatManager: GroupChannelDelegate {
         )
 
         print("✅ [SendbirdChatManager] Received message: \(chatMessage.text)")
+        print("   Is from user: \(chatMessage.isFromUser)")
 
         // Notify delegate
+        print("🔄 [SendbirdChatManager-DEBUG] Notifying delegate...")
         Task { @MainActor in
-            self.delegate?.didReceiveMessage(chatMessage, channelUrl: channel.channelURL)
+            if self.delegate != nil {
+                print("✅ [SendbirdChatManager-DEBUG] Delegate exists, calling didReceiveMessage")
+                self.delegate?.didReceiveMessage(chatMessage, channelUrl: channel.channelURL)
+            } else {
+                print("⚠️ [SendbirdChatManager-DEBUG] Delegate is nil! Message will not be delivered to UI")
+            }
         }
     }
 
     nonisolated func channel(_ channel: BaseChannel, didUpdate message: BaseMessage) {
+        print("🔔 [SendbirdChatManager-DEBUG] didUpdate callback triggered!")
+        print("   Channel URL: \(channel.channelURL)")
         print("ℹ️ [SendbirdChatManager] Message updated in channel: \(channel.channelURL)")
 
         Task { @MainActor in
@@ -326,6 +363,8 @@ extension SendbirdChatManager: GroupChannelDelegate {
     }
 
     nonisolated func channel(_ channel: BaseChannel, messageWasDeleted messageId: Int64) {
+        print("🔔 [SendbirdChatManager-DEBUG] messageWasDeleted callback triggered!")
+        print("   Message ID: \(messageId)")
         print("ℹ️ [SendbirdChatManager] Message deleted: \(messageId) in channel: \(channel.channelURL)")
     }
 }

@@ -711,22 +711,24 @@ class SupabaseManager: ObservableObject {
             throw AuthError.invalidResponse
         }
 
-        // Accept both 201 (created) and 409 (conflict - already exists)
-        if httpResponse.statusCode != 201 && httpResponse.statusCode != 409 {
-            if let responseString = String(data: responseData, encoding: .utf8) {
-                print("  Save persona channel failed: \(responseString)")
-            }
-
-            // If conflict, try updating instead
-            if httpResponse.statusCode == 409 {
-                try await updatePersonaChannelUrl(personaId: personaId, channelUrl: channelUrl)
-                return
-            }
-
-            throw AuthError.serverError("Failed to save persona channel")
+        // Handle success (201) or conflict (409)
+        if httpResponse.statusCode == 201 {
+            print(" Persona channel URL saved successfully")
+            return
         }
 
-        print(" Persona channel URL saved successfully")
+        // If conflict (409), the row already exists - update it instead
+        if httpResponse.statusCode == 409 {
+            print("ℹ️ [SupabaseManager] Channel already exists (409), updating instead")
+            try await updatePersonaChannelUrl(personaId: personaId, channelUrl: channelUrl)
+            return
+        }
+
+        // Any other status code is an error
+        if let responseString = String(data: responseData, encoding: .utf8) {
+            print("  Save persona channel failed: \(responseString)")
+        }
+        throw AuthError.serverError("Failed to save persona channel (status \(httpResponse.statusCode))")
     }
 
     /// Update Sendbird channel URL for a persona
