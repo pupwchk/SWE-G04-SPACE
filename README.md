@@ -127,6 +127,8 @@ Workflow:
 - User receives the final response in the chat
 - This integration enables a natural conversational interface that can trigger real device actions.
 
+---
+
 ## Tech Stack
 ### Client (iOS / watchOS)
 - SwiftUI
@@ -161,3 +163,83 @@ Workflow:
 - GitHub Actions (optional future CI)
 - Postman / Bruno (API testing)
 - VSCode Remote SSH
+
+---
+
+## Database Structure
+User
+ ├── UserPhone (1:1)
+ ├── UserDevice (1:1)
+ ├── HRV_logs (1:N)
+ ├── HealthHourly (1:N)
+ ├── TimeSlot (1:N)
+ ├── SleepSession (1:N)
+ ├── WorkoutSession (1:N)
+ ├── ApplianceConditionRule (1:N)
+ ├── UserAppliancePreferences (1:N)
+ ├── ApplianceStatus (1:N)
+ └── ApplianceCommandLog (1:N)
+
+TimeSlot
+ ├── WeatherObservation (Mapped by nx, ny, timestamp)
+
+WeatherObservation
+ └── Cached for all time-based logic
+
+---
+
+## Installation & Run Guide
+This guide explains how to run the HARU backend system using Docker, either locally or on an AWS EC2 instance.
+The backend includes FastAPI, PostgreSQL, NGINX, Sendbird webhooks, and integration with external APIs such as OpenAI and KMA.
+
+### Prerequisites
+Required Tools
+- Docker (24.x or higher recommended)
+- Docker Compose
+- Git
+- Python 3.11 (pyproject.toml run at 3.11, docker server set on 3.10)
+- (Optional) Supabase CLI
+
+Required API Keys
+- OpenAI API Key ->	LLM reasoning & decision-making
+- Sendbird App ID / API Token -> Chat server & webhook integration
+- KMA Weather API Key	-> Ultra-short-term weather forecast
+- Supabase Project URL / Service Role Key	-> Managed PostgreSQL database
+
+### Clone the Repository
+git clone https://github.com/pupwchk/SWE-G04-SPACE.git
+cd SWE-G04-SPACE
+
+### Create a .env File
+Create an .env file in the project root and fill it with your credentials:
+
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=yourpassword
+POSTGRES_DB=haru
+
+And set Sendbird, OpenAI, KMA API Key on .env File.
+
+### Run the System With Docker
+HARU uses the following Dockerized components:
+- FastAPI backend
+- PostgreSQL
+- NGINX reverse proxy
+- Alembic auto-migrations
+
+**Start System:**
+docker-compose up --build
+
+**Run in detached mode:**
+docker-compose up -d
+
+**Default exposed ports:**
+FastAPI	8000
+NGINX	80
+PostgreSQL 5432
+
+**Stop Containers**
+docker-compose down
+
+---
+
+## Demo Section
