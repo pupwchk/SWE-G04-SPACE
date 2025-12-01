@@ -20,30 +20,32 @@ class SendbirdChatClient:
         self,
         channel_url: str,
         message: str,
-        sender_id: Optional[str] = None
+        sender_id: Optional[str] = None,
+        user_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        채널에 메시지 전송
-        
+        채널에 메시지 전송 (채널이 없으면 자동 생성)
+
         Args:
             channel_url: 채널 URL
             message: 메시지 내용
             sender_id: 발신자 ID (기본값: AI assistant)
-        
+            user_id: 채널에 추가할 사용자 ID (채널 생성 시 필요)
+
         Returns:
             API 응답
         """
         if sender_id is None:
             sender_id = SendbirdConfig.AI_USER_ID
-        
+
         url = f"{self.base_url}/group_channels/{channel_url}/messages"
-        
+
         payload = {
             "message_type": "MESG",
             "user_id": sender_id,
             "message": message
         }
-        
+
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.post(
@@ -53,13 +55,39 @@ class SendbirdChatClient:
                     timeout=10.0
                 )
                 response.raise_for_status()
-                
+
                 logger.info(f"✅ Message sent to channel {channel_url}")
                 return response.json()
-                
+
         except httpx.HTTPStatusError as e:
-            logger.error(f"❌ Failed to send message: {e.response.status_code} - {e.response.text}")
-            raise
+            # 채널이 없으면 자동 생성 후 재시도
+            if e.response.status_code == 400 and "Channel\" not found" in e.response.text:
+                logger.warning(f"⚠️  Channel {channel_url} not found, creating...")
+
+                if user_id:
+                    # 채널 생성
+                    await self.create_channel(
+                        channel_url=channel_url,
+                        user_ids=[user_id, SendbirdConfig.AI_USER_ID]
+                    )
+
+                    # 메시지 재전송
+                    async with httpx.AsyncClient() as retry_client:
+                        retry_response = await retry_client.post(
+                            url,
+                            headers=self.headers,
+                            json=payload,
+                            timeout=10.0
+                        )
+                        retry_response.raise_for_status()
+                        logger.info(f"✅ Message sent to new channel {channel_url}")
+                        return retry_response.json()
+                else:
+                    logger.error(f"❌ Cannot create channel: user_id not provided")
+                    raise
+            else:
+                logger.error(f"❌ Failed to send message: {e.response.status_code} - {e.response.text}")
+                raise
         except Exception as e:
             logger.error(f"❌ Error sending message: {str(e)}")
             raise

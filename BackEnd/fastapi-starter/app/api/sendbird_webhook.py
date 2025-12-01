@@ -123,18 +123,20 @@ async def process_and_respond(
             # 일반 텍스트 응답
             await chat_client.send_message(
                 channel_url=channel_url,
-                message=response_text
+                message=response_text,
+                user_id=user_id
             )
             logger.info(f"✅ Text response sent to {user_id}")
-        
+
         elif action == LLMAction.CALL:
             # 전화 걸기
             # 먼저 메시지 전송
             await chat_client.send_message(
                 channel_url=channel_url,
-                message=response_text
+                message=response_text,
+                user_id=user_id
             )
-            
+
             # 전화 발신
             await calls_client.make_call(
                 caller_id=SendbirdConfig.AI_USER_ID,
@@ -142,17 +144,18 @@ async def process_and_respond(
                 call_type="voice"
             )
             logger.info(f"📞 Call initiated to {user_id}")
-        
+
         elif action == LLMAction.AUTO_CALL:
             # 자동 전화 (GPS 트리거)
             message_to_user = response.get("message_to_user", response_text)
-            
+
             # 메시지 먼저 전송
             await chat_client.send_message(
                 channel_url=channel_url,
-                message=message_to_user
+                message=message_to_user,
+                user_id=user_id
             )
-            
+
             # 전화 발신
             await calls_client.make_call(
                 caller_id=SendbirdConfig.AI_USER_ID,
@@ -163,12 +166,13 @@ async def process_and_respond(
     
     except Exception as e:
         logger.error(f"❌ Process and respond error: {str(e)}")
-        
+
         # 에러 메시지 전송
         try:
             await chat_client.send_message(
                 channel_url=channel_url,
-                message="죄송해요, 일시적인 오류가 발생했어요. 잠시 후 다시 시도해주세요."
+                message="죄송해요, 일시적인 오류가 발생했어요. 잠시 후 다시 시도해주세요.",
+                user_id=user_id
             )
         except:
             pass

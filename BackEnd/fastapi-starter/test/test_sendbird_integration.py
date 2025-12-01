@@ -20,6 +20,32 @@ def print_section(title):
     print(f"  {title}")
     print("="*60)
 
+def create_test_user():
+    """테스트 사용자 생성"""
+    print_section("0. 테스트 사용자 생성")
+
+    user_data = {
+        "email": f"test_{TEST_USER_ID}@example.com"
+    }
+
+    print(f"\n👤 사용자 생성: {user_data['email']}")
+    response = requests.post(f"{BASE_URL}/api/users/", json=user_data)
+    print(f"Status: {response.status_code}")
+
+    if response.status_code == 201:  # Created
+        user = response.json()
+        # TEST_USER_ID를 실제 생성된 user ID로 업데이트
+        global TEST_USER_ID
+        TEST_USER_ID = user['id']
+        print(f"✅ 사용자 생성 성공: {TEST_USER_ID}")
+        return True
+    elif response.status_code == 400:
+        print(f"⚠️  사용자가 이미 존재: {response.json()}")
+        return False
+    else:
+        print(f"❌ 사용자 생성 실패: {response.text}")
+        return False
+
 def test_location_update():
     """위치 업데이트 테스트"""
     print_section("1. 위치 업데이트 테스트")
@@ -137,6 +163,9 @@ def main():
     print(f"Test User ID: {TEST_USER_ID}")
 
     try:
+        # 0. 테스트 사용자 생성
+        create_test_user()
+
         # 1. 위치 업데이트 테스트
         test_location_update()
 
