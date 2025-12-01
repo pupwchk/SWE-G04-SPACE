@@ -1,0 +1,151 @@
+\begin{figure*}[h!]
+    \centering
+\includegraphics[width=\textwidth]{dogyeom/env/Untitled diagram-2025-10-29-115516.png}
+    \caption{Entity–Relationship Diagram of the backend database schema}
+\end{figure*}
+
+\section{Specification}
+\subsection{Backend Data Management}
+\subsubsection{User and Device Information Management}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+
+The backend data system functions as an integrated database schema that analyzes the relationships among users’ health states, weather conditions, and spatial contexts.
+Data are categorized into four domains—user, health, location, and weather—each interconnected through a unified identifier hierarchy.
+
+User and device information constitute the fundamental entities of the service, serving as the top-level reference keys for all subsequent data.
+The User table stores each user’s primary information, while a user may register multiple devices through the Device table.
+Each device record contains model name, platform type (e.g., iOS watch, iOS phone), and registration time, and links to the DeviceModel table to trace hardware and OS-level capabilities.
+The Consent table records the scope of user consent for health, location, and weather data collection, along with the timestamps of consent and revocation (granted\_at, revoked\_at), thereby ensuring ethical and legal transparency in data access.
+
+\end{adjustwidth}
+
+\subsubsection{Health Data Schema and Time-Series Management}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em} 
+Health-related data are stored in a per-user time-series structure, designed to capture continuous physiological measurements.
+The HealthSample table stores quantitative biosignals such as heart rate, heart rate variability(HRV), blood oxygen saturation, and respiratory rate.
+Each record is uniquely identified by a composite key of user\_id, type\_code, observed\_at, and device\_id, forming a natural unique constraint to prevent redundant uploads from the same device and timestamp.
+
+To analyze long-term physiological patterns, dedicated tables for sleep and workout sessions are defined.
+The SleepSession table records the start and end time of each sleep episode, durations of deep, REM, and core sleep, and overall sleep efficiency.
+The WorkoutSession table manages high-intensity exercise sessions, logging activity type (running, cycling, strength, etc.), average heart rate, and active energy expenditure.
+In addition, the ActivitySummary table aggregates daily activity features—such as step count, exercise minutes, active calories, and standing hours—which later serve as inputs for the DailyFeature table used in model training.
+
+This hierarchical structure is compatible with Apple’s HealthKit data model and is automatically normalized and stored via the FastAPI-based backend service.
+\end{adjustwidth}
+
+\subsubsection{Environmental Context Integration}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em} 
+To represent users’ physical and environmental contexts, the system integrates location and weather information in a unified schema.
+The LocationFix table stores raw GPS samples collected at regular intervals, including latitude, longitude, altitude, speed, true heading, and both horizontal and vertical accuracy values.
+These raw samples are clustered to identify frequently visited places (Place), each defined by its center coordinates, radius, confidence level, and visit count.
+Each place is also mapped to the 5-km grid system (nx, ny) provided by the Korea Meteorological Administration(KMA) for efficient weather retrieval.
+Address and category data (e.g., home, office, gym) are stored in a features JSON field obtained through Apple Maps reverse geocoding, enabling higher-level behavioral analysis.
+
+Weather data are organized into WeatherTile and WeatherObservation tables.
+The WeatherTile table defines regional grid cells based on KMA’s standardized nx, ny coordinates, while WeatherObservation stores hourly or 10-minute-interval meteorological measurements.
+Observed attributes include temperature, apparent temperature, humidity, wind speed, cloud cover, precipitation type (none/rain/snow/sleet), precipitation probability, and air-quality indicators.
+These data are periodically updated through KMA’s ultra-short-term forecast and observation APIs and are linked to each Place via the grid\_nx and grid\_ny attributes for spatiotemporal environmental analysis.
+
+All tables employ UUID (CHAR(36)) primary keys, and major tables include a foreign key (user\_id) to ensure data ownership consistency.
+Cascade deletion rules (ON DELETE CASCADE) guarantee referential integrity when a user or parent record is removed.
+High-frequency time-series tables are indexed by (user\_id, observed\_at DESC) to enable efficient temporal queries, while (tile\_id, as\_of) indexing optimizes spatiotemporal weather lookups.
+
+This ERD-based schema enables seamless integration of user health, location, and environmental data under a common key structure.
+By aligning all domains through the unified user\_id and temporal fields (observed\_at, as\_of, recorded\_at),
+the system ensures data consistency throughout the feature-engineering and stress-prediction pipelines.
+Furthermore, linking KMA’s grid-based tile system directly to user places allows efficient three-way integration among weather, location, and health data.
+This architecture maintains high extensibility for incorporating additional environmental factors (e.g., air quality, ambient noise, indoor conditions),
+and serves as the core backend infrastructure connecting user health, contextual environment, and AI-driven inference in a unified pipeline.
+\end{adjustwidth}
+
+\subsection{Apple Watch Integration and Frontend Architecture}
+\subsubsection{Health and Sensor Data Acquisition}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+The mobile application interfaces with Apple Watch via the HealthKit and CoreLocation frameworks to collect continuous biometric and spatial data in real time.  
+Through the HealthKit API, the system retrieves categorized health data across multiple domains — including heart rate, heart rate variability (HRV), oxygen saturation, respiratory rate, and sleep analysis.  
+Each data type is defined under Apple's standardized schema (\texttt{HKQuantityType}, \texttt{HKCategoryType}, and \texttt{HKWorkoutType}), ensuring compatibility with the user’s privacy settings and consent scope.
+
+Collected metrics are automatically normalized into time-series format before being transmitted to the backend pipeline.  
+This structure allows the system to infer physical conditions such as fatigue, stress, and recovery status.  
+To preserve transparency and user control, data synchronization strictly follows HealthKit’s permission model, where the user explicitly authorizes or revokes each category (e.g., heart rate, step count, sleep).  
+The synchronized data are later used to generate contextual insights, such as detecting elevated stress from HRV or reduced activity from step count trends.
+\end{adjustwidth}
+
+
+\subsubsection{GPS-Based Context Recognition}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+The CoreLocation module continuously monitors the user’s GPS position to determine spatial context.  
+Raw data points including latitude, longitude, altitude, speed, and heading accuracy — are captured at configurable accuracy levels (\texttt{kCLLocationAccuracyBestForNavigation}, \texttt{kCLLocationAccuracyNearestTenMeters}, etc.), balancing precision with energy efficiency.  
+
+Using these coordinates, the application determines whether the user is near home, commuting, or in a specific habitual zone.  
+This context awareness enables anticipatory automation; for example, preparing home device states when the user is approaching or logging environmental conditions along outdoor routes.  
+Each location update is timestamped and locally cached until successful transmission to the backend.
+\end{adjustwidth}
+
+\subsubsection{Map Visualization and Routine Pattern Analysis}
+% \begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+The MapKit framework is utilized to visualize spatial trajectories and reconstruct the user’s daily movement timeline.  
+GPS samples are rendered as polylines on a map interface, where clusters of frequent stops are highlighted as potential key places (home, workplace, gym, etc.).  
+By aggregating temporal and spatial data, the application generates an interactive timeline that represents not only the user’s movement patterns but also correlates them with physiological data such as heart rate and activity levels.  
+
+This visual feedback helps users interpret lifestyle trends — for instance, linking increased stress levels with prolonged commuting or identifying sedentary periods during the day.  
+Map-based insights are presented in both static (daily summary) and dynamic (real-time tracking) modes, with user control over privacy and data visibility.
+\end{adjustwidth}
+
+\subsubsection{Integration Architecture and Data Flow}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+All frontend modules (HealthKit, GPS, and MapKit) are connected through a unified data pipeline within the iOS app architecture.  
+The WatchKit extension communicates sensor updates via background tasks and delegates, which are received by the iOS host app using the \texttt{WCSession} framework.  
+The host app then packages these data points into a consistent JSON schema before sending them to the backend through the FastAPI endpoint.
+
+The entire flow ensures high modularity and real-time responsiveness:
+\begin{enumerate}
+    \item Apple Watch collects health and motion data via sensors.
+    \item Data are serialized and transferred to the paired iPhone through \texttt{WCSession}.
+    \item The iPhone app integrates HealthKit and GPS samples, tagging them with timestamps and user identifiers.
+    \item Processed data are transmitted to the backend, where normalization and database insertion occur.
+\end{enumerate}
+This modular integration enables continuous synchronization between the user’s wearable, smartphone, and backend analytics system, forming the foundation of personalized health and behavior intelligence.
+\end{adjustwidth}
+
+\subsection{User State Prediction Flow}
+\subsubsection{Model Architecture and Design Principles}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+The user state prediction model employs a hybrid deep learning architecture that integrates time-series health data with contextual environmental information to forecast physiological and psychological conditions. The model outputs four primary state indicators: stress level (0-10 scale), fatigue level (0-10 scale), sleep readiness (0-1 probability), and comfort index (0-10 scale). These predictions serve as the foundation for generating LLM-based commands that automatically adjust smart home appliances to optimize the user's living environment.
+
+The architecture combines Long Short-Term Memory (LSTM) networks for temporal pattern recognition in health metrics with dense neural layers for contextual feature encoding. An attention mechanism identifies critical time periods that significantly influence current user states, while a fusion layer integrates both data streams into a unified representation. Multiple output heads enable simultaneous prediction of different state dimensions, allowing the system to capture complex interdependencies between stress, fatigue, and environmental comfort.
+\end{adjustwidth}
+
+\subsubsection{Input Feature Engineering}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+The model processes two distinct feature categories: time-series health data and contextual environmental data. Health features include 24-hour rolling windows of heart rate statistics (mean, standard deviation, maximum), heart rate variability (HRV) as a primary stress indicator, activity metrics (step count, active energy expenditure, exercise duration), and sleep quality measures aggregated over the past seven days (sleep duration, efficiency, deep sleep ratio, REM sleep ratio). Additional physiological signals such as respiratory rate and blood oxygen saturation supplement the primary health indicators.
+
+Contextual features capture temporal, spatial, and environmental dimensions that influence user states. Temporal features include hour of day, day of week, and cyclic encodings using sine and cosine transformations to represent daily and weekly patterns. Spatial context is derived from GPS clustering that identifies location types (home, office, commute, other) and calculates time spent at each location. Weather data retrieved from the Korea Meteorological Administration API provides temperature, humidity, precipitation, and air quality indices (PM10, PM2.5) that correlate with physiological comfort and stress responses. Current smart home device states, including indoor temperature, humidity, and lighting levels, are also incorporated to model feedback loops between environmental conditions and user comfort.
+\end{adjustwidth}
+
+\subsubsection{Real-Time Inference and LLM Integration}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+The pipeline executes continuously with configurable prediction intervals, typically ranging from 15 to 60 minutes depending on computational constraints and user preferences. When triggered, the feature engineering module queries the PostgreSQL database to extract recent health samples, GPS locations, and weather observations, constructing the input tensors required by the neural network. The trained model performs forward propagation in under 100 milliseconds on the server, producing state predictions that are immediately formatted into a structured natural language prompt for the OpenAI API.
+
+The LLM prompt includes the predicted stress level, fatigue level, sleep readiness, and current contextual information such as time of day, location type, outdoor weather conditions, and current indoor environment settings. The prompt instructs the agent to generate a JSON-formatted response containing recommended adjustments for temperature, lighting intensity, humidity control, and any additional appliance actions. The LLM's reasoning capability enables contextually appropriate decisions. The parsed JSON commands are then transmitted to the smart home controller for execution, with confirmation feedback sent to the iOS interface for user transparency and manual override capability.
+\end{adjustwidth}
+
+\subsubsection{Limitation of ML Model}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+Despite the advances in AI models, securing appropriate training datasets remained a major challenge during development. To obtain more reliable data, I contacted the researcher who created PMData, a dataset for fatigue prediction based on diverse biometric signals from participants. Through this inquiry, I confirmed that the experiment was conducted in Oslo, after which I collected Oslo weather data to use for training.
+
+However, because the fatigue scores were subjective ratings on a 1–5 scale, the resulting model performance was inevitably poor. As part of broader experimentation, I trained and evaluated several models—including XGBoost, a tree ensemble model with soft voting, and an LSTM with data transformations—using dummy data. These models reached approximately 0.7 accuracy, but the results were dismissed due to their lack of real-world interpretability.
+
+After multiple rounds of discussion, we established a feedback loop that uses real-time weather information to determine whether home appliances should operate, combined with each user’s personalized home-appliance preference values. The user can review the recommended appliances and settings through an LLM, and then accept, modify, or reject them. Based on the user’s decisions, both the operating conditions and preference values are continuously updated.
+\end{adjustwidth}

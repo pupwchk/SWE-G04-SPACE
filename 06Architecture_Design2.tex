@@ -1,0 +1,881 @@
+%프론트 내용
+\clearpage
+\subsection{Frontend}
+\subsubsection{Purpose}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+The frontend for HARU is a native iOS application built with Swift and SwiftUI, responsible for providing the user interface for health monitoring, location tracking, smart home control, and AI-powered conversational interactions. The application integrates with Apple Watch for real-time biometric data collection (heart rate, HRV, calories, sleep), implements GPS-based routine tracking with intelligent checkpoint detection, and provides seamless communication with the FastAPI backend for AI-driven appliance automation. The frontend manages user authentication, persona customization, location tagging with proximity notifications, and bidirectional iPhone-Watch data synchronization using WatchConnectivity framework.
+\end{adjustwidth}
+
+\subsubsection{Functionality}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+The HARU iOS application provides comprehensive health and automation features across iPhone and Apple Watch platforms. Core functionality includes: (1) Real-time HealthKit data collection from Apple Watch with automatic HRV-based stress calculation and fatigue prediction integration; (2) Intelligent GPS tracking with automatic checkpoint generation triggered by HRV changes, stay detection (15m radius, 5min duration), and periodic fallback (10min intervals); (3) Location tagging system with configurable proximity notifications (default 1000m radius) for important places (home, office, cafe); (4) Multi-persona AI chat system with Sendbird integration for natural language appliance control and conversational interactions; (5) Smart home appliance control interface with real-time status monitoring; (6) Timeline visualization showing complete route history with health metrics correlation; and (7) Apple Watch companion app for autonomous workout tracking and health data collection. The application implements two primary user scenarios mirroring the backend: geofence-triggered proactive voice calls when approaching home, and user-initiated conversational appliance control through chat interfaces.
+\end{adjustwidth}
+
+\subsubsection{Location of Source Code}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+https://github.com/pupwchk/SWE-G04-SPACE/tree/main/swift\_app\_demo/space
+\end{adjustwidth}
+
+\subsubsection{Class Components}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+
+\textbf{spaceApp.swift}: Main application entry point defining the SwiftUI \texttt{App} structure with \texttt{@main} attribute. Initializes core managers in sequence: WatchConnectivityManager for iPhone-Watch communication, HealthKitManager for biometric data collection with authorization requests, LocationManager for GPS tracking with notification permissions, and TaggedLocationManager for loading saved location tags. Sets ContentView as root view with authentication flow handling.
+
+\textbf{Views/Common}: Directory for core navigation and shared UI components.
+
+\begin{itemize}
+    \item \textbf{ContentView.swift}: Root authentication flow manager. Displays SplashView (3-second duration) on launch, then transitions to LoginView (unauthenticated users) or MainTabView (authenticated users) based on SupabaseManager session state.
+    \item \textbf{MainTabView.swift}: Four-tab navigation container providing access to Home (dashboard with widgets), Appliance/Device (smart home controls), Chat (messaging and voice calls), and Menu/Settings (user preferences). Implements tab-based navigation with SF Symbols icons.
+    \item \textbf{SplashView.swift}: Launch screen displaying HARU logo with 3-second auto-dismiss timer before transitioning to authentication flow.
+    \item \textbf{PersonalTestView.swift}: Development/testing view for persona functionality verification.
+\end{itemize}
+
+\textbf{Managers}: Core singleton service classes managing application-wide functionality.
+
+\begin{itemize}
+    \item \textbf{HealthKitManager.swift}: Manages all HealthKit data collection from Apple Watch with real-time observer queries and background delivery. Published properties include daily metrics (sleepHours, stressLevel, caloriesBurned), real-time metrics (currentHeartRate, currentCalories, currentSteps, currentDistance, currentHRV), and historical data (weeklySleepData, weeklyStressData, weeklyCaloriesData). Implements HRV-based stress calculation using inverse relationship (higher HRV = lower stress) with SDNN metric. Key methods:
+    \begin{itemize}
+        \item \textbf{requestAuthorization()}: Requests HealthKit permissions for sleep, heart rate, HRV, calories, steps, distance.
+        \item \textbf{startObservingRealTimeData()}: Establishes background observer queries for continuous health monitoring.
+        \item \textbf{fetchDailyHealthData()}: Retrieves aggregate health metrics for current day.
+        \item \textbf{fetchWeeklyHealthData()}: Computes 7-day trends for sleep, stress, calories.
+        \item \textbf{calculateStress(from:)}: Converts HRV SDNN to stress level (1-4 scale).
+    \end{itemize}
+    Synchronizes data with Watch app via WatchConnectivityManager, sending health updates every 30 seconds during active tracking.
+    
+    \item \textbf{LocationManager.swift}: GPS tracking manager implementing intelligent checkpoint detection with best-for-navigation accuracy (kCLLocationAccuracyBestForNavigation). Provides always-on location updates (background + foreground) with 4-point moving average smoothing to reduce GPS noise. Published properties include current location data (currentLatitude, currentLongitude, currentSpeed, currentHeading), route tracking (routeCoordinates, totalDistance, speedHistory, timestampHistory), and liveCheckpoints. Implements three checkpoint generation strategies:
+    \begin{itemize}
+        \item \textbf{HRV jump detection}: Triggers when HRV changes by 15ms or 20\% from previous checkpoint.
+        \item \textbf{Stay detection}: Identifies prolonged stops (5+ minutes within 15m radius).
+        \item \textbf{Periodic fallback}: Creates checkpoints every 10 minutes as backup.
+    \end{itemize}
+    Integrates with HealthKitManager to enrich checkpoints with heart rate, calories, steps, HRV, and stress level context. Manages proximity-based notifications for tagged locations.
+    
+    \item \textbf{TaggedLocationManager.swift}: Manages user-defined location tags (home, office, cafe, etc.) with proximity-based notification system. Implements CRUD operations for tagged locations with configurable notification radius (default 1000m) and throttling (1-hour minimum interval between notifications for same location). Supports location tag types: Home, Dormitory, Office, School, Cafe, Custom. Provides primary home location detection for special handling in geofence scenarios. Key methods:
+    \begin{itemize}
+        \item \textbf{loadTaggedLocations()}: Retrieves saved locations from Supabase database on app launch.
+        \item \textbf{saveLocation()}: Creates new tagged location with user-defined name and tag type.
+        \item \textbf{checkProximity()}: Calculates distance to all tagged locations and triggers notifications when within radius.
+        \item \textbf{updateNotificationSettings()}: Configures radius and enabled state per location.
+    \end{itemize}
+    
+    \item \textbf{SupabaseManager.swift}: Primary authentication and database manager implementing Supabase client integration. Handles user authentication (sign up, sign in, sign out, session management), database operations (user profiles, settings, personas, tagged locations), and session validation with auto-refresh. Key methods:
+    \begin{itemize}
+        \item \textbf{signUp(email:password:name:)}: Creates new user account with email confirmation, automatically creates user\_profile and default user\_settings records.
+        \item \textbf{signIn(email:password:)}: Authenticates user with session token storage in UserDefaults.
+        \item \textbf{signOut()}: Terminates session and clears cached credentials.
+        \item \textbf{getCurrentUser()}: Retrieves authenticated user session with automatic refresh.
+        \item \textbf{getUserProfile()}: Fetches extended profile data (birthday, avatar URL).
+        \item \textbf{updateUserProfile()}: Updates profile fields with optimistic UI updates.
+        \item \textbf{getUserSettings()}: Retrieves app preferences (notification method, DND, font size, emergency settings).
+        \item \textbf{updateUserSettings()}: Persists preference changes to database.
+    \end{itemize}
+    Delegates persona management to PersonaRepository for clean separation of concerns.
+    
+    \item \textbf{WatchConnectivityManager.swift}: Manages bidirectional iPhone-Watch data synchronization using WatchConnectivity framework. Implements three communication methods: (1) sendMessage() for immediate delivery requiring Watch reachability, (2) transferUserInfo() for background queued transfers, (3) updateApplicationContext() for latest state only (overwrites previous). Handles data flows:
+    \begin{itemize}
+        \item \textbf{iPhone → Watch}: Authentication status (user ID, email), tracking commands (start/stop).
+        \item \textbf{Watch → iPhone}: Location updates (coordinates array with timestamps and health data), health data (heart rate, calories, steps, distance, HRV), checkpoints (mood, stress change, location, health context), tracking status updates.
+    \end{itemize}
+    Message types: \texttt{locationUpdate}, \texttt{healthData}, \texttt{checkpoint}, \texttt{trackingStatus}, \texttt{authentication}. Implements WCSessionDelegate for receiving Watch messages with automatic data parsing and manager updates.
+    
+    \item \textbf{CallHistoryManager.swift}: Tracks call history with AI-generated summaries. Manages CallRecord entities containing contact name, call type (Text, Voice, Video), timestamp, duration, and AI-generated summary text. Provides CRUD operations for call history with UserDefaults persistence.
+    
+    \item \textbf{DeviceManager.swift}: Manages connected smart devices (Apple Watch, AirPods, iPhone). Implements device detection via WatchConnectivity, battery level monitoring, connection status tracking, and device type categorization. Published properties: \texttt{connectedDevices} array with real-time updates.
+    
+    \item \textbf{FontSizeManager.swift}: Global font size manager for accessibility. Provides font size presets (Small, Medium, Large) with dynamic type scaling. Published property \texttt{currentFontSize} triggers UI updates across all views when changed.
+\end{itemize}
+
+\textbf{Services}: Backend integration service layer for external API communication.
+
+\begin{itemize}
+    \item \textbf{SupabaseService.swift}: Generic MCP-style service layer providing reusable data access patterns for Supabase REST API. Implements clean separation of concerns with protocol-based design. Methods:
+    \begin{itemize}
+        \item \textbf{query<T>()}: Generic SELECT with PostgREST filters (eq, in, order, limit).
+        \item \textbf{insert<T>()}: Generic INSERT with return representation (minimal, full).
+        \item \textbf{update<T>()}: Generic PATCH with filters for targeted updates.
+        \item \textbf{delete()}: Generic DELETE with filters for batch deletion.
+        \item \textbf{rpc<T>()}: Remote Procedure Call support for custom database functions.
+    \end{itemize}
+    All methods are async/await-based with structured error handling (SupabaseError enum). Handles authentication headers (apikey, Authorization Bearer token) automatically.
+    
+    \item \textbf{FastAPIService.swift}: Integration client for Python FastAPI backend AI services. Current endpoints:
+    \begin{itemize}
+        \item \textbf{registerUser(email:)}: POST /api/users/ for email-based user registration. Returns user ID on success, handles 400 status for duplicate emails.
+    \end{itemize}
+    Planned extensions: user lookup, AI chat endpoints for persona interactions, health data analysis integration, timeline recommendation services.
+\end{itemize}
+
+\textbf{Repositories}: Repository pattern implementations for clean data access abstraction.
+
+\begin{itemize}
+    \item \textbf{PersonaRepository.swift}: Implements repository pattern for AI persona CRUD operations with protocol-based design for testability. Provides persona creation with adjective-based prompt generation, multi-persona selection (up to 5 personas), active persona management, and final prompt composition from adjectives + custom instructions. Key methods:
+    \begin{itemize}
+        \item \textbf{fetchAllPersonas()}: Retrieves user's personas with adjective details via JOIN query.
+        \item \textbf{createPersona()}: Inserts new persona, generates final\_prompt from selected adjectives and custom instructions.
+        \item \textbf{updatePersona()}: Modifies persona fields, regenerates final\_prompt if adjectives changed.
+        \item \textbf{deletePersona()}: Removes persona and cleans up selection/active references.
+        \item \textbf{getActivePersona()}: Retrieves currently active persona for conversations.
+        \item \textbf{setActivePersona()}: Updates user\_active\_persona table.
+        \item \textbf{getSelectedPersonas()}: Fetches up to 5 selected personas with order.
+        \item \textbf{updateSelectedPersonas()}: Batch updates selection with order preservation.
+        \item \textbf{generateFinalPrompt()}: Combines adjective instruction texts with custom instructions using newline concatenation.
+    \end{itemize}
+    Uses SupabaseService for all database operations, maintaining clean separation from business logic.
+\end{itemize}
+
+\textbf{Models}: Data structures and entity definitions for application state management.
+
+\begin{itemize}
+    \item \textbf{User Models} (embedded in SupabaseManager.swift):
+    \begin{itemize}
+        \item \textbf{User}: Basic authentication info (id, email, name) from Supabase auth.users table.
+        \item \textbf{UserProfile}: Extended profile (user\_id, birthday, avatar\_url, created\_at, updated\_at).
+        \item \textbf{UserSettings}: App preferences (user\_id, notification\_method, dnd\_enabled, dnd\_start\_time, dnd\_end\_time, emergency\_call\_enabled, emergency\_contact, font\_size).
+    \end{itemize}
+    
+    \item \textbf{Persona Models} (PersonaRepository.swift):
+    \begin{itemize}
+        \item \textbf{Adjective}: Pre-defined personality trait (adjective\_id, adjective\_name, instruction\_text, category).
+        \item \textbf{Persona}: User-created AI personality (persona\_id, user\_id, nickname, adjective\_ids, custom\_instructions, final\_prompt, created\_at).
+        \item \textbf{ActivePersona}: Currently selected persona reference (user\_id, persona\_id, updated\_at).
+        \item \textbf{SelectedPersona}: Multi-selection support (user\_id, persona\_id, order, selected\_at).
+    \end{itemize}
+    
+    \item \textbf{TaggedLocation.swift}: Defines saved location entities with notification settings. Fields: location\_id, user\_id, latitude, longitude, tag (enum: Home, Dormitory, Office, School, Cafe, Custom), custom\_name, is\_home (bool), notification\_enabled, notification\_radius, last\_notification\_at, created\_at. Implements Codable for JSON serialization and Identifiable for SwiftUI list rendering.
+    
+    \item \textbf{TimelineDataModel.swift}: Defines route tracking data structures:
+    \begin{itemize}
+        \item \textbf{TimelineRecord}: Complete route record (record\_id, start\_time, end\_time, coordinates array, checkpoints array, total\_distance, duration, average\_speed, max\_speed).
+        \item \textbf{CoordinateData}: GPS point (latitude, longitude, timestamp).
+        \item \textbf{Checkpoint}: Significant event (coordinate, mood enum, stress\_change enum, stay\_duration, created\_at, heart\_rate, calories, steps, distance, hrv, stress\_level).
+        \item \textbf{CheckpointMood}: Enum (VeryHappy, Happy, Neutral, Sad, VerySad) with emoji representation.
+        \item \textbf{StressChange}: Enum (Increased, Unchanged, Decreased) based on HRV delta.
+    \end{itemize}
+    Implements Codable for UserDefaults persistence, Identifiable for SwiftUI lists, computed properties for map region calculation and statistics.
+    
+    \item \textbf{AdjectiveModels.swift}: Extends Adjective model with UI-specific properties for personality tag display (color, icon, localized descriptions).
+    
+    \item \textbf{Device Models} (DeviceManager.swift):
+    \begin{itemize}
+        \item \textbf{ConnectedDevice}: Device info (device\_id, type enum, name, model, battery\_level, is\_connected, last\_seen).
+        \item \textbf{DeviceType}: Enum (Watch, AirPods, iPhone) with SF Symbols icon mapping.
+    \end{itemize}
+    
+    \item \textbf{Call Models} (CallHistoryManager.swift):
+    \begin{itemize}
+        \item \textbf{CallRecord}: Call history entry (record\_id, contact\_name, call\_type enum, timestamp, duration, summary).
+        \item \textbf{CallType}: Enum (Text, Voice, Video) with icon and color representation.
+    \end{itemize}
+\end{itemize}
+
+\textbf{Views/Auth}: Authentication and onboarding user interfaces.
+
+\begin{itemize}
+    \item \textbf{LoginView.swift}: User authentication interface with email/password input fields, form validation, error message display, navigation to SignUpView, and social login button placeholders (Google, Apple). Calls SupabaseManager.signIn() on submission, transitions to MainTabView on success.
+    
+    \item \textbf{SignUpView.swift}: User registration interface with name, email, password, password confirmation fields. Implements client-side validation (email format, password match, minimum length). Calls SupabaseManager.signUp() followed by FastAPIService.registerUser() to synchronize user creation across backend services. Displays email confirmation notice on success.
+    
+    \item \textbf{SocialLoginButton.swift}: Reusable button component for social authentication providers with provider icon, customizable colors, and tap handler.
+\end{itemize}
+
+\textbf{Views/Home}: Dashboard and primary user interface.
+
+\begin{itemize}
+    \item \textbf{HomeView.swift}: Main dashboard displaying three widget sections: (1) Personal Status with TimelineWidget (latest route), StateWidget (current health metrics), PersonaBubbleWidget (active personas); (2) Connected Devices showing Apple Watch status and battery level; (3) Smart Appliances with home automation controls (mock data). Implements ScrollView for vertical scrolling, lazy loading for performance optimization.
+    
+    \item \textbf{HomeLocationSetupView.swift}: Initial home location configuration wizard. Displays Map view for location selection with draggable pin, current location detection button, location tag selector (Home, Dormitory, Office, etc.), custom name input field, and save button. Creates tagged\_location record with is\_home flag on completion.
+    
+    \item \textbf{LocationTagSheet.swift}: Bottom sheet modal for selecting location tag type with icon and color-coded options. Returns selected LocationTag enum to parent view.
+    
+    \item \textbf{SplashView.swift}: Launch screen with HARU logo, fade-in animation, and 3-second auto-dismiss timer using onAppear + DispatchQueue.main.asyncAfter.
+\end{itemize}
+
+\textbf{Views/Chat}: Messaging and voice communication interfaces.
+
+\begin{itemize}
+    \item \textbf{ChatView.swift}: Multi-mode communication interface with SelectionView (choose text messaging or phone call), PersonaChatListView (list of available personas), and navigation to PersonaChatView or PhoneCallView based on selection. Integrates with Sendbird for real-time messaging backend.
+    
+    \item \textbf{PersonaChatView.swift}: Individual persona chat interface with message history display (LazyVStack), text input field with send button, persona name and adjective tags header, and real-time message synchronization via Sendbird SDK. Implements auto-scroll to bottom on new messages, keyboard avoidance with .ignoresSafeArea(.keyboard).
+    
+    \item \textbf{PhoneCallView.swift}: Full-screen voice/video call interface displaying contact name, call duration timer, call controls (mute, speaker, end call buttons), and video preview (AVCaptureVideoPreviewLayer integration placeholder). Implements CallKit integration for system call UI (planned).
+    
+    \item \textbf{CallErrorHistoryView.swift}: Historical call records list displaying CallRecord entities with call type icon, contact name, timestamp (relative format), duration, and AI-generated summary text. Implements search/filter functionality, swipe-to-delete actions.
+\end{itemize}
+
+\textbf{Views/Device}: Smart device and appliance control interfaces.
+
+\begin{itemize}
+    \item \textbf{DeviceView.swift}: Connected device management interface (placeholder for future expansion). Displays list of ConnectedDevice entities with device type icons, connection status indicators, battery levels.
+    
+    \item \textbf{ApplianceView.swift}: Smart home device control dashboard with appliance cards (ApplianceCard components), category filters (All, Lighting, Climate, Security), on/off toggles, brightness/temperature sliders, and real-time status updates via FastAPI backend integration (planned).
+    
+    \item \textbf{ApplianceCard.swift}: Reusable appliance control card component with device icon, name, status indicator (on/off), control widgets (toggle, slider, buttons), and tap gesture for detailed view navigation.
+    
+    \item \textbf{ApplianceItemCard.swift}: Simplified appliance card for list display with compact layout optimized for horizontal scrolling.
+    
+    \item \textbf{DeviceCard.swift}: Reusable device status card component displaying device info, connection status, battery level with color-coded indicators.
+    
+    \item \textbf{DeviceDetailView.swift}: Detailed device settings view with device information, control options, notification preferences, and removal/reset actions.
+    
+    \item \textbf{AddItemWidget.swift}: Add new device/appliance widget with plus icon button, modal sheet for device selection, QR code scanning support (placeholder).
+\end{itemize}
+
+\textbf{Views/Persona}: AI persona management and customization interfaces.
+
+\begin{itemize}
+    \item \textbf{PersonaListView.swift}: List of user-created personas with ChatRoomCell components, selection mode for choosing up to 5 personas (checkmark indicators), edit/delete context menu per persona, floating add button for PersonaEditView navigation, and selection count indicator (X/5).
+    
+    \item \textbf{PersonaEditView.swift}: Create/edit persona interface with nickname TextField, adjective multi-selector (AdjectiveTagView grid), custom instructions TextEditor (multi-line), final prompt preview (read-only), and save button. Calls PersonaRepository.createPersona() or updatePersona() with automatic final\_prompt generation.
+    
+    \item \textbf{AdjectiveTagView.swift}: Grid of selectable adjective tags with category grouping (Personality, Tone, Style), multi-selection support (up to 10 adjectives), visual selection indicators (border, background color), and tap gesture handling.
+    
+    \item \textbf{PersonaWidget.swift}: Home screen widget displaying selected personas (up to 5) with circular bubble UI (first letter of nickname), background gradient based on persona ID hash, tap gesture for chat navigation, and horizontal scroll for overflow.
+    
+    \item \textbf{PersonaBubbleWidgetNew.swift}: Redesigned persona bubble component with profile image support, online status indicator, unread message badge, and press animation effects.
+    
+    \item \textbf{PersonaChatView.swift}: (See Views/Chat section above for details).
+\end{itemize}
+
+\textbf{Views/Timeline}: Route tracking and health metrics visualization.
+
+\begin{itemize}
+    \item \textbf{TimelineWidget.swift}: Latest timeline summary card displaying minimap with route polyline, checkpoint markers, statistics (distance, duration, checkpoint count), and tap gesture for TimelineDetailView navigation. Implements MapKit integration with automatic region calculation.
+    
+    \item \textbf{TimelineDetailView.swift}: Full route visualization with Map view (polyline overlay, checkpoint annotations with mood icons), health metrics graph (Line chart showing heart rate, stress, HRV over time), detailed statistics panel (distance, duration, average/max speed, start/end times), checkpoint list with timestamps and health context. Implements zoom/pan gestures, timeline scrubbing.
+    
+    \item \textbf{StateWidget.swift}: Current health status dashboard displaying real-time metrics: current heart rate (BPM with heart icon), calories burned (kcal with flame icon), steps count (with shoe icon), distance walked (km with location icon). Updates every 30 seconds via HealthKitManager published properties.
+    
+    \item \textbf{StateDetailView.swift}: Detailed health metrics view with weekly trend charts (sleep hours, stress level, calories burned), daily history table, average/min/max statistics, and date range selector. Implements Chart framework for data visualization with interactive tooltips.
+\end{itemize}
+
+\textbf{Views/Settings}: User preferences and configuration interfaces.
+
+\begin{itemize}
+    \item \textbf{MenuView.swift}: Settings menu navigation with MenuRow components for each category: My Page (profile editing), Space Notification (notification preferences), Do Not Disturb (DND schedule), Emergency Call (emergency contact settings), Font Size (accessibility), General (app info, logout). Implements NavigationStack for hierarchical navigation.
+    
+    \item \textbf{MyPageView.swift}: User profile editing interface with avatar image picker, name TextField, birthday DatePicker, email display (read-only), and save button. Calls SupabaseManager.updateUserProfile() with optimistic UI updates.
+    
+    \item \textbf{SpaceNotificationView.swift}: Notification method selector (Push, SMS, Email) with toggle for each method, notification history list, test notification button. Persists to user\_settings.notification\_method.
+    
+    \item \textbf{DoNotDisturbView.swift}: DND schedule configuration with enabled toggle, start time picker, end time picker, override for emergency calls toggle. Persists to user\_settings.dnd\_enabled, dnd\_start\_time, dnd\_end\_time.
+    
+    \item \textbf{EmergencyCallView.swift}: Emergency contact settings with enabled toggle, contact name/phone input, test call button, call history list. Persists to user\_settings.emergency\_call\_enabled, emergency\_contact.
+    
+    \item \textbf{FontSizeView.swift}: Font size selector (Small, Medium, Large) with preview text at each size, system dynamic type integration, and immediate UI updates via FontSizeManager.currentFontSize published property.
+    
+    \item \textbf{GeneralView.swift}: App information and account management with app version display, privacy policy link, terms of service link, open source licenses, logout button (with confirmation alert), delete account button (with double confirmation).
+    
+    \item \textbf{MenuRow.swift}: Reusable settings menu row component with SF Symbol icon, title text, disclosure indicator, and tap gesture navigation.
+    
+    \item \textbf{NotificationMethodView.swift}: Detailed notification preferences with granular controls per notification type (geofence, health alert, appliance status), method selector per type, quiet hours configuration.
+\end{itemize}
+
+\textbf{Watch App}: Apple Watch companion application for autonomous health and location tracking.
+
+\begin{itemize}
+    \item \textbf{space\_Watch\_AppApp.swift}: Watch app entry point initializing WatchConnectivityManager.shared on launch. Defines single scene with ContentView.
+    
+    \item \textbf{ContentView.swift}: Main Watch UI with authentication-aware display. Authenticated view shows tracking status indicator (red circle when active), iPhone connection status icon, navigation button to MapView, quick stats (distance, coordinate count). Not authenticated view displays lock icon with "Please log in via iPhone app" message.
+    
+    \item \textbf{MapView.swift}: Real-time route visualization on Watch with Map view showing current location, route polyline, start/stop tracking button (with workout session integration), live stats during tracking (distance, duration, heart rate), and automatic data sending to iPhone via WatchConnectivityManager.
+    
+    \item \textbf{WatchHealthKitManager.swift}: Watch-side HealthKit manager implementing HKWorkoutSession for workout tracking. Manages real-time queries for heart rate, active energy, steps, distance. Sends health data to iPhone every 30 seconds during active workouts. Supports workout types: Walking, Running, Cycling, Outdoor (generic). Key methods:
+    \begin{itemize}
+        \item \textbf{startWorkout(type:)}: Begins HKWorkoutSession with specified activity type.
+        \item \textbf{endWorkout()}: Terminates workout session and saves to HealthKit.
+        \item \textbf{startHealthObservers()}: Establishes real-time observer queries for live data collection.
+        \item \textbf{sendHealthDataToiPhone()}: Packages current health metrics and transmits via WatchConnectivity.
+    \end{itemize}
+    
+    \item \textbf{WatchLocationManager.swift}: Watch-side GPS tracking manager with coordinate collection, distance calculation, timestamp recording, and integration with health data per GPS point. Sends location updates to iPhone bundled with corresponding health metrics.
+    
+    \item \textbf{WatchConnectivityManager.swift}: Watch-side connectivity manager mirroring iPhone implementation. Handles authentication state from iPhone (receives user ID, email), sends location/health data to iPhone (coordinates array, heart rate, calories, steps, HRV), receives tracking commands from iPhone (start/stop), and implements WCSessionDelegate for message handling with automatic state updates.
+\end{itemize}
+
+\end{adjustwidth}
+
+\subsubsection{Technology Stack}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+
+\textbf{Core Frameworks and Libraries:}
+
+\begin{itemize}
+    \item \textbf{SwiftUI}: Declarative UI framework for all view implementations with modern reactive data binding.
+    \item \textbf{CoreLocation}: GPS location tracking with background delivery, geofencing, and region monitoring.
+    \item \textbf{HealthKit}: Apple Watch biometric data collection (sleep, heart rate, HRV, calories, steps, distance) with background observer queries.
+    \item \textbf{WatchConnectivity}: Bidirectional iPhone-Watch data synchronization with three transfer methods (immediate message, background transfer, application context).
+    \item \textbf{MapKit}: Map visualization with polyline overlays, custom annotations, and region calculation.
+    \item \textbf{Combine}: Reactive programming framework for observable state management (@Published properties).
+    \item \textbf{UserNotifications}: Local notifications for proximity alerts (tagged locations), health warnings.
+    \item \textbf{Charts}: Native data visualization framework for health metrics trends (iOS 16+).
+\end{itemize}
+
+\textbf{Backend Integration:}
+
+\begin{itemize}
+    \item \textbf{Supabase Swift Client}: Authentication (sign up, sign in, session management), REST API client for database operations (PostgREST query syntax).
+    \begin{itemize}
+        % \item Base URL: \texttt{https://aghsjspkzivcpibwwzvu.supabase.co}
+        \item Authentication: Bearer token with automatic refresh
+        \item Tables: user\_profiles, user\_settings, personas, adjectives, user\_active\_persona, user\_selected\_personas, tagged\_locations, location\_notifications
+    \end{itemize}
+    
+    \item \textbf{FastAPI Integration}: HTTP client for Python backend AI services.
+    \begin{itemize}
+        % \item Base URL: \texttt{http://13.125.85.158:11325}
+        \item Endpoints: POST /api/users/ (user registration)
+        \item Planned: AI chat, health analysis, timeline recommendations
+    \end{itemize}
+    
+    \item \textbf{Sendbird SDK}: Real-time chat backend for persona conversations.
+    \begin{itemize}
+        \item User initialization on login with Supabase user ID
+        \item Channel-based messaging (one channel per persona)
+        \item Message history persistence, read receipts, typing indicators
+    \end{itemize}
+\end{itemize}
+
+\textbf{Data Persistence:}
+
+\begin{itemize}
+    \item \textbf{UserDefaults}: Local storage for session tokens, timeline records, call history, font size preferences.
+    \item \textbf{Supabase PostgreSQL}: Server-side persistence for users, personas, locations, settings.
+    \item \textbf{HealthKit Store}: Native iOS health data storage managed by Apple Health app.
+\end{itemize}
+
+\textbf{Development Requirements:}
+
+\begin{itemize}
+    \item \textbf{Minimum iOS Version}: iOS 16.0+ (SwiftUI features, Charts framework)
+    \item \textbf{Minimum watchOS Version}: watchOS 9.0+
+    \item \textbf{Target Devices}: iPhone, Apple Watch (companion app)
+    \item \textbf{Language}: Swift 5.9+
+    \item \textbf{IDE}: Xcode 15.0+
+\end{itemize}
+
+\textbf{Required Permissions:}
+
+\begin{itemize}
+    \item \textbf{Location}: "Always" authorization for background GPS tracking and geofencing.
+    \item \textbf{HealthKit}: Read authorization for sleep analysis, heart rate, HRV (SDNN), active energy, step count, walking/running distance, resting heart rate.
+    \item \textbf{Notifications}: User authorization for proximity alerts, health warnings.
+    \item \textbf{WatchConnectivity}: Automatic pairing requirement for iPhone-Watch data synchronization.
+\end{itemize}
+
+\end{adjustwidth}
+
+\subsubsection{Architecture Patterns}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+
+\textbf{Design Patterns:}
+
+\begin{itemize}
+    \item \textbf{Singleton Pattern}: All manager classes (HealthKitManager, LocationManager, SupabaseManager, WatchConnectivityManager, TaggedLocationManager, DeviceManager, FontSizeManager, CallHistoryManager) implement singleton pattern with \texttt{shared} static property ensuring single instance across app lifecycle.
+    
+    \item \textbf{Repository Pattern}: PersonaRepository provides clean abstraction layer between business logic and data access, implementing protocol-based design for testability and dependency injection.
+    
+    \item \textbf{MVVM Pattern}: ViewModels for complex views (PersonaListViewModel, PersonaChatListViewModel) separate business logic from UI code, implement @Published properties for reactive data binding with SwiftUI views.
+    
+    \item \textbf{Observer Pattern}: Combine framework @Published properties enable automatic UI updates when manager state changes, eliminating manual refresh logic.
+    
+    \item \textbf{Delegate Pattern}: CLLocationManagerDelegate (GPS updates), HKWorkoutSessionDelegate (workout lifecycle), WCSessionDelegate (Watch connectivity).
+    
+    \item \textbf{Service Layer Pattern}: SupabaseService provides generic CRUD operations with type-safe generics, eliminating code duplication across repositories.
+\end{itemize}
+
+\textbf{Data Flow:}
+
+\begin{verbatim}
+User Interaction (SwiftUI View)
+    ↓
+ViewModel (Business Logic, @Published State)
+    ↓
+Repository/Manager (Data Access, Singleton)
+    ↓
+Service (Backend API Client)
+    ↓
+External Backend (Supabase/FastAPI/Sendbird)
+\end{verbatim}
+
+\textbf{State Management:}
+
+\begin{itemize}
+    \item \textbf{@Published}: Observable properties in managers/view models automatically trigger view re-renders when changed.
+    \item \textbf{@StateObject}: View-owned observable objects with lifecycle tied to view.
+    \item \textbf{@ObservedObject}: Parent-passed observable objects for child views.
+    \item \textbf{@State}: View-local state for UI-only data (text field input, toggle states).
+    \item \textbf{@EnvironmentObject}: Globally accessible state injected at root level (SupabaseManager, FontSizeManager).
+    \item \textbf{UserDefaults}: Persistent local storage for session tokens, cached data, user preferences.
+    \item \textbf{Supabase}: Server-side single source of truth for user data, personas, locations, settings.
+\end{itemize}
+
+\textbf{Error Handling:}
+
+\begin{itemize}
+    \item Custom error enums: AuthError, SupabaseError, TaggedLocationError, WatchConnectivityError, each implementing LocalizedError protocol for user-facing messages.
+    \item Structured error propagation using Swift Result type and async/await throwing functions.
+    \item ViewModel-level error state management with @Published errorMessage properties for UI display.
+\end{itemize}
+
+\textbf{Asynchronous Operations:}
+
+\begin{itemize}
+    \item \textbf{async/await}: Modern Swift concurrency for all API calls (Supabase, FastAPI, Sendbird) with structured error handling.
+    \item \textbf{Task}: Asynchronous work in SwiftUI views using Task \{ \} blocks for API calls on button taps.
+    \item \textbf{@MainActor}: Ensures UI updates execute on main thread, preventing SwiftUI purple runtime warnings.
+    \item \textbf{Combine}: Reactive programming for real-time updates from managers (published properties auto-propagate to views).
+    \item \textbf{DispatchQueue}: Legacy async for specific use cases (timer-based updates, background Work).
+\end{itemize}
+
+\textbf{Performance Optimizations:}
+
+\begin{itemize}
+    \item \textbf{GPS Smoothing}: 4-point moving average filter reduces GPS noise and prevents erratic route polylines.
+    \item \textbf{Lazy Loading}: LazyVStack for persona lists, timeline history, call records to render only visible cells.
+    \item \textbf{Background Delivery}: HealthKit data collection continues in background via observer queries with enableBackgroundDelivery().
+    \item \textbf{Notification Throttling}: 1-hour minimum interval per tagged location prevents notification spam.
+    \item \textbf{Session Caching}: Supabase auth token stored in UserDefaults reduces auth API calls on app launch.
+    \item \textbf{Debouncing}: HRV checkpoint minimum 3-minute interval prevents excessive checkpoint generation.
+    \item \textbf{Batch Transfers}: WatchConnectivity transferUserInfo() queues multiple updates for efficient background synchronization.
+\end{itemize}
+
+\textbf{Security Measures:}
+
+\begin{itemize}
+    \item \textbf{Bearer Token Authentication}: Supabase JWT token with automatic refresh before expiration.
+    \item \textbf{Anonymous Key}: Supabase anon key for public endpoints (sign up, sign in) with RLS policies.
+    \item \textbf{Session Validation}: getCurrentUser() checks session validity on app launch, redirects to login if expired.
+    \item \textbf{No Hardcoded Credentials}: All API keys loaded from configuration files excluded from version control.
+    \item \textbf{HTTPS Only}: All backend communication uses TLS encryption (Supabase HTTPS, FastAPI HTTPS planned).
+    \item \textbf{Keychain Storage}: Secure storage for sensitive tokens (planned migration from UserDefaults).
+\end{itemize}
+
+\end{adjustwidth}
+
+\vspace{0.8cm}
+\subsection{Backend}
+\subsubsection{Purpose}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+The backend for HARU is responsible for managing server-side operations, database management, and orchestrating communication between multiple services. Built with FastAPI and Python, it handles user authentication, biometric data processing (HRV analysis), environmental data integration (weather APIs), smart home appliance control logic, and real-time chat functionality through Sendbird integration. The backend stores and retrieves data using PostgreSQL, ensuring reliable and scalable data management for health-responsive automation and conversational AI features.
+\end{adjustwidth}
+
+\subsubsection{Functionality}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+The HARU backend processes user requests from the frontend and chat interfaces, managing user health data (HRV metrics), fatigue prediction, geolocation-based triggers, weather condition monitoring, and appliance control automation. It implements two primary scenarios: (1) Geofence-triggered proactive voice calls when users approach home, and (2) User-initiated conversational appliance control based on environmental complaints. The backend integrates with external services including OpenAI GPT-4o for natural language processing, Sendbird for chat management, OpenWeatherMap for environmental data, and manages virtual appliance states with comprehensive command logging for analytics and preference learning.
+\end{adjustwidth}
+
+\subsubsection{Location of Source Code}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+https://github.com/pupwchk/SWE-G04-SPACE/tree/main/BackEnd/fastapi-starter
+\end{adjustwidth}
+
+\subsubsection{Class Components}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+
+\textbf{main.py}: Entry point for launching the FastAPI application, configuring logging and initializing the API router.
+
+\textbf{app/\_\_init\_\_.py}: Initializes the FastAPI application instance with logging configuration.
+
+\textbf{app/api}: Directory for handling incoming API requests and routing them to appropriate services.
+
+\begin{itemize}
+    \item \textbf{\_\_init\_\_.py}: Aggregates all API routers for centralized routing configuration.
+    \item \textbf{users.py}: Manages user-related endpoints, including registration, profile retrieval, and user settings.
+    \item \textbf{chat.py}: Handles conversational AI endpoints for Scenario 2 (user-initiated chat), including message processing, intent parsing, appliance suggestion generation, and approval handling.
+    \item \textbf{hrv.py}: Processes heart rate variability data from Apple Watch, stores HRV metrics, and triggers fatigue prediction.
+    \item \textbf{weather.py}: Retrieves real-time weather data (temperature, humidity, PM10, PM2.5) from OpenWeatherMap API.
+    \item \textbf{location.py}: Manages user location updates and geofence detection for Scenario 1 triggers.
+    \item \textbf{appliance.py}: Handles appliance control endpoints, including manual control, status queries, and rule management.
+    \item \textbf{voice.py}: Manages voice call endpoints for text-to-speech conversational interactions.
+    \item \textbf{voice\_realtime.py}: Implements OpenAI Realtime API integration for real-time voice conversations via WebSocket.
+    \item \textbf{characters.py}: Manages AI persona/character configurations for personalized dialogue styles.
+    \item \textbf{sendbird\_webhook.py}: Receives webhook notifications from Sendbird chat service for message events.
+    \item \textbf{tracking.py}: Handles activity tracking and wellness metrics logging.
+\end{itemize}
+
+% \textbf{app/models}: Defines database entity models using SQLAlchemy ORM.
+
+% \begin{itemize}
+%     \item \textbf{user.py}: Represents user entities with authentication credentials, profile information, and Sendbird integration IDs.
+%     \item \textbf{hrv.py}: Stores heart rate variability metrics (RMSSD, SDNN, heart rate) with timestamps.
+%     \item \textbf{appliance.py}: Defines four appliance-related tables:
+%     \begin{itemize}
+%         \item \textbf{ApplianceConditionRule}: Stores fatigue-level-based activation conditions (e.g., "turn on AC when temp $\geq$ 26°C at fatigue level 3").
+%         \item \textbf{UserAppliancePreference}: Stores learned user preferences for appliance settings per fatigue level.
+%         \item \textbf{ApplianceStatus}: Maintains current virtual appliance states (power status, current settings).
+%         \item \textbf{ApplianceCommandLog}: Logs all appliance control commands for analytics and debugging.
+%     \end{itemize}
+%     \item \textbf{weather.py}: Caches weather data to reduce external API calls.
+%     \item \textbf{location.py}: Stores user home coordinates and current location for geofence calculations.
+%     \item \textbf{info.py}: Stores AI character/persona configurations (nickname, personality description).
+%     \item \textbf{tracking.py}: Manages wellness tracking data and activity logs.
+% \end{itemize}
+
+% \textbf{app/schemas}: Contains Pydantic models for request/response validation and serialization.
+
+% \begin{itemize}
+%     \item \textbf{user.py}: Defines data transfer objects for user-related API requests and responses.
+%     \item \textbf{info.py}: Defines schemas for character/persona data structures.
+%     \item \textbf{tracking.py}: Defines schemas for activity and wellness tracking data.
+% \end{itemize}
+
+% \textbf{app/cruds}: Implements database CRUD (Create, Read, Update, Delete) operations.
+
+\section*{Backend Directory Documentation}
+
+\subsection*{app/models}
+Defines all database entity models using SQLAlchemy ORM.
+
+\begin{itemize}
+
+    \item \textbf{user.py}: Defines core user-related entities.
+    \begin{itemize}
+        \item \textbf{User}: Basic user profile (email, username, created\_at).
+        \item \textbf{UserPhone}: Stores user phone information.
+        \item \textbf{UserDevice}: Stores device installation metadata per user.
+    \end{itemize}
+
+    \item \textbf{tracking.py}: Stores user activity, health, and contextual tracking information.
+    \begin{itemize}
+        \item \textbf{Place}: User-defined physical places (home, workplace, gym).
+        \item \textbf{TimeSlot}: Per-hour tracking window referencing a Place.
+        \item \textbf{WeatherObservation}: Cached hourly weather data indexed by (nx, ny, ts\_hour).
+        \item \textbf{SleepSession}: Tracks sleep start/end timestamps and quality.
+        \item \textbf{WorkoutSession}: Tracks workout metadata.
+        \item \textbf{HealthHourly}: Hourly HRV/heart rate summary.
+    \end{itemize}
+
+    \item \textbf{info.py}: Defines appliance and AI-character-related entities.
+    \begin{itemize}
+        \item \textbf{Appliance}: Represents a user-owned appliance instance (AC, TV, Purifier, Light, etc.).
+        \item \textbf{AirConditionerConfig}: AC modes, temperature, wind speed settings.
+        \item \textbf{TvConfig}: Channel, volume, power, input source.
+        \item \textbf{AirPurifierConfig}: Air purifier fan levels and modes.
+        \item \textbf{LightConfig}: Light brightness and color modes.
+        \item \textbf{HumidifierConfig}: Mist level and operating mode.
+        \item \textbf{Character}: AI persona attached to each user.
+    \end{itemize}
+
+\end{itemize}
+
+\subsection*{app/schemas}
+Contains Pydantic models for type-safe request/response validation.
+
+\begin{itemize}
+
+    \item \textbf{user.py}:
+    \begin{itemize}
+        \item \textbf{UserBase}, \textbf{UserCreate}: DTO for creating users.
+        \item \textbf{User}: Response schema for full user entity.
+        \item \textbf{UserWithRelations}: User + phones + devices.
+    \end{itemize}
+
+    \item \textbf{tracking.py}:
+    \begin{itemize}
+        \item DTOs including \textbf{PlaceCreate}, \textbf{TimeSlotCreate}, 
+        \textbf{WeatherObservationCreate}, \textbf{SleepSessionCreate},
+        \textbf{WorkoutSessionCreate}, \textbf{HealthHourlyCreate}.
+    \end{itemize}
+
+    \item \textbf{info.py}:
+    \begin{itemize}
+        \item \textbf{ApplianceCreate}
+        \item \textbf{AirConditionerConfigCreate}, \textbf{TvConfigCreate},
+        \textbf{AirPurifierConfigCreate}, \textbf{LightConfigCreate},
+        \textbf{HumidifierConfigCreate}
+        \item \textbf{CharacterCreate}, \textbf{CharacterUpdate}, \textbf{Character}
+    \end{itemize}
+
+\end{itemize}
+
+\subsection*{app/cruds}
+Implements DB access patterns and business logic for each model.
+
+\begin{itemize}
+
+    \item \textbf{user.py}:
+    \begin{itemize}
+        \item \textbf{create\_user(db, user\_in)}: Register a new user.
+        \item \textbf{get\_user(db, user\_id)}: Retrieve a user by ID.
+        \item \textbf{get\_user\_by\_email(db, email)}: Fetch user by email.
+        \item \textbf{get\_users(db, skip, limit)}: Paginated user listing.
+    \end{itemize}
+
+    \item \textbf{tracking.py}:
+    \begin{itemize}
+        \item \textbf{create\_place}, \textbf{create\_timeslot}
+        \item \textbf{create\_weather\_observation}
+        \item \textbf{create\_sleep\_session}
+        \item \textbf{create\_workout\_session}
+        \item \textbf{create\_health\_hourly}
+        \item (Each function inserts the corresponding tracking model.)
+    \end{itemize}
+
+    \item \textbf{info.py}:
+
+    \textit{Appliance CRUD:}
+    \begin{itemize}
+        \item \textbf{create\_appliance}: Create appliance instance.
+        \item \textbf{get\_appliance}: Retrieve appliance by ID.
+        \item \textbf{get\_appliances\_by\_user}: Filter by user and type.
+        \item \textbf{delete\_appliance}: Remove appliance instance.
+    \end{itemize}
+
+    \textit{Config Upsert (1:1 per appliance):}
+    \begin{itemize}
+        \item \textbf{upsert\_air\_conditioner\_config}
+        \item \textbf{upsert\_tv\_config}
+        \item \textbf{upsert\_air\_purifier\_config}
+        \item \textbf{upsert\_light\_config}
+        \item \textbf{upsert\_humidifier\_config}
+        \item (All support update-if-exists / create-if-not.)
+    \end{itemize}
+
+    \textit{Character CRUD:}
+    \begin{itemize}
+        \item \textbf{create\_character}: New AI persona.
+        \item \textbf{get\_character}: Single-character lookup.
+        \item \textbf{get\_characters\_by\_user}: List user’s personas.
+        \item \textbf{update\_character}: Modify nickname or persona.
+        \item \textbf{delete\_character}: Remove character profile.
+    \end{itemize}
+
+\end{itemize}
+
+
+
+\begin{itemize}
+    \item \textbf{user.py}: Handles database operations for user entities.
+    \item \textbf{info.py}: Manages character/persona database operations.
+    \item \textbf{tracking.py}: Handles tracking data persistence.
+\end{itemize}
+
+\textbf{app/services}: Contains business logic for core application functionality.
+
+\begin{itemize}
+    \item \textbf{llm\_service.py}: Implements GPT-4o integration for natural language processing tasks:
+    \begin{itemize}
+        \item \textbf{parse\_user\_intent()}: Classifies user messages into environment\_complaint, appliance\_request, or general\_chat.
+        \item \textbf{generate\_appliance\_suggestion()}: Creates natural language suggestions based on weather, fatigue, and recommendations.
+        \item \textbf{detect\_modification()}: Parses user approval/rejection/modification responses.
+        \item \textbf{generate\_response()}: Generates general conversational responses with persona support.
+        \item \textbf{generate\_geofence\_trigger()}: Creates automatic voice call prompts for geofence events.
+    \end{itemize}
+    \item \textbf{appliance\_rule\_engine.py}: Evaluates fatigue-based conditions to determine which appliances to control:
+    \begin{itemize}
+        \item \textbf{evaluate\_condition()}: Checks if weather data meets activation thresholds.
+        \item \textbf{get\_appliances\_to\_control()}: Queries rules, evaluates conditions, retrieves learned preferences, and returns control recommendations.
+        \item \textbf{create\_default\_rules()}: Initializes default rules and preferences for new users across all fatigue levels (1-4).
+    \end{itemize}
+    \item \textbf{appliance\_control\_service.py}: Executes virtual appliance control commands:
+    \begin{itemize}
+        \item \textbf{execute\_command()}: Updates appliance state, logs commands, handles errors.
+        \item \textbf{execute\_multiple\_commands()}: Batch execution for multiple appliances.
+        \item \textbf{get\_appliance\_status()}: Queries current appliance states.
+        \item \textbf{get\_command\_history()}: Retrieves historical command logs.
+    \end{itemize}
+    \item \textbf{hrv\_service.py}: Processes HRV data and provides fatigue level calculations:
+    \begin{itemize}
+        \item \textbf{get\_latest\_fatigue\_level()}: Retrieves most recent fatigue prediction (1-4 scale).
+        \item \textbf{calculate\_hrv\_metrics()}: Computes RMSSD and SDNN from raw HRV data.
+    \end{itemize}
+    \item \textbf{weather\_service.py}: Integrates with OpenWeatherMap API:
+    \begin{itemize}
+        \item \textbf{get\_combined\_weather()}: Fetches temperature, humidity, PM10, PM2.5 data.
+        \item Implements caching to reduce API calls.
+    \end{itemize}
+    \item \textbf{geofence\_service.py}: Calculates distance to home and triggers Scenario 1 events:
+    \begin{itemize}
+        \item \textbf{calculate\_distance()}: Haversine formula for GPS distance calculation.
+        \item \textbf{check\_geofence()}: Detects when user enters 100m radius.
+    \end{itemize}
+    \item \textbf{fatigue\_predictor.py}: Loads XGBoost model to predict fatigue levels from HRV metrics and weather data.
+    \item \textbf{sendbird\_client.py}: Wrapper for Sendbird Platform API for chat management.
+    \item \textbf{voice\_service.py}: Implements text-to-speech using external TTS APIs.
+    \item \textbf{realtime\_voice\_agent.py}: Manages OpenAI Realtime API WebSocket connections for real-time voice conversations.
+\end{itemize}
+
+\textbf{app/config}: Configuration files and dependency injection.
+
+\begin{itemize}
+    \item \textbf{db.py}: SQLAlchemy database engine and session management.
+    \item \textbf{env.py}: Environment variable loading and configuration.
+    \item \textbf{sendbird.py}: Sendbird API credentials and configuration.
+\end{itemize}
+
+\textbf{app/migrations}: Alembic database migration scripts.
+
+\begin{itemize}
+    \item \textbf{env.py}: Alembic migration environment configuration.
+    \item \textbf{versions/}: Individual migration files for schema evolution:
+    \begin{itemize}
+        \item 673442797dd9\_init\_user\_tables.py: Initial user table creation.
+        \item 81c03ade5e0d\_add\_hrv\_appliance\_weather\_and
+        \_geofence\_.py: Adds HRV, appliance, weather, and location tables.
+        \item 3ab07a8e1cd4\_add\_action\_settings\_priority\_to\_.py: Enhances appliance rules with action, settings, and priority fields.
+        \item add\_fatigue\_prediction\_table.py: Adds fatigue prediction result storage.
+        \item e0bbb0017a7b\_add\_weather\_cache\_table.py: Adds weather data caching table.
+    \end{itemize}
+\end{itemize}
+
+
+\textbf{test/}: Integration and manual testing scripts.
+
+\begin{itemize}
+    \item \textbf{test\_scenario2\_integration.py}: End-to-end test for conversational appliance control.
+    \item \textbf{test\_with\_real\_user.py}: Tests with actual user data.
+    \item \textbf{test\_hrv\_manual.py}: Manual HRV data submission and fatigue prediction testing.
+    \item \textbf{setup\_appliance\_rules.py}: Script to initialize default rules for test users.
+\end{itemize}
+
+
+
+
+\end{adjustwidth}
+
+\subsection{AI}
+\subsubsection{Purpose}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+The AI module serves as the intelligent core of the HARU system, implementing LLM-based dialogue management for natural language understanding and generation. Its primary purpose is to process user inputs in Korean and English, analyze conversational intent, generate context-aware appliance control suggestions based on real-time environmental and health data, and maintain adaptive learning through preference storage. The AI module leverages OpenAI's GPT-4o model exclusively, eliminating the need for custom dialogue datasets through carefully engineered prompt templates and structured JSON output enforcement.
+\end{adjustwidth}
+
+\subsubsection{Functionality}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+The AI module performs four core natural language processing tasks: (1) Intent Recognition - classifying user messages into environment\_complaint, appliance\_request, or general\_chat categories; (2) Context-Aware Recommendation - combining weather data, fatigue levels, and learned preferences to generate appliance control suggestions; (3) Natural Language Generation - creating personalized, context-aware response messages in Korean with persona support; and (4) Modification Detection - parsing user approval, rejection, or modification responses to adjust control parameters. All LLM interactions use structured JSON output format to ensure reliable parsing and action execution. The module integrates seamlessly with the backend's FastAPI services through the LLMService class, providing sub-2-second response times for complete conversational flows.
+\end{adjustwidth}
+
+\subsubsection{Location of Source Code}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+https://github.com/pupwchk/SWE-G04-SPACE/tree/main/BackEnd/fastapi-starter/app/services
+
+(Note: Unlike the Spring Boot + Kotlin backend in the referenced template, HARU uses a unified FastAPI architecture where AI services are integrated directly within the backend codebase under \texttt{app/services/llm\_service.py})
+\end{adjustwidth}
+
+\subsubsection{Class Components}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+
+\textbf{app/services/llm\_service.py}: Core LLM integration service implementing all natural language processing functionality.
+
+\begin{itemize}
+    \item \textbf{LLMService}: Main service class for GPT-4o API interactions.
+    \begin{itemize}
+        \item \textbf{\_\_init\_\_()}: Initializes OpenAI AsyncClient with API key and model configuration (gpt-4o).
+        \item \textbf{\_build\_system\_prompt(persona: Optional[Dict])}: Constructs system prompts with optional persona integration for personalized dialogue styles. Supports role definitions, response format specifications, and behavioral guidelines.
+        \item \textbf{parse\_user\_intent(user\_message: str, context: Optional[Dict])}: Classifies user messages using GPT-4o with temperature=0.3 for consistent intent recognition. Returns JSON with \texttt{intent\_type}, \texttt{issues} array (temperature/humidity/air\_quality conditions), \texttt{needs\_control} flag, and summary text. Handles Korean informal speech variations ("hot", "fire", "melting").
+        \item \textbf{generate\_appliance\_suggestion(appliances: List, weather: Dict, fatigue\_level: int, user\_message: str, persona: Optional[Dict])}: Creates natural Korean language suggestions incorporating current environmental conditions, recommended appliances, and user fatigue state. Uses temperature=0.7 for varied, natural responses. Returns plain text (non-JSON) formatted as "Present [environment explanation]. [Appliance Suggestion]?".
+        \item \textbf{detect\_modification(original\_plan, user\_response)}: Parses user approval/rejection/modification responses with temperature=0.2 for precise parsing. Returns JSON with \texttt{approved} (bool), \texttt{has\_modification} (bool), \texttt{modifications} (dict mapping appliance types to setting overrides), and \texttt{reason} (string). Handles responses like "good" (approve), "AC to 24" (modify), "Stop" (reject).
+        \item \textbf{generate\_response(user\_message, conversation\_history, persona, context)}: Generates general conversational responses with action classification (NONE/CALL/AUTO\_CALL). Maintains conversation history (last 10 messages) and injects real-time context. Returns structured JSON with action type and response text.
+        \item \textbf{generate\_geofence\_trigger(user\_id: str, distance: float, context: Optional[Dict])}: Creates automatic voice call prompts for Scenario 1 geofence events. Generates user-friendly messages explaining automatic call trigger and provides pre-call notification text.
+    \end{itemize}
+    
+    \item \textbf{LLMAction}: Enum class defining action types:
+    \begin{itemize}
+        \item \textbf{NONE}: Standard text response.
+        \item \textbf{CALL}: User-requested phone call.
+        \item \textbf{AUTO\_CALL}: GPS-triggered automatic call.
+    \end{itemize}
+    
+    \item \textbf{MemoryService}: In-memory conversation state management (temporary implementation).
+    \begin{itemize}
+        \item \textbf{add\_message(user\_id: str, role: str, content: str)}: Appends messages to conversation history, maintaining last 50 messages per user.
+        \item \textbf{get\_history(user\_id: str, limit: int)}: Retrieves recent conversation context for LLM prompts.
+        \item \textbf{update\_long\_term\_memory(user\_id: str, key: str, value: Any)}: Stores persistent user information for future context.
+        \item \textbf{get\_long\_term\_memory(user\_id: str)}: Retrieves user-specific long-term memory.
+    \end{itemize}
+\end{itemize}
+
+\begin{adjustwidth}{1em}{0em}\textbf{app/api/chat.py}: RESTful API endpoints for conversational appliance control (Scenario 2).
+
+\begin{itemize}
+    \item \textbf{POST /chat/\{user\_id\}/message}: Processes user messages through multi-step pipeline:
+    \begin{enumerate}
+        \item Calls \texttt{llm\_service.parse\_user\_intent()} for intent classification.
+        \item If \texttt{needs\_control=true}, queries weather data, fatigue level, and user preferences.
+        \item Invokes \texttt{appliance\_rule\_engine.get\_  appliances\_to\_control()} for recommendations.
+        \item Calls \texttt{llm\_service.generate\_  appliance\_suggestion()} for natural language response.
+        \item Stores suggestions in session state for approval step.
+    \end{enumerate}
+    Returns \texttt{ChatMessageResponse} with AI response text, intent type, control flag, suggestions array, and session ID.
+    
+    \item \textbf{POST /chat/\{user\_id\}/approve}: Handles user approval/modification responses:
+    \begin{enumerate}
+        \item Calls \texttt{llm\_service.detect\_modification()} to parse user response.
+        \item If approved, applies modifications to original suggestions.
+        \item Executes commands via \texttt{appliance\_control\_service.execute\_ command()}.
+        \item Saves learned preferences to \texttt{UserAppliancePreference} table.
+    \end{enumerate}
+
+    Returns \texttt{ApplianceApprovalResponse} with approval status, modifications, execution results, and confirmation message.
+    
+    \item \textbf{GET /chat/\{user\_id\}/history}: Retrieves conversation history from session storage (last 20 messages).
+    
+    \item \textbf{DELETE /chat/\{user\_id\}/session}: Clears conversation session and pending suggestions.
+\end{itemize}
+
+\textbf{app/api/voice\_realtime.py}: WebSocket endpoint for OpenAI Realtime API integration.
+
+\begin{itemize}
+    \item \textbf{app/services/realtime\_voice\_agent.py}: Manages bidirectional WebSocket connections for real-time voice conversations.
+    \begin{itemize}
+        \item Handles audio streaming to/from OpenAI Realtime API.
+        \item Integrates with LLMService for context-aware voice responses.
+        \item Supports Scenario 1 geofence-triggered automatic calls.
+    \end{itemize}
+\end{itemize}
+
+Prompt Templates: Embedded within \texttt{llm\_service.py} methods as f-string templates:
+
+\begin{itemize}
+    \item \textbf{System Prompt (General Chat)}: Defines AI assistant role, capabilities (smart home control, wellness monitoring, proactive calling), and JSON response format specifications. Includes persona description when provided.
+    
+    \item \textbf{Intent Parsing Prompt}: Provides classification criteria with Korean examples:
+    \begin{itemize}
+        \item environment\_complaint: "hot", "cold", "dry", "wet", "stuck"
+        \item appliance\_request: "turn on the AC", "turn on the light"
+        \item general\_chat: "Bye", "Thx"
+    \end{itemize}
+    Enforces \texttt{needs\_control=true} for environmental complaints and appliance requests.
+    
+    \item \textbf{Suggestion Generation Prompt}: Provides current weather data (temperature, humidity, PM10), fatigue level (1-4 scale), and recommended appliances. Requests natural Korean response format: "Present [environment explanation]. [Appliance control recommandation]?". Specifies plain text output (not JSON).
+    
+    \item \textbf{Modification Detection Prompt}: Shows original plan and user response, with examples:
+    \begin{itemize}
+        \item "good", "yes" $\rightarrow$ approved: true, has\_modification: false
+        \item "AC to 24" $\rightarrow$ approved: true, has\_modification: true, modifications: \{"AC": \{"target\_temp\_c": 24\}\}
+        \item "Stop" $\rightarrow$ approved: false
+    \end{itemize}
+    
+    \item \textbf{Geofence Trigger Prompt}: Includes user distance to home, requests AUTO\_CALL action with geofence trigger, voice message for call, and pre-call notification text.
+\end{itemize}
+
+
+\begin{itemize}
+    \item \textbf{OpenAI Client}: Initialized with \texttt{AsyncOpenAI} for non-blocking API calls.
+    \item \textbf{Model}: GPT-4o (\texttt{gpt-4o}) exclusively.
+    \item \textbf{Temperature Settings}:
+    \begin{itemize}
+        \item Intent Parsing: 0.3 (consistent classification)
+        \item Modification Detection: 0.2 (precise parsing)
+        \item Suggestion Generation: 0.7 (natural variation)
+        \item General Chat: 0.7 (conversational responses)
+    \end{itemize}
+    \item \textbf{Response Format}: \texttt{\{"type": "json\_object"\}} for all tasks except suggestion generation (plain text).
+    \item \textbf{API Key}: Loaded from environment variable \texttt{OPENAI\_API\_KEY}.
+\end{itemize}
+
+\end{adjustwidth}

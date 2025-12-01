@@ -1,0 +1,96 @@
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+% The preceding line is only needed to identify funding in the first footnote. If that is unneeded, please comment it out.
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{enumerate}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{microtype}
+\usepackage{titlesec}
+\usepackage{indentfirst}
+\usepackage{changepage}
+\usepackage{caption}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{multicol}
+\usepackage{float}
+
+%Subsubsection
+\titleformat{\subsubsection}
+  {\normalfont\normalsize\itshape}
+  {\hspace{1em}\arabic{subsubsection})}{0.5em}{}
+\titlespacing*{\subsubsection}
+  {0.1em}{3.25ex plus 1ex minus .2ex}{1.5ex plus .2ex}  
+\setlength{\parindent}{1em}
+
+\title{HARU\\
+{\large{AI-Driven Multimodal Smart Home Manager
+}}}
+
+
+\author{\IEEEauthorblockN{Junho Uh}
+\IEEEauthorblockA{\textit{College of Engineering} \\
+\textit{Hanyang University}\\
+\textit{Dept. of Information Systems}\\
+Seoul, Korea\\
+djwnsgh0248@hanyang.ac.kr}
+\and
+\IEEEauthorblockN{Yeonseong Shin}
+\IEEEauthorblockA{\textit{College of Engineering} \\
+\textit{Hanyang University}\\
+\textit{Dept. of Data Science}\\
+Seoul, Korea\\
+dustjd2651@gmail.com}
+\and
+\IEEEauthorblockN{Dogyeom Kim}
+\IEEEauthorblockA{\textit{College of Engineering} \\
+\textit{Hanyang University}\\
+\textit{Dept. of Computer Science}\\
+Seoul, Korea\\
+dogyeom74@hanyang.ac.kr }
+\and
+\IEEEauthorblockN{Donghyun Lim}
+\IEEEauthorblockA{\textit{College of Engineering} \\
+\textit{Hanyang University}\\
+\textit{Dept. of Computer Science}\\
+Seoul, Korea\\
+limdongxian1207@gmail.com}
+}
+
+
+\begin{document}
+\maketitle
+
+\input{00abstract}
+\input{01roleassignment}
+
+\section{Introduction}
+\input{02intro1_motivation}
+\input{02intro2_problem}
+\input{02intro3_solution}
+\input{02intro4_related}
+
+\section{Requirement}
+\input{03Requirements}
+
+\section{Development Environment}
+\input{04dev_env1_Choice of Software Development Platform}
+\input{04dev_env2_Software_in_use}
+\input{04dev_env3_Task_Distribution}
+
+% \section{Specification}
+\input{05spec1_back_front}
+% \input{05spec2_ai}
+
+\input{06Architecture_Design1}
+\input{06Architecture_Design2}
+
+
+\section{Chat Logic}
+\input{07logic}
+
+\end{document}
+
