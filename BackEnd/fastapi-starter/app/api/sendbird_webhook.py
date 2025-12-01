@@ -116,6 +116,18 @@ async def process_and_respond(
     message: str
 ):
     """메시지 처리 및 응답"""
+    from app.config.db import SessionLocal
+    from app.services.appliance_rule_engine import appliance_rule_engine
+    from app.services.weather_service import weather_service
+    from app.services.hrv_service import hrv_service
+    from app.services.appliance_control_service import appliance_control_service
+    from app.models.user import User
+    from app.models.location import UserLocation
+    from uuid import UUID
+    import os
+
+    db = SessionLocal()
+
     try:
         logger.info("=" * 80)
         logger.info("🤖 [RESPONSE-DEBUG] Starting AI response generation...")
@@ -131,78 +143,183 @@ async def process_and_respond(
         long_term = memory_service.get_long_term_memory(user_id)
         logger.info(f"💭 [RESPONSE-DEBUG] Long-term memory: {long_term.get('persona', 'default')}")
 
-        # LLM 응답 생성
-        logger.info("🧠 [RESPONSE-DEBUG] Generating LLM response...")
-        response = await llm_service.generate_response(
+        # 1. 의도 파싱
+        logger.info("🧠 [RESPONSE-DEBUG] Parsing user intent...")
+        intent_result = await llm_service.parse_user_intent(
             user_message=message,
-            conversation_history=history,
-            persona=long_term.get("persona"),
-            context={
-                "user_id": user_id,
-                "channel_url": channel_url
-            }
+            context=None
         )
 
-        action = response.get("action", "NONE")
-        response_text = response.get("response", "")
-        logger.info(f"✅ [RESPONSE-DEBUG] LLM response generated!")
-        logger.info(f"   Action: {action}")
+        intent_type = intent_result.get("intent_type")
+        needs_control = intent_result.get("needs_control", False)
+        logger.info(f"📝 [RESPONSE-DEBUG] Intent: {intent_type}, needs_control: {needs_control}")
+
+        # environment_complaint나 appliance_request는 무조건 제어 필요
+        if intent_type in ["environment_complaint", "appliance_request"]:
+            needs_control = True
+
+        # 현재 가전 상태 조회
+        appliance_states = appliance_control_service.get_appliance_status(
+            db=db,
+            user_id=user_id
+        )
+
+        # 2. 가전 제어가 필요 없는 경우 (일반 대화)
+        if intent_type == "general_chat" or not needs_control:
+            logger.info("💬 [RESPONSE-DEBUG] General chat - generating normal response...")
+            response = await llm_service.generate_response(
+                user_message=message,
+                conversation_history=history,
+                persona=long_term.get("persona"),
+                appliance_states=appliance_states,
+                context={
+                    "user_id": user_id,
+                    "channel_url": channel_url
+                }
+            )
+
+            action = response.get("action", "NONE")
+            response_text = response.get("response", "")
+            logger.info(f"✅ [RESPONSE-DEBUG] LLM response generated!")
+            logger.info(f"   Action: {action}")
+            logger.info(f"   Response: {response_text[:100]}...")
+
+            # 메모리에 AI 응답 추가
+            memory_service.add_message(user_id, "assistant", response_text)
+            logger.info("💾 [RESPONSE-DEBUG] AI response saved to memory")
+
+            # 액션 처리
+            if action == LLMAction.NONE:
+                # 일반 텍스트 응답
+                logger.info("📤 [RESPONSE-DEBUG] Sending text response via Sendbird...")
+                await chat_client.send_message(
+                    channel_url=channel_url,
+                    message=response_text,
+                    user_id=user_id
+                )
+                logger.info(f"✅ [RESPONSE-DEBUG] Text response sent to {user_id} successfully!")
+
+            elif action == LLMAction.CALL:
+                # 전화 걸기
+                await chat_client.send_message(
+                    channel_url=channel_url,
+                    message=response_text,
+                    user_id=user_id
+                )
+                await calls_client.make_call(
+                    caller_id=SendbirdConfig.AI_USER_ID,
+                    callee_id=user_id,
+                    call_type="voice"
+                )
+                logger.info(f"📞 Call initiated to {user_id}")
+
+            elif action == LLMAction.AUTO_CALL:
+                # 자동 전화
+                message_to_user = response.get("message_to_user", response_text)
+                await chat_client.send_message(
+                    channel_url=channel_url,
+                    message=message_to_user,
+                    user_id=user_id
+                )
+                await calls_client.make_call(
+                    caller_id=SendbirdConfig.AI_USER_ID,
+                    callee_id=user_id,
+                    call_type="voice"
+                )
+                logger.info(f"📞 Auto-call initiated to {user_id}")
+
+            logger.info("=" * 80)
+            return
+
+        # 3. 가전 제어가 필요한 경우
+        logger.info("🏠 [RESPONSE-DEBUG] Appliance control needed - getting context...")
+
+        # 사용자 정보 조회
+        user = db.query(User).filter(User.id == UUID(user_id)).first()
+        if not user:
+            logger.warning(f"⚠️ User {user_id} not found, using defaults")
+            home_lat = 37.5665
+            home_lng = 126.9780
+        else:
+            user_location = db.query(UserLocation).filter(UserLocation.user_id == UUID(user_id)).first()
+            home_lat = user_location.home_latitude if user_location else 37.5665
+            home_lng = user_location.home_longitude if user_location else 126.9780
+
+        # 날씨 정보 조회
+        logger.info("🌤️ [RESPONSE-DEBUG] Fetching weather data...")
+        weather_data = await weather_service.get_combined_weather(
+            db=db,
+            latitude=home_lat,
+            longitude=home_lng,
+            sido_name=os.getenv("DEFAULT_SIDO_NAME", "서울")
+        )
+        logger.info(f"   Temperature: {weather_data.get('temperature')}°C")
+        logger.info(f"   Humidity: {weather_data.get('humidity')}%")
+        logger.info(f"   PM10: {weather_data.get('pm10')} ㎍/㎥")
+
+        # 피로도 조회
+        logger.info("💪 [RESPONSE-DEBUG] Fetching fatigue level...")
+        fatigue_level = hrv_service.get_latest_fatigue_level(db, UUID(user_id))
+        if fatigue_level is None:
+            fatigue_level = 2
+            logger.warning(f"⚠️ No fatigue level, using default: {fatigue_level}")
+        else:
+            logger.info(f"   Fatigue level: {fatigue_level}")
+
+        # 피로도 기반 가전 제어 추천 생성
+        logger.info("🔧 [RESPONSE-DEBUG] Generating appliance recommendations based on fatigue...")
+        recommendations = appliance_rule_engine.get_appliances_to_control(
+            db=db,
+            user_id=user_id,
+            weather_data=weather_data,
+            fatigue_level=fatigue_level
+        )
+
+        if not recommendations:
+            logger.info("ℹ️ [RESPONSE-DEBUG] No appliance control needed")
+            response_text = "현재 집안 환경은 적절한 상태입니다. 다른 도움이 필요하신가요?"
+            memory_service.add_message(user_id, "assistant", response_text)
+            await chat_client.send_message(
+                channel_url=channel_url,
+                message=response_text,
+                user_id=user_id
+            )
+            logger.info("=" * 80)
+            return
+
+        # 자연어 제안 생성 (피로도 기반 설정값 포함)
+        logger.info(f"💡 [RESPONSE-DEBUG] Generating suggestion message for {len(recommendations)} appliances...")
+        response_text = await llm_service.generate_appliance_suggestion(
+            appliances=recommendations,
+            weather=weather_data,
+            fatigue_level=fatigue_level,
+            user_message=message,
+            persona=long_term.get("persona"),
+            appliance_states=appliance_states,
+            conversation_history=history
+        )
+
+        logger.info(f"✅ [RESPONSE-DEBUG] Suggestion generated!")
         logger.info(f"   Response: {response_text[:100]}...")
+        logger.info(f"   Recommendations: {[r['appliance_type'] + ' (' + str(r.get('settings', {})) + ')' for r in recommendations]}")
 
         # 메모리에 AI 응답 추가
         memory_service.add_message(user_id, "assistant", response_text)
         logger.info("💾 [RESPONSE-DEBUG] AI response saved to memory")
 
-        # 액션 처리
-        if action == LLMAction.NONE:
-            # 일반 텍스트 응답
-            logger.info("📤 [RESPONSE-DEBUG] Sending text response via Sendbird...")
-            await chat_client.send_message(
-                channel_url=channel_url,
-                message=response_text,
-                user_id=user_id
-            )
-            logger.info(f"✅ [RESPONSE-DEBUG] Text response sent to {user_id} successfully!")
-            logger.info("=" * 80)
+        # Sendbird로 메시지 전송
+        logger.info("📤 [RESPONSE-DEBUG] Sending appliance suggestion via Sendbird...")
+        await chat_client.send_message(
+            channel_url=channel_url,
+            message=response_text,
+            user_id=user_id
+        )
+        logger.info(f"✅ [RESPONSE-DEBUG] Appliance suggestion sent to {user_id} successfully!")
+        logger.info("=" * 80)
 
-        elif action == LLMAction.CALL:
-            # 전화 걸기
-            # 먼저 메시지 전송
-            await chat_client.send_message(
-                channel_url=channel_url,
-                message=response_text,
-                user_id=user_id
-            )
-
-            # 전화 발신
-            await calls_client.make_call(
-                caller_id=SendbirdConfig.AI_USER_ID,
-                callee_id=user_id,
-                call_type="voice"
-            )
-            logger.info(f"📞 Call initiated to {user_id}")
-
-        elif action == LLMAction.AUTO_CALL:
-            # 자동 전화 (GPS 트리거)
-            message_to_user = response.get("message_to_user", response_text)
-
-            # 메시지 먼저 전송
-            await chat_client.send_message(
-                channel_url=channel_url,
-                message=message_to_user,
-                user_id=user_id
-            )
-
-            # 전화 발신
-            await calls_client.make_call(
-                caller_id=SendbirdConfig.AI_USER_ID,
-                callee_id=user_id,
-                call_type="voice"
-            )
-            logger.info(f"📞 Auto-call initiated to {user_id}")
-    
     except Exception as e:
         logger.error(f"❌ Process and respond error: {str(e)}")
+        logger.error(f"   Stack trace:", exc_info=True)
 
         # 에러 메시지 전송
         try:
@@ -213,6 +330,8 @@ async def process_and_respond(
             )
         except:
             pass
+    finally:
+        db.close()
 
 
 @router.post("/calls")
