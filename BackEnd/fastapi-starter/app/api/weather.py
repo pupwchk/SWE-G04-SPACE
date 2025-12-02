@@ -56,22 +56,27 @@ async def get_current_weather(
         raise HTTPException(status_code=500, detail=f"날씨 조회 실패: {str(e)}")
 
 
-@router.get("/home/{user_id}", response_model=WeatherResponse)
+@router.get("/home/{user_identifier}", response_model=WeatherResponse)
 async def get_home_weather(
-    user_id: str,
+    user_identifier: str,
     db: Session = Depends(get_db)
 ):
     """
     사용자의 집 위치 기반 날씨 조회
+    user_identifier: 사용자 email 또는 서버 DB UUID
 
     UserLocation 테이블에서 집 좌표를 조회하여 날씨 정보 반환
     """
     try:
         from app.models.location import UserLocation
+        from app.utils.user_utils import get_user_uuid_by_identifier
 
-        # 사용자 집 위치 조회
+        # user_identifier(email 또는 UUID)를 서버 DB UUID로 변환
+        user_uuid = get_user_uuid_by_identifier(db, user_identifier)
+
+        # 사용자 집 위치 조회 (서버 DB UUID 사용)
         location = db.query(UserLocation)\
-            .filter(UserLocation.user_id == user_id)\
+            .filter(UserLocation.user_id == user_uuid)\
             .first()
 
         if not location or not location.home_latitude or not location.home_longitude:

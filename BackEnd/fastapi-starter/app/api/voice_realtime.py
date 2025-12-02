@@ -366,15 +366,16 @@ class VoiceRealtimeHandler:
             logger.info(f"✅ WebSocket closed: {user_id}")
 
 
-@router.websocket("/ws/voice/{user_id}")
+@router.websocket("/ws/voice/{user_identifier}")
 async def websocket_voice_endpoint(
     websocket: WebSocket,
-    user_id: str,
+    user_identifier: str,
     character_id: str = None,  # Query parameter로 페르소나 선택
     db: Session = Depends(get_db)
 ):
     """
     OpenAI Realtime API 음성 WebSocket 엔드포인트
+    user_identifier: 사용자 email 또는 서버 DB UUID
 
     프로토콜:
     - Client → Server: 바이너리 오디오 데이터 (PCM16, 16kHz, mono)
@@ -405,6 +406,17 @@ async def websocket_voice_endpoint(
     };
     ```
     """
+    from app.utils.user_utils import get_user_uuid_by_identifier
+
+    # user_identifier(email 또는 UUID)를 서버 DB UUID로 변환
+    try:
+        user_uuid = get_user_uuid_by_identifier(db, user_identifier)
+        user_id = str(user_uuid)  # UUID를 문자열로 변환
+    except Exception as e:
+        logger.error(f"❌ Invalid user_identifier: {user_identifier}, error: {str(e)}")
+        await websocket.close(code=1008, reason="Invalid user identifier")
+        return
+
     # 환경 변수로 수동 커밋 모드 설정
     # VOICE_MANUAL_COMMIT=true: 수동 커밋 (테스트용)
     # VOICE_MANUAL_COMMIT=false: Server VAD 자동 처리 (실제 서비스)
