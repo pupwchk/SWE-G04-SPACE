@@ -9,9 +9,11 @@ import SwiftUI
 
 /// Appliance screen - manages home appliances
 struct ApplianceView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @State private var appliances: [ApplianceItem] = []
     @State private var selectedAppliance: ApplianceItem?
     @State private var isLoadingAppliances = false
+    @State private var autoRefreshTask: Task<Void, Never>?
 
     var body: some View {
         NavigationStack {
@@ -98,6 +100,23 @@ struct ApplianceView: View {
         .task {
             await loadAppliances()
         }
+        .onAppear {
+            startAutoRefresh()
+        }
+        .onDisappear {
+            stopAutoRefresh()
+        }
+        .onChange(of: scenePhase) { phase in
+            switch phase {
+            case .active:
+                startAutoRefresh()
+                Task { await loadAppliances() }  // Refresh when returning to foreground
+            case .inactive, .background:
+                stopAutoRefresh()
+            @unknown default:
+                break
+            }
+        }
     }
 
     // MARK: - Helpers
@@ -135,6 +154,21 @@ struct ApplianceView: View {
             isLoadingAppliances = false
             print("✅ [ApplianceView] Loaded \(items.count) appliances")
         }
+    }
+
+    private func startAutoRefresh() {
+        guard autoRefreshTask == nil else { return }
+        autoRefreshTask = Task {
+            while !Task.isCancelled {
+                await loadAppliances()
+                try? await Task.sleep(nanoseconds: 10 * 1_000_000_000)
+            }
+        }
+    }
+
+    private func stopAutoRefresh() {
+        autoRefreshTask?.cancel()
+        autoRefreshTask = nil
     }
 }
 

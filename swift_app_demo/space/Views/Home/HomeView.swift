@@ -9,8 +9,10 @@ import SwiftUI
 
 /// Home screen - main dashboard view
 struct HomeView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @State private var appliances: [ApplianceItem] = []
     @State private var isLoadingAppliances = false
+    @State private var autoRefreshTask: Task<Void, Never>?
     @StateObject private var deviceManager = DeviceManager.shared
     @StateObject private var connectivityManager = WatchConnectivityManager.shared
 
@@ -135,6 +137,21 @@ struct HomeView: View {
             .onAppear {
                 // Refresh device list when view appears
                 deviceManager.refresh()
+                startAutoRefresh()
+            }
+            .onDisappear {
+                stopAutoRefresh()
+            }
+            .onChange(of: scenePhase) { phase in
+                switch phase {
+                case .active:
+                    startAutoRefresh()
+                    Task { await loadAppliances() }
+                case .inactive, .background:
+                    stopAutoRefresh()
+                @unknown default:
+                    break
+                }
             }
             .task {
                 await loadAppliances()
@@ -229,6 +246,21 @@ struct HomeView: View {
             appliances = items
             isLoadingAppliances = false
         }
+    }
+
+    private func startAutoRefresh() {
+        guard autoRefreshTask == nil else { return }
+        autoRefreshTask = Task {
+            while !Task.isCancelled {
+                await loadAppliances()
+                try? await Task.sleep(nanoseconds: 10 * 1_000_000_000)
+            }
+        }
+    }
+
+    private func stopAutoRefresh() {
+        autoRefreshTask?.cancel()
+        autoRefreshTask = nil
     }
 
     private func handleApplianceAdd() {

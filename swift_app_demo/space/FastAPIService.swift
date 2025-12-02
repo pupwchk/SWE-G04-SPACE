@@ -5,8 +5,15 @@ class FastAPIService {
     static let shared = FastAPIService()
 
     private let baseURL = "http://13.125.85.158:11325"
+    private let apiSession: URLSession
 
-    private init() {}
+    private init() {
+        // Disable URL cache so backend updates show up immediately without rebuilds
+        let config = URLSessionConfiguration.default
+        config.requestCachePolicy = .reloadIgnoringLocalCacheData
+        config.urlCache = nil
+        apiSession = URLSession(configuration: config)
+    }
 
     // MARK: - User Registration
 
@@ -20,6 +27,7 @@ class FastAPIService {
         }
 
         var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
@@ -28,7 +36,7 @@ class FastAPIService {
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await apiSession.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
                 print("  [FastAPI] Invalid response")
@@ -74,11 +82,12 @@ class FastAPIService {
         }
 
         var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
         request.httpMethod = "GET"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await apiSession.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
                 print("❌ [FastAPI] Invalid response")
@@ -129,11 +138,12 @@ class FastAPIService {
         }
 
         var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
         request.httpMethod = "GET"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await apiSession.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
                 print("❌ [FastAPI] Invalid response")
@@ -201,6 +211,7 @@ class FastAPIService {
         }
 
         var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
@@ -208,7 +219,7 @@ class FastAPIService {
             let encoder = JSONEncoder()
             request.httpBody = try encoder.encode(session)
 
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await apiSession.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
                 print("❌ [FastAPI] Invalid response")
@@ -243,6 +254,7 @@ class FastAPIService {
         }
 
         var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
         request.httpMethod = "PUT"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
@@ -250,7 +262,7 @@ class FastAPIService {
             let encoder = JSONEncoder()
             request.httpBody = try encoder.encode(hourlyData)
 
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await apiSession.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
                 print("❌ [FastAPI] Invalid response")
@@ -285,6 +297,7 @@ class FastAPIService {
         }
 
         var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
@@ -292,7 +305,7 @@ class FastAPIService {
             let encoder = JSONEncoder()
             request.httpBody = try encoder.encode(session)
 
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await apiSession.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
                 print("❌ [FastAPI] Invalid response")
@@ -327,6 +340,7 @@ class FastAPIService {
         }
 
         var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
@@ -334,7 +348,7 @@ class FastAPIService {
             let encoder = JSONEncoder()
             request.httpBody = try encoder.encode(slot)
 
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await apiSession.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
                 print("❌ [FastAPI] Invalid response")
@@ -373,6 +387,7 @@ class FastAPIService {
         }
 
         var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
@@ -380,7 +395,7 @@ class FastAPIService {
             let encoder = JSONEncoder()
             request.httpBody = try encoder.encode(place)
 
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await apiSession.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
                 print("❌ [FastAPI] Invalid response")
@@ -424,11 +439,12 @@ class FastAPIService {
         }
 
         var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
         request.httpMethod = "GET"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await apiSession.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
                 print("❌ [FastAPI] Invalid response")
@@ -470,11 +486,12 @@ class FastAPIService {
         }
 
         var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
         request.httpMethod = "GET"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await apiSession.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
                 print("❌ [FastAPI] Invalid response")
@@ -613,11 +630,12 @@ class FastAPIService {
         }
 
         var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
         request.httpMethod = "GET"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await apiSession.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
                 print("❌ [FastAPI] Invalid response for appliance list")
@@ -649,10 +667,11 @@ class FastAPIService {
         }
 
         var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
         request.httpMethod = "GET"
 
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await apiSession.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
                 print("❌ [FastAPI] Invalid response for smart status")
@@ -696,6 +715,7 @@ class FastAPIService {
         }
 
         var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
@@ -711,7 +731,7 @@ class FastAPIService {
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await apiSession.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
                 print("❌ [FastAPI] Invalid response for smart-control")
@@ -763,6 +783,7 @@ class FastAPIService {
         }
 
         var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
@@ -772,7 +793,7 @@ class FastAPIService {
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await apiSession.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
                 print("❌ [FastAPI] Invalid response for update config")
@@ -816,6 +837,7 @@ class FastAPIService {
         }
 
         var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
@@ -832,7 +854,7 @@ class FastAPIService {
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await apiSession.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
                 print("❌ [FastAPI] Invalid response for chat message")
@@ -870,6 +892,7 @@ class FastAPIService {
         }
 
         var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
@@ -881,7 +904,7 @@ class FastAPIService {
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await apiSession.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
                 print("❌ [FastAPI] Invalid response for approve changes")
@@ -924,10 +947,11 @@ class FastAPIService {
         }
 
         var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
         request.httpMethod = "GET"
 
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await apiSession.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
                 print("❌ [FastAPI] Invalid response for chat history")
@@ -962,10 +986,11 @@ class FastAPIService {
         }
 
         var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
         request.httpMethod = "DELETE"
 
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await apiSession.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
                 print("❌ [FastAPI] Invalid response for clear session")
@@ -1000,11 +1025,12 @@ class FastAPIService {
         }
 
         var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await apiSession.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
                 print("❌ [FastAPI] Invalid response for trigger auto-call")
