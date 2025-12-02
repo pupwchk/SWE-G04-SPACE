@@ -236,9 +236,16 @@ class ApplianceControlService:
         """
         from app.models.info import Appliance
         from app.utils.appliance_mapping import BACKEND_CODE_TO_DISPLAY
+        from uuid import UUID
+
+        # user_id를 UUID로 변환 (문자열로 전달되는 경우 대응)
+        if isinstance(user_id, str):
+            user_id_uuid = UUID(user_id)
+        else:
+            user_id_uuid = user_id
 
         # 실제 등록된 가전 조회
-        appliances_query = db.query(Appliance).filter(Appliance.user_id == user_id)
+        appliances_query = db.query(Appliance).filter(Appliance.user_id == user_id_uuid)
         registered_appliances = appliances_query.all()
 
         if not registered_appliances:
