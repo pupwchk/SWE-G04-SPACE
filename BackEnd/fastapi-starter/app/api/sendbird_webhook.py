@@ -149,9 +149,23 @@ async def process_and_respond(
     try:
         logger.info("=" * 80)
         logger.info("🤖 [RESPONSE-DEBUG] Starting AI response generation...")
-        logger.info(f"   User: {user_id}")
+        logger.info(f"   Sendbird User ID: {user_id}")
         logger.info(f"   Message: {message}")
         logger.info(f"   Channel: {channel_url}")
+
+        # Sendbird user_id를 실제 DB user_id로 변환
+        # Sendbird의 user_id는 이메일로 설정되어 있을 수 있음
+        actual_user = db.query(User).filter(
+            (User.id == user_id) | (User.email == user_id)
+        ).first()
+
+        if actual_user:
+            actual_user_id = str(actual_user.id)
+            logger.info(f"✅ [USER-MAPPING] Mapped Sendbird user {user_id} to DB user {actual_user_id} ({actual_user.email})")
+        else:
+            # 매핑 실패 시 원래 user_id 사용
+            actual_user_id = user_id
+            logger.warning(f"⚠️ [USER-MAPPING] Could not find DB user for Sendbird user {user_id}, using as-is")
 
         # 대화 히스토리 조회
         history = memory_service.get_history(user_id)
@@ -203,10 +217,10 @@ async def process_and_respond(
         if intent_type in ["environment_complaint", "appliance_request"]:
             needs_control = True
 
-        # 현재 가전 상태 조회
+        # 현재 가전 상태 조회 (실제 DB user_id 사용)
         appliance_states = appliance_control_service.get_appliance_status(
             db=db,
-            user_id=user_id
+            user_id=actual_user_id
         )
 
         # 2. 가전 제어가 필요 없는 경우 (일반 대화)
@@ -279,14 +293,14 @@ async def process_and_respond(
         # 3. 가전 제어가 필요한 경우
         logger.info("🏠 [RESPONSE-DEBUG] Appliance control needed - getting context...")
 
-        # 사용자 정보 조회
-        user = db.query(User).filter(User.id == UUID(user_id)).first()
+        # 사용자 정보 조회 (실제 DB user_id 사용)
+        user = db.query(User).filter(User.id == UUID(actual_user_id)).first()
         if not user:
-            logger.warning(f"⚠️ User {user_id} not found, using defaults")
+            logger.warning(f"⚠️ User {actual_user_id} not found, using defaults")
             home_lat = 37.5665
             home_lng = 126.9780
         else:
-            user_location = db.query(UserLocation).filter(UserLocation.user_id == UUID(user_id)).first()
+            user_location = db.query(UserLocation).filter(UserLocation.user_id == UUID(actual_user_id)).first()
             home_lat = user_location.home_latitude if user_location else 37.5665
             home_lng = user_location.home_longitude if user_location else 126.9780
 
@@ -302,20 +316,20 @@ async def process_and_respond(
         logger.info(f"   Humidity: {weather_data.get('humidity')}%")
         logger.info(f"   PM10: {weather_data.get('pm10')} ㎍/㎥")
 
-        # 피로도 조회
+        # 피로도 조회 (실제 DB user_id 사용)
         logger.info("💪 [RESPONSE-DEBUG] Fetching fatigue level...")
-        fatigue_level = hrv_service.get_latest_fatigue_level(db, UUID(user_id))
+        fatigue_level = hrv_service.get_latest_fatigue_level(db, UUID(actual_user_id))
         if fatigue_level is None:
             fatigue_level = 2
             logger.warning(f"⚠️ No fatigue level, using default: {fatigue_level}")
         else:
             logger.info(f"   Fatigue level: {fatigue_level}")
 
-        # 피로도 기반 가전 제어 추천 생성 (자동 조건 기반)
+        # 피로도 기반 가전 제어 추천 생성 (자동 조건 기반) - 실제 DB user_id 사용
         logger.info("🔧 [RESPONSE-DEBUG] Generating appliance recommendations based on fatigue...")
         recommendations = appliance_rule_engine.get_appliances_to_control(
             db=db,
-            user_id=user_id,
+            user_id=actual_user_id,
             weather_data=weather_data,
             fatigue_level=fatigue_level
         )
