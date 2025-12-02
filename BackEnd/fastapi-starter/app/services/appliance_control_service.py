@@ -224,7 +224,7 @@ class ApplianceControlService:
         appliance_type: Optional[str] = None
     ) -> list[Dict[str, Any]]:
         """
-        가전 상태 조회
+        가전 상태 조회 (실제 등록된 가전과 상태 정보 병합)
 
         Args:
             db: 데이터베이스 세션
@@ -234,24 +234,57 @@ class ApplianceControlService:
         Returns:
             가전 상태 리스트
         """
-        query = db.query(ApplianceStatus)\
-            .filter(ApplianceStatus.user_id == user_id)
+        from app.models.info import Appliance
+        from app.utils.appliance_mapping import BACKEND_CODE_TO_DISPLAY
 
-        if appliance_type:
-            query = query.filter(ApplianceStatus.appliance_type == appliance_type)
+        # 실제 등록된 가전 조회
+        appliances_query = db.query(Appliance).filter(Appliance.user_id == user_id)
+        registered_appliances = appliances_query.all()
 
-        statuses = query.all()
+        if not registered_appliances:
+            logger.warning(f"⚠️ No registered appliances found for user {user_id}")
+            return []
 
-        return [
-            format_appliance_status_for_frontend(
-                appliance_type=status.appliance_type,
-                is_on=status.is_on,
-                current_settings=status.current_settings,
-                last_command=status.last_command,
-                last_updated=status.last_updated.isoformat()
-            )
-            for status in statuses
-        ]
+        # 등록된 가전 목록을 기반으로 상태 정보 병합
+        result = []
+        for appliance in registered_appliances:
+            # appliance_code를 한글 표시 이름으로 변환
+            display_type = BACKEND_CODE_TO_DISPLAY.get(appliance.appliance_code, appliance.appliance_code)
+
+            # appliance_type 필터가 있으면 확인
+            if appliance_type and display_type != appliance_type:
+                continue
+
+            # 해당 가전의 상태 조회
+            status = db.query(ApplianceStatus)\
+                .filter(
+                    ApplianceStatus.user_id == user_id,
+                    ApplianceStatus.appliance_type == display_type
+                )\
+                .first()
+
+            if status:
+                # 상태가 있으면 사용
+                result.append(
+                    format_appliance_status_for_frontend(
+                        appliance_type=status.appliance_type,
+                        is_on=status.is_on,
+                        current_settings=status.current_settings,
+                        last_command=status.last_command,
+                        last_updated=status.last_updated.isoformat()
+                    )
+                )
+            else:
+                # 상태가 없으면 기본값으로 생성
+                result.append({
+                    "appliance_type": display_type,
+                    "is_on": False,
+                    "current_settings": {},
+                    "last_command": None,
+                    "last_updated": datetime.utcnow().isoformat()
+                })
+
+        return result
 
     @staticmethod
     def get_command_history(
