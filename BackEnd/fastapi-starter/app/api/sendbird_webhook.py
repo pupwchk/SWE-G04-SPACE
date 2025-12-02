@@ -155,9 +155,22 @@ async def process_and_respond(
 
         # Sendbird user_id를 실제 DB user_id로 변환
         # Sendbird의 user_id는 이메일로 설정되어 있을 수 있음
-        actual_user = db.query(User).filter(
-            (User.id == user_id) | (User.email == user_id)
-        ).first()
+        actual_user = None
+
+        # 1. UUID로 직접 매칭 시도
+        try:
+            actual_user = db.query(User).filter(User.id == UUID(user_id)).first()
+            if actual_user:
+                logger.info(f"✅ [USER-MAPPING] Found user by UUID: {actual_user.email}")
+        except (ValueError, TypeError):
+            # UUID 변환 실패 - 이메일일 가능성
+            logger.info(f"ℹ️ [USER-MAPPING] {user_id} is not a valid UUID, trying email lookup...")
+
+        # 2. 이메일로 매칭 시도
+        if not actual_user:
+            actual_user = db.query(User).filter(User.email == user_id).first()
+            if actual_user:
+                logger.info(f"✅ [USER-MAPPING] Found user by email: {user_id}")
 
         if actual_user:
             actual_user_id = str(actual_user.id)
