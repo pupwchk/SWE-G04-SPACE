@@ -540,6 +540,34 @@ class FastAPIService {
         let appliances = await applianceListTask ?? []
         let smartStatus = await smartStatusTask
 
+        // Debug raw payloads to spot missing codes/fields that cause drops
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+
+        if let data = try? encoder.encode(appliances),
+           let jsonString = String(data: data, encoding: .utf8) {
+            print("🧾 [FastAPI][Debug] Appliance list (\(appliances.count)):\n\(jsonString)")
+        } else {
+            print("⚠️ [FastAPI][Debug] Failed to encode appliance list (\(appliances.count))")
+        }
+
+        if let statusArray = smartStatus?.appliances {
+            if let data = try? encoder.encode(statusArray),
+               let jsonString = String(data: data, encoding: .utf8) {
+                print("🧾 [FastAPI][Debug] Smart status (\(statusArray.count)):\n\(jsonString)")
+            } else {
+                print("⚠️ [FastAPI][Debug] Failed to encode smart status (\(statusArray.count))")
+            }
+
+            let summary = statusArray.map { status in
+                let keys = status.currentSettings?.keys.sorted().joined(separator: ",") ?? "none"
+                return "\(status.applianceType) isOn=\(status.isOn) keys=[\(keys)]"
+            }.joined(separator: " | ")
+            print("📊 [FastAPI][Debug] Smart status summary: \(summary)")
+        } else {
+            print("⚠️ [FastAPI][Debug] No smart status data")
+        }
+
         let statusByType: [ApplianceType: BackendApplianceStatus] = Dictionary(
             (smartStatus?.appliances ?? []).compactMap { status in
                 guard let type = ApplianceType.resolve(
@@ -553,11 +581,28 @@ class FastAPIService {
             uniquingKeysWith: { first, _ in first }
         )
 
-        return appliances.compactMap { appliance in
-            let type = ApplianceType.resolve(backendCode: appliance.applianceCode)
-            let matchedStatus = type.flatMap { statusByType[$0] }
-            return ApplianceItem(backend: appliance, status: matchedStatus)
+        var mapped: [ApplianceItem] = []
+
+        for appliance in appliances {
+            guard let resolvedType = ApplianceType.resolve(backendCode: appliance.applianceCode) else {
+                print("⚠️ [FastAPI][Debug] Unknown appliance_code \(appliance.applianceCode) for id=\(appliance.id), dropping")
+                continue
+            }
+
+            let matchedStatus = statusByType[resolvedType]
+            if matchedStatus == nil {
+                print("⚠️ [FastAPI][Debug] No smart status for id=\(appliance.id) type=\(resolvedType.displayName)")
+            }
+
+            if let item = ApplianceItem(backend: appliance, status: matchedStatus) {
+                mapped.append(item)
+            } else {
+                let keys = matchedStatus?.currentSettings?.keys.sorted().joined(separator: ",") ?? "none"
+                print("⚠️ [FastAPI][Debug] Failed to build ApplianceItem id=\(appliance.id) type=\(resolvedType.displayName) settingsKeys=[\(keys)]")
+            }
         }
+
+        return mapped
     }
 
     private func getApplianceList(userId: String) async -> [BackendAppliance]? {
