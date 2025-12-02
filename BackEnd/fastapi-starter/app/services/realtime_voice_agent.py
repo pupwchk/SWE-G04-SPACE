@@ -28,7 +28,7 @@ class RealtimeVoiceAgent:
 
     def __init__(self):
         self.api_key = os.getenv("OPENAI_API_KEY", "")
-        self.model = "gpt-4o-realtime-preview-2024-10-01"
+        self.model = "gpt-realtime"
         self.api_url = "wss://api.openai.com/v1/realtime?model=" + self.model
 
         # 세션별 WebSocket 연결

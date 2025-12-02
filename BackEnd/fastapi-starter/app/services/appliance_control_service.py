@@ -8,6 +8,11 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 
 from app.models.appliance import ApplianceStatus, ApplianceCommandLog
+from app.utils.appliance_mapping import (
+    validate_settings,
+    format_settings_for_frontend,
+    format_appliance_status_for_frontend
+)
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +48,18 @@ class ApplianceControlService:
         try:
             logger.info(f"🎛️ Executing command: {action} {appliance_type} for user {user_id}")
 
+            # 설정값 검증
+            if settings:
+                is_valid, error = validate_settings(appliance_type, settings)
+                if not is_valid:
+                    logger.error(f"❌ Invalid settings: {error}")
+                    return {
+                        "success": False,
+                        "appliance_type": appliance_type,
+                        "action": action,
+                        "error_message": error
+                    }
+
             # 가상 제어 시뮬레이션
             success = True
             error_message = None
@@ -68,7 +85,10 @@ class ApplianceControlService:
             # 상태 업데이트
             if action == "on":
                 status.is_on = True
-                status.current_settings = settings or {}
+                # 프론트엔드 포맷으로 설정값 저장
+                status.current_settings = format_settings_for_frontend(
+                    appliance_type, settings or {}
+                )
                 status.last_command = {
                     "action": action,
                     "settings": settings,
@@ -82,7 +102,11 @@ class ApplianceControlService:
                 }
             elif action == "set":
                 if status.is_on:
-                    status.current_settings.update(settings or {})
+                    # 기존 설정에 새 설정 병합
+                    updated_settings = {**status.current_settings, **settings}
+                    status.current_settings = format_settings_for_frontend(
+                        appliance_type, updated_settings
+                    )
                     status.last_command = {
                         "action": action,
                         "settings": settings,
@@ -219,13 +243,13 @@ class ApplianceControlService:
         statuses = query.all()
 
         return [
-            {
-                "appliance_type": status.appliance_type,
-                "is_on": status.is_on,
-                "current_settings": status.current_settings,
-                "last_command": status.last_command,
-                "last_updated": status.last_updated.isoformat()
-            }
+            format_appliance_status_for_frontend(
+                appliance_type=status.appliance_type,
+                is_on=status.is_on,
+                current_settings=status.current_settings,
+                last_command=status.last_command,
+                last_updated=status.last_updated.isoformat()
+            )
             for status in statuses
         ]
 

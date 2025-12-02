@@ -135,7 +135,7 @@ class RealtimeVoiceService:
     """
     
     def __init__(self):
-        self.model = "gpt-4o-realtime-preview"
+        self.model = "gpt-realtime"
     
     async def create_realtime_session(
         self,

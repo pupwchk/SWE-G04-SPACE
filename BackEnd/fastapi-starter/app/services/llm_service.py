@@ -395,11 +395,61 @@ class LLMService:
     {{
       "appliance_type": "등록된 가전의 정확한 이름 (위 목록에서만 선택)",
       "action": "on 또는 off",
-      "settings": {{"mode": "cool|heat", "target_temp_c": 22, ...}},
+      "settings": {{}},
       "reason": "제어 이유"
     }}
   ]
 }}
+
+**중요:**
+- action이 "on"일 때만 settings를 포함하세요
+- action이 "off"일 때는 settings를 빈 객체 {{}}로 하세요
+- power_state는 settings에 포함하지 마세요 (is_on으로 별도 관리)
+
+**가전별 settings 형식 (action: "on"일 때):**
+
+에어컨:
+{{"mode": "냉방", "target_temp_c": 23, "fan_speed": 3}}
+- mode: "냉방", "제습", "송풍", "자동", "난방" 중 하나
+- target_temp_c: 18~28 (정수)
+- fan_speed: 1~5 (정수)
+
+조명:
+{{"brightness_pct": 80, "color_temperature_k": 3000}}
+- scene: "집중", "휴식", "수면" (선택, scene 사용 시 다른 설정 생략 가능)
+- brightness_pct: 0~100 (정수)
+- color_temperature_k: 2700~6500, 100 단위 (선택)
+- color_hex: "#RRGGBB" 형식 (선택)
+
+공기청정기:
+{{"mode": "자동", "fan_speed": 3}}
+- mode: "자동", "수동", "저소음" 중 하나
+- fan_speed: 1~5 (정수)
+- target_pm2_5: 목표 미세먼지 수치 (선택)
+- target_pm10: 목표 미세먼지 수치 (선택)
+- ionizer_on: true/false (선택)
+
+제습기:
+{{"mode": "일반", "target_humidity_pct": 45, "fan_speed": 2}}
+- mode: "일반", "연속", "세탁물" 중 하나
+- target_humidity_pct: 35~60 (정수)
+- fan_speed: 1~4 (정수)
+
+가습기:
+{{"mode": "자동", "target_humidity_pct": 50, "mist_level": 2}}
+- mode: "자동", "수면", "쾌적" 중 하나
+- target_humidity_pct: 40~65 (정수)
+- mist_level: 1~4 (정수)
+- warm_mist: true/false (선택)
+
+TV:
+{{"input_source": "OTT", "volume": 30, "brightness": 70}}
+- input_source: "HDMI 1", "OTT", "게임", "음악" 중 하나
+- volume: 0~100 (정수)
+- brightness: 30~100 (정수)
+- channel: 채널 번호 (선택)
+- contrast: 대비 값 (선택)
+- color: 색상 값 (선택)
 
 **다시 한번 강조:**
 - **반드시 등록된 가전만** appliances에 포함시키세요
