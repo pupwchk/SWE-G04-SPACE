@@ -283,15 +283,59 @@ class ApplianceControlService:
                 )
             else:
                 # 상태가 없으면 기본값으로 생성
+                # 프론트엔드가 ApplianceItem을 빌드할 수 있도록 필수 설정값 포함
+                default_settings = ApplianceControlService._get_default_settings(display_type)
                 result.append({
                     "appliance_type": display_type,
                     "is_on": False,
-                    "current_settings": {},
+                    "current_settings": default_settings,
                     "last_command": None,
                     "last_updated": datetime.utcnow().isoformat()
                 })
 
         return result
+
+    @staticmethod
+    def _get_default_settings(appliance_type: str) -> Dict[str, Any]:
+        """
+        가전 타입별 기본 설정값 반환 (프론트엔드 필수 필드 포함)
+
+        Args:
+            appliance_type: 가전 종류 (한글)
+
+        Returns:
+            기본 설정값 딕셔너리
+        """
+        defaults = {
+            "에어컨": {
+                "mode": "냉방",
+                "target_temp_c": 23,
+                "fan_speed": 3
+            },
+            "조명": {
+                "brightness_pct": 100
+            },
+            "공기청정기": {
+                "mode": "자동",
+                "fan_speed": 3
+            },
+            "제습기": {
+                "mode": "일반",
+                "target_humidity_pct": 45,
+                "fan_speed": 2
+            },
+            "가습기": {
+                "mode": "자동",
+                "target_humidity_pct": 50,
+                "mist_level": 2
+            },
+            "TV": {
+                "input_source": "OTT",
+                "volume": 30,
+                "brightness": 70
+            }
+        }
+        return defaults.get(appliance_type, {})
 
     @staticmethod
     def get_command_history(

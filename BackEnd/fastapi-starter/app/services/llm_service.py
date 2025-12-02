@@ -550,8 +550,13 @@ TV:
 반드시 일반 텍스트로만 응답하세요 (JSON 아님).
 """
 
-            # 시스템 프롬프트 생성 (페르소나 적용)
-            system_prompt = self._build_system_prompt(persona)
+            # 시스템 프롬프트 생성 (JSON 응답 지시 제거)
+            system_prompt = f"""당신은 사용자의 스마트홈 AI 어시스턴트입니다.
+사용자에게 자연스럽고 친근하게 대화하세요.
+**중요: 일반 텍스트로만 응답하세요. JSON 형식을 사용하지 마세요.**
+"""
+            if persona:
+                system_prompt += f"\n**말투/성격:**\n{persona.get('description', '')}\n"
 
             response = await client.chat.completions.create(
                 model=self.model,
