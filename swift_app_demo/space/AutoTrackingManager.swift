@@ -261,8 +261,6 @@ class AutoTrackingManager: NSObject, ObservableObject {
     }
 
     private func collectSleepData(from startTime: Date, to endTime: Date) async -> SleepSessionData? {
-        let formatter = ISO8601DateFormatter()
-
         // TODO: Query actual sleep data from HealthKit
         // For now, return nil if no data available
 

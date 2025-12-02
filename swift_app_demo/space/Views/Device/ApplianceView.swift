@@ -23,29 +23,16 @@ struct ApplianceView: View {
 
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 16) {
-                        ForEach(appliances) { appliance in
-                            Button(action: {
-                                selectedAppliance = appliance
-                            }) {
-                                ApplianceItemCard(
-                                    appliance: appliance,
-                                    isOn: Binding(
-                                        get: { appliance.isOn },
-                                        set: { newValue in
-                                            if let index = appliances.firstIndex(where: { $0.id == appliance.id }) {
-                                                appliances[index].isOn = newValue
-                                                appliances[index].syncStatusFromControls()
-                                                Task {
-                                                    let action = newValue ? "on" : "off"
-                                                    _ = await appliances[index].saveToBackend(action: action)
-                                                    await loadAppliances()  // Reload after save
-                                                }
-                                            }
-                                        }
-                                    )
-                                )
-                            }
-                            .buttonStyle(.plain)
+                        ForEach($appliances) { $appliance in
+                            ApplianceItemCard(
+                                appliance: appliance,
+                                onToggle: {
+                                    handleToggle(appliance: appliance)
+                                },
+                                onTap: {
+                                    selectedAppliance = appliance
+                                }
+                            )
                         }
 
                         Button(action: {
@@ -85,13 +72,19 @@ struct ApplianceView: View {
             }
             .navigationDestination(item: $selectedAppliance) { appliance in
                 if let binding = binding(for: appliance) {
-                    ApplianceDetailView(appliance: binding)
-                        .onDisappear {
-                            // Reload appliances when returning from detail view
-                            Task {
-                                await loadAppliances()
-                            }
+                    ApplianceDetailView(
+                        appliance: binding,
+                        onSaveSuccess: {
+                            // Force reload immediately after successful save
+                            await loadAppliances(force: true)
                         }
+                    )
+                    .onDisappear {
+                        // Reload appliances when returning from detail view
+                        Task {
+                            await loadAppliances(force: true)
+                        }
+                    }
                 } else {
                     Text("선택한 기기를 불러올 수 없습니다.")
                 }
@@ -106,7 +99,7 @@ struct ApplianceView: View {
         .onDisappear {
             stopAutoRefresh()
         }
-        .onChange(of: scenePhase) { phase in
+        .onChange(of: scenePhase) { _, phase in
             switch phase {
             case .active:
                 startAutoRefresh()
@@ -131,8 +124,34 @@ struct ApplianceView: View {
         print("Add appliance tapped")
     }
 
-    private func loadAppliances() async {
-        guard !isLoadingAppliances else {
+    private func handleToggle(appliance: ApplianceItem) {
+        // 1. Optimistic UI update - 즉시 반영
+        if let index = appliances.firstIndex(where: { $0.id == appliance.id }) {
+            appliances[index].isOn.toggle()
+        }
+
+        // 2. Call API in background - UI는 이미 업데이트됨
+        Task {
+            let action = !appliance.isOn ? "on" : "off"
+            let success = await appliance.saveToBackend(action: action)
+
+            // 3. Sync with backend only if successful
+            if success {
+                await loadAppliances(force: true)
+            } else {
+                // Rollback on failure
+                await MainActor.run {
+                    if let index = appliances.firstIndex(where: { $0.id == appliance.id }) {
+                        appliances[index].isOn.toggle()
+                    }
+                }
+            }
+        }
+    }
+
+    private func loadAppliances(force: Bool = false) async {
+        // Allow force reload to bypass loading check for immediate updates after control actions
+        guard force || !isLoadingAppliances else {
             print("⏳ [ApplianceView] Already loading appliances, skipping...")
             return
         }
@@ -150,9 +169,15 @@ struct ApplianceView: View {
         let items = await FastAPIService.shared.fetchApplianceItems(userId: fastAPIUserId)
 
         await MainActor.run {
+            // Update appliances array - SwiftUI will detect changes via Equatable/Hashable
             appliances = items
             isLoadingAppliances = false
-            print("✅ [ApplianceView] Loaded \(items.count) appliances")
+            print("✅ [ApplianceView] Loaded \(items.count) appliances - UI updated")
+
+            // Log changes for debugging
+            for item in items {
+                print("   - \(item.type.displayName): \(item.location) | ON: \(item.isOn) | Primary: \(item.primaryValue)")
+            }
         }
     }
 
@@ -332,11 +357,27 @@ struct ApplianceItem: Identifiable, Hashable {
     }
 
     static func == (lhs: ApplianceItem, rhs: ApplianceItem) -> Bool {
-        lhs.id == rhs.id
+        lhs.id == rhs.id &&
+        lhs.type == rhs.type &&
+        lhs.location == rhs.location &&
+        lhs.status == rhs.status &&
+        lhs.mode == rhs.mode &&
+        lhs.isOn == rhs.isOn &&
+        lhs.primaryValue == rhs.primaryValue &&
+        lhs.secondaryValue == rhs.secondaryValue &&
+        lhs.hasCustomStatus == rhs.hasCustomStatus
     }
 
     func hash(into hasher: inout Hasher) {
         hasher.combine(id)
+        hasher.combine(type)
+        hasher.combine(location)
+        hasher.combine(status)
+        hasher.combine(mode)
+        hasher.combine(isOn)
+        hasher.combine(primaryValue)
+        hasher.combine(secondaryValue)
+        hasher.combine(hasCustomStatus)
     }
 }
 

@@ -983,7 +983,7 @@ struct SupabaseUser: Codable, Identifiable {
             self.userMetadata = metadata
         } else if !name.isEmpty {
             // Create a simple UserMetadata with just the name
-            self.userMetadata = try? UserMetadata(name: name)
+            self.userMetadata = UserMetadata(name: name)
         } else {
             self.userMetadata = nil
         }

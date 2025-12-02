@@ -10,7 +10,8 @@ import SwiftUI
 /// Individual appliance card with toggle and temperature display
 struct ApplianceItemCard: View {
     let appliance: ApplianceItem
-    @Binding var isOn: Bool
+    var onToggle: (() -> Void)?
+    var onTap: (() -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -36,12 +37,26 @@ struct ApplianceItemCard: View {
                             .foregroundColor(.gray)
                     }
                 }
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    onTap?()
+                }
 
                 Spacer(minLength: 12)
 
-                Toggle("", isOn: $isOn)
+                Toggle("", isOn: .constant(appliance.isOn))
                     .labelsHidden()
                     .tint(Color(hex: "A50034"))
+                    .disabled(true)  // Disable drag interaction
+                    .allowsHitTesting(false)  // Disable toggle's own tap handling
+                    .overlay(
+                        // Custom tap area
+                        Color.clear
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                onToggle?()
+                            }
+                    )
             }
 
             Divider()
@@ -71,6 +86,10 @@ struct ApplianceItemCard: View {
                             .foregroundColor(.black)
                     }
                 }
+            }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                onTap?()
             }
         }
         .padding(16)
@@ -102,8 +121,7 @@ struct ApplianceItemCard: View {
             isOn: true,
             primaryValue: 23,
             secondaryValue: 3
-        ),
-        isOn: .constant(true)
+        )
     )
     .padding()
     .background(Color(hex: "F9F9F9"))

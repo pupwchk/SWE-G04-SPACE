@@ -7,8 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		AE1558482EDF1842003288DD /* SendBirdCalls in Frameworks */ = {isa = PBXBuildFile; productRef = AE1558472EDF1842003288DD /* SendBirdCalls */; };
-		AEC0B1E22EDEF392002273B0 /* SendbirdChatSDK in Frameworks */ = {isa = PBXBuildFile; productRef = AEC0B1E12EDEF392002273B0 /* SendbirdChatSDK */; };
+		AE15584B2EDF40EA003288DD /* SendbirdChatSDK in Frameworks */ = {isa = PBXBuildFile; productRef = AE15584A2EDF40EA003288DD /* SendbirdChatSDK */; };
+		AE15584E2EDF410B003288DD /* SendBirdCalls in Frameworks */ = {isa = PBXBuildFile; productRef = AE15584D2EDF410B003288DD /* SendBirdCalls */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -54,8 +54,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				AEC0B1E22EDEF392002273B0 /* SendbirdChatSDK in Frameworks */,
-				AE1558482EDF1842003288DD /* SendBirdCalls in Frameworks */,
+				AE15584B2EDF40EA003288DD /* SendbirdChatSDK in Frameworks */,
+				AE15584E2EDF410B003288DD /* SendBirdCalls in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -130,8 +130,8 @@
 			);
 			name = space;
 			packageProductDependencies = (
-				AEC0B1E12EDEF392002273B0 /* SendbirdChatSDK */,
-				AE1558472EDF1842003288DD /* SendBirdCalls */,
+				AE15584A2EDF40EA003288DD /* SendbirdChatSDK */,
+				AE15584D2EDF410B003288DD /* SendBirdCalls */,
 			);
 			productName = space;
 			productReference = AE715CBB2EB8DF470054A54F /* space.app */;
@@ -165,8 +165,8 @@
 			mainGroup = AE715CB22EB8DF470054A54F;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				AE1AC6B92EDEF2AE004591E0 /* XCRemoteSwiftPackageReference "sendbird-chat-sdk-ios" */,
-				AE1558462EDF1842003288DD /* XCRemoteSwiftPackageReference "sendbird-calls-ios" */,
+				AE1558492EDF40EA003288DD /* XCRemoteSwiftPackageReference "sendbird-chat-sdk-ios" */,
+				AE15584C2EDF410B003288DD /* XCRemoteSwiftPackageReference "sendbird-calls-ios" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = AE715CBC2EB8DF470054A54F /* Products */;
@@ -488,15 +488,7 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		AE1558462EDF1842003288DD /* XCRemoteSwiftPackageReference "sendbird-calls-ios" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/sendbird/sendbird-calls-ios";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 1.11.1;
-			};
-		};
-		AE1AC6B92EDEF2AE004591E0 /* XCRemoteSwiftPackageReference "sendbird-chat-sdk-ios" */ = {
+		AE1558492EDF40EA003288DD /* XCRemoteSwiftPackageReference "sendbird-chat-sdk-ios" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/sendbird/sendbird-chat-sdk-ios";
 			requirement = {
@@ -504,18 +496,26 @@
 				minimumVersion = 4.34.1;
 			};
 		};
+		AE15584C2EDF410B003288DD /* XCRemoteSwiftPackageReference "sendbird-calls-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sendbird/sendbird-calls-ios";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.11.1;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		AE1558472EDF1842003288DD /* SendBirdCalls */ = {
+		AE15584A2EDF40EA003288DD /* SendbirdChatSDK */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = AE1558462EDF1842003288DD /* XCRemoteSwiftPackageReference "sendbird-calls-ios" */;
-			productName = SendBirdCalls;
-		};
-		AEC0B1E12EDEF392002273B0 /* SendbirdChatSDK */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = AE1AC6B92EDEF2AE004591E0 /* XCRemoteSwiftPackageReference "sendbird-chat-sdk-ios" */;
+			package = AE1558492EDF40EA003288DD /* XCRemoteSwiftPackageReference "sendbird-chat-sdk-ios" */;
 			productName = SendbirdChatSDK;
+		};
+		AE15584D2EDF410B003288DD /* SendBirdCalls */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AE15584C2EDF410B003288DD /* XCRemoteSwiftPackageReference "sendbird-calls-ios" */;
+			productName = SendBirdCalls;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

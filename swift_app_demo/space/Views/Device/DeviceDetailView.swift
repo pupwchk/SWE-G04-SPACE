@@ -12,6 +12,11 @@ struct ApplianceDetailView: View {
     @Binding var appliance: ApplianceItem
     @State private var isSaving = false
     @State private var saveError: String?
+    @State private var saveTask: Task<Void, Never>?
+    @Environment(\.dismiss) private var dismiss
+
+    // Callback to notify parent view to reload data after successful save
+    var onSaveSuccess: (() async -> Void)?
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -97,7 +102,8 @@ struct ApplianceDetailView: View {
                     get: { appliance.isOn },
                     set: { newValue in
                         appliance.isOn = newValue
-                        saveChanges(actionOverride: newValue ? "on" : "off")
+                        // For toggle, save immediately without debounce
+                        saveChangesImmediately(actionOverride: newValue ? "on" : "off")
                     }
                 ))
                     .labelsHidden()
@@ -171,7 +177,7 @@ struct ApplianceDetailView: View {
                     }
                 }
                 .pickerStyle(.segmented)
-                .onChange(of: appliance.mode) { _ in
+                .onChange(of: appliance.mode) { _, _ in
                     appliance.syncStatusFromControls()
                     saveChanges()
                 }
@@ -221,7 +227,7 @@ struct ApplianceDetailView: View {
                     }
                 }
                 .pickerStyle(.segmented)
-                .onChange(of: appliance.mode) { _ in
+                .onChange(of: appliance.mode) { _, _ in
                     appliance.syncStatusFromControls()
                     saveChanges()
                 }
@@ -269,7 +275,7 @@ struct ApplianceDetailView: View {
                     }
                 }
                 .pickerStyle(.segmented)
-                .onChange(of: appliance.mode) { _ in
+                .onChange(of: appliance.mode) { _, _ in
                     appliance.syncStatusFromControls()
                     saveChanges()
                 }
@@ -313,7 +319,7 @@ struct ApplianceDetailView: View {
                     }
                 }
                 .pickerStyle(.segmented)
-                .onChange(of: appliance.mode) { _ in
+                .onChange(of: appliance.mode) { _, _ in
                     appliance.syncStatusFromControls()
                     saveChanges()
                 }
@@ -361,7 +367,7 @@ struct ApplianceDetailView: View {
                     }
                 }
                 .pickerStyle(.segmented)
-                .onChange(of: appliance.mode) { _ in
+                .onChange(of: appliance.mode) { _, _ in
                     appliance.syncStatusFromControls()
                     saveChanges()
                 }
@@ -409,7 +415,7 @@ struct ApplianceDetailView: View {
                     }
                 }
                 .pickerStyle(.segmented)
-                .onChange(of: appliance.mode) { _ in
+                .onChange(of: appliance.mode) { _, _ in
                     appliance.syncStatusFromControls()
                     saveChanges()
                 }
@@ -585,23 +591,52 @@ struct ApplianceDetailView: View {
 
     // MARK: - Backend Save
 
+    /// Save changes with debouncing (for sliders and pickers)
     private func saveChanges(actionOverride: String? = nil) {
-        guard !isSaving else { return }
+        // Cancel previous save task if exists (debouncing)
+        saveTask?.cancel()
+
+        // Create new save task with debounce delay
+        saveTask = Task {
+            // Wait for 500ms to allow user to finish adjusting
+            try? await Task.sleep(nanoseconds: 500_000_000)
+
+            // Check if task was cancelled
+            guard !Task.isCancelled else { return }
+
+            await performSave(actionOverride: actionOverride)
+        }
+    }
+
+    /// Save changes immediately without debouncing (for toggles)
+    private func saveChangesImmediately(actionOverride: String? = nil) {
+        // Cancel any pending debounced saves
+        saveTask?.cancel()
 
         Task {
-            await MainActor.run { isSaving = true }
+            await performSave(actionOverride: actionOverride)
+        }
+    }
 
-            let success = await appliance.saveToBackend(action: actionOverride)
+    /// Perform the actual save operation
+    private func performSave(actionOverride: String?) async {
+        await MainActor.run { isSaving = true }
 
-            await MainActor.run {
-                isSaving = false
-                if !success {
-                    saveError = "설정 저장에 실패했습니다"
-                    // Show error for 3 seconds
-                    Task {
-                        try? await Task.sleep(nanoseconds: 3_000_000_000)
-                        saveError = nil
-                    }
+        let success = await appliance.saveToBackend(action: actionOverride)
+
+        await MainActor.run {
+            isSaving = false
+            if success {
+                // Trigger parent view reload to sync with backend state
+                Task {
+                    await onSaveSuccess?()
+                }
+            } else {
+                saveError = "설정 저장에 실패했습니다"
+                // Show error for 3 seconds
+                Task {
+                    try? await Task.sleep(nanoseconds: 3_000_000_000)
+                    saveError = nil
                 }
             }
         }
