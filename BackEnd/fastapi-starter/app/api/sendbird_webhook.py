@@ -190,7 +190,11 @@ async def process_and_respond(
             logger.info(f"✅ [RESPONSE-DEBUG] Using persona context from frontend: {persona_context[:100]}...")
         elif supabase_persona_service.is_available():
             # Supabase에서 페르소나 조회
-            selected_personas = supabase_persona_service.get_user_selected_personas(user_id, limit=1)
+            # NOTE: Supabase는 Supabase Auth UUID를 사용하지만, 현재는 이메일로 시도
+            # 향후 iOS 앱에서 FastAPI user_id를 사용하도록 수정 필요
+            # 임시: 이메일로 조회 시도 (조회 실패 시 persona_context 사용)
+            logger.info(f"🔍 [PERSONA-DEBUG] Attempting to query Supabase with email: {actual_user.email}")
+            selected_personas = supabase_persona_service.get_user_selected_personas(actual_user.email, limit=1)
             if selected_personas and len(selected_personas) > 0:
                 persona_id = selected_personas[0].get("persona_id")
                 if persona_id:

@@ -219,10 +219,21 @@ class SupabaseManager: ObservableObject {
             print(" About to set authenticated state")
 
             // Register user with FastAPI backend (or ensure they exist)
+            // Then connect to Sendbird with the FastAPI user ID
             Task {
                 if let fastAPIUserId = await FastAPIService.shared.registerUser(email: userObj.email) {
                     UserDefaults.standard.set(fastAPIUserId, forKey: "fastapi_user_id")
                     print("✅ [FastAPI] User registered with ID: \(fastAPIUserId)")
+
+                    // Connect to Sendbird Chat using FastAPI DB UUID
+                    do {
+                        try await SendbirdManager.shared.connect(userId: fastAPIUserId)
+                        print("✅ [Sendbird] Connected after login with FastAPI user ID: \(fastAPIUserId)")
+                    } catch {
+                        print("⚠️ [Sendbird] Failed to connect: \(error)")
+                    }
+                } else {
+                    print("❌ [FastAPI] Failed to register user, cannot connect to Sendbird")
                 }
             }
 
@@ -242,16 +253,6 @@ class SupabaseManager: ObservableObject {
             // Load tagged locations for proximity detection
             Task {
                 await TaggedLocationManager.shared.loadTaggedLocations()
-            }
-
-            // Connect to Sendbird Chat
-            Task {
-                do {
-                    try await SendbirdManager.shared.connect(userId: user.id)
-                    print("✅ [Sendbird] Connected after login")
-                } catch {
-                    print("⚠️ [Sendbird] Failed to connect: \(error)")
-                }
             }
 
             print(" Returning user: \(user.email)")
@@ -919,10 +920,21 @@ class SupabaseManager: ObservableObject {
             )
 
             // Ensure user exists in FastAPI backend
+            // Then connect to Sendbird with the FastAPI user ID
             Task {
                 if let fastAPIUserId = await FastAPIService.shared.registerUser(email: userObj.email) {
                     UserDefaults.standard.set(fastAPIUserId, forKey: "fastapi_user_id")
                     print("✅ [FastAPI] User registered with ID: \(fastAPIUserId)")
+
+                    // Connect to Sendbird Chat using FastAPI DB UUID (session restore)
+                    do {
+                        try await SendbirdManager.shared.connect(userId: fastAPIUserId)
+                        print("✅ [Sendbird] Connected on session restore with FastAPI user ID: \(fastAPIUserId)")
+                    } catch {
+                        print("⚠️ [Sendbird] Failed to connect: \(error)")
+                    }
+                } else {
+                    print("❌ [FastAPI] Failed to register user, cannot connect to Sendbird")
                 }
             }
 
@@ -941,16 +953,6 @@ class SupabaseManager: ObservableObject {
             // Load tagged locations for proximity detection
             Task {
                 await TaggedLocationManager.shared.loadTaggedLocations()
-            }
-
-            // Connect to Sendbird Chat (session restore)
-            Task {
-                do {
-                    try await SendbirdManager.shared.connect(userId: user.id)
-                    print("✅ [Sendbird] Connected on session restore")
-                } catch {
-                    print("⚠️ [Sendbird] Failed to connect: \(error)")
-                }
             }
 
             print(" Session validated, user: \(user.email)")
