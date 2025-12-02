@@ -85,10 +85,17 @@ class ApplianceControlService:
             # 상태 업데이트
             if action == "on":
                 status.is_on = True
-                # 프론트엔드 포맷으로 설정값 저장
-                status.current_settings = format_settings_for_frontend(
-                    appliance_type, settings or {}
-                )
+                # settings가 제공되면 업데이트, 없으면 기존 설정 유지 또는 기본값 사용
+                if settings:
+                    # 새로운 설정이 제공된 경우
+                    status.current_settings = format_settings_for_frontend(
+                        appliance_type, settings
+                    )
+                elif not status.current_settings or status.current_settings == {}:
+                    # 기존 설정이 없는 경우에만 기본값으로 초기화
+                    status.current_settings = ApplianceControlService._get_default_settings(appliance_type)
+                # else: 기존 설정 유지
+
                 status.last_command = {
                     "action": action,
                     "settings": settings,
