@@ -121,7 +121,7 @@ def create_air_purifier(db, user_id: UUID):
         vendor="LG",
         model_name="LG PuriCare 360°",
         connection_type="wifi",
-        status="ONLINE",
+        status="공기질 좋음",
     )
     db.add(appliance)
     db.flush()
