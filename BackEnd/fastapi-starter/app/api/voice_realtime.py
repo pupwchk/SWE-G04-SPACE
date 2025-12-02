@@ -100,6 +100,16 @@ class VoiceRealtimeHandler:
                     user_id=uid
                 )
 
+                # 가전 목록을 자연스러운 문자열로 변환
+                if appliances:
+                    appliance_list = []
+                    for app in appliances:
+                        status_text = "켜져 있음" if app.get("is_on") else "꺼져 있음"
+                        appliance_list.append(f"{app.get('appliance_type')}({status_text})")
+                    appliances_text = ", ".join(appliance_list)
+                else:
+                    appliances_text = "등록된 가전이 없습니다"
+
                 return {
                     "weather": {
                         "temperature": weather_data.get("temperature"),
@@ -110,13 +120,44 @@ class VoiceRealtimeHandler:
                     },
                     "fatigue_level": fatigue,
                     "appliances": appliances,
-                    "message": f"현재 온도 {weather_data.get('temperature')}도, 습도 {weather_data.get('humidity')}%, 피로도 레벨 {fatigue}입니다."
+                    "appliances_text": appliances_text,
+                    "message": f"현재 온도 {weather_data.get('temperature')}도, 습도 {weather_data.get('humidity')}%, 피로도 레벨 {fatigue}입니다. 등록된 가전: {appliances_text}"
                 }
             except Exception as e:
                 logger.error(f"❌ Status error: {str(e)}")
                 return {"error": str(e)}
 
-        # 3. 가전 제어 추천
+        # 3. 가전 목록 조회
+        async def handle_list_appliances(uid: str):
+            """등록된 가전 목록 조회"""
+            try:
+                # 가전 상태
+                appliances = appliance_control_service.get_appliance_status(
+                    db=self.db,
+                    user_id=uid
+                )
+
+                if not appliances:
+                    return {
+                        "appliances": [],
+                        "message": "등록된 가전이 없습니다."
+                    }
+
+                # 가전 목록을 자연스러운 문자열로 변환
+                appliance_list = []
+                for app in appliances:
+                    status_text = "켜져 있습니다" if app.get("is_on") else "꺼져 있습니다"
+                    appliance_list.append(f"{app.get('appliance_type')}는 현재 {status_text}")
+
+                return {
+                    "appliances": appliances,
+                    "message": ". ".join(appliance_list) + "."
+                }
+            except Exception as e:
+                logger.error(f"❌ List appliances error: {str(e)}")
+                return {"error": str(e)}
+
+        # 4. 가전 제어 추천
         async def handle_recommend_appliances(uid: str):
             """현재 상황 기반 가전 제어 추천"""
             try:
@@ -163,6 +204,7 @@ class VoiceRealtimeHandler:
         # 핸들러 등록
         realtime_agent.register_function("control_appliance", handle_control_appliance)
         realtime_agent.register_function("get_current_status", handle_get_current_status)
+        realtime_agent.register_function("list_appliances", handle_list_appliances)
         realtime_agent.register_function("recommend_appliances", handle_recommend_appliances)
 
         self.registered_functions = True

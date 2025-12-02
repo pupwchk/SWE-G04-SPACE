@@ -152,6 +152,16 @@ class ApplianceRuleEngine:
             logger.info(f"ℹ️ No active rules for user {user_id} at fatigue level {fatigue_level}")
             return []
 
+        # 현재 가전 상태 조회
+        from app.services.appliance_control_service import appliance_control_service
+        current_statuses = appliance_control_service.get_appliance_status(
+            db=db,
+            user_id=user_id
+        )
+
+        # 가전 타입별로 상태를 빠르게 찾기 위한 딕셔너리
+        status_map = {status["appliance_type"]: status for status in current_statuses}
+
         # 조건 평가
         appliances_to_control = []
 
@@ -162,6 +172,28 @@ class ApplianceRuleEngine:
             )
 
             if condition_met:
+                # 현재 가전 상태 확인
+                current_status = status_map.get(rule.appliance_type)
+
+                # 이미 원하는 상태인 경우 추천하지 않음
+                if current_status:
+                    is_on = current_status.get("is_on", False)
+
+                    # on 액션인데 이미 켜져있으면 스킵
+                    if rule.action == "on" and is_on:
+                        logger.info(f"⏭️ Skipping {rule.appliance_type}: already ON")
+                        continue
+
+                    # off 액션인데 이미 꺼져있으면 스킵
+                    if rule.action == "off" and not is_on:
+                        logger.info(f"⏭️ Skipping {rule.appliance_type}: already OFF")
+                        continue
+
+                    # set 액션인데 꺼져있으면 스킵
+                    if rule.action == "set" and not is_on:
+                        logger.info(f"⏭️ Skipping {rule.appliance_type}: cannot set while OFF")
+                        continue
+
                 # 📚 우선순위: UserAppliancePreference > ApplianceConditionRule.settings_json
                 # 사용자가 학습한 선호 세팅이 있는지 먼저 확인
                 preference = db.query(UserAppliancePreference).filter(

@@ -143,6 +143,10 @@ class RealtimeVoiceAgent:
 - 집안일 도움 (가전제품 제어, 일정 관리 등)
 - 사용자의 상태 파악 (피로도, 스트레스 등)
 
+**가전 조회:**
+- 사용자가 "등록된 가전", "가전 목록", "무슨 가전 있어?" 등을 요청하면 list_appliances 함수를 호출하세요
+- list_appliances는 등록된 가전과 현재 켜짐/꺼짐 상태를 반환합니다
+
 **가전 제어:**
 - 사용자가 "에어컨 켜줘", "불 켜줘" 등을 요청하면 control_appliance 함수를 호출하세요
 - "덥다", "춥다", "건조하다" 등 환경 불편 표현이 있으면:
@@ -203,6 +207,16 @@ class RealtimeVoiceAgent:
                 "type": "function",
                 "name": "get_current_status",
                 "description": "현재 날씨와 집안 환경 상태를 조회합니다",
+                "parameters": {
+                    "type": "object",
+                    "properties": {},
+                    "required": []
+                }
+            },
+            {
+                "type": "function",
+                "name": "list_appliances",
+                "description": "등록된 가전 목록과 각 가전의 켜짐/꺼짐 상태를 조회합니다. 사용자가 '등록된 가전', '가전 목록', '무슨 가전 있어?' 등을 물어볼 때 사용하세요.",
                 "parameters": {
                     "type": "object",
                     "properties": {},
