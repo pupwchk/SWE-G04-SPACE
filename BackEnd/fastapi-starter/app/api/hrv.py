@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.config.db import get_db
 from app.services.hrv_service import hrv_service
+from app.utils.user_utils import get_user_uuid_by_identifier
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/health", tags=["Health"])
@@ -17,7 +18,7 @@ router = APIRouter(prefix="/health", tags=["Health"])
 
 class HRVSyncRequest(BaseModel):
     """HRV 동기화 요청"""
-    user_id: str = Field(..., description="사용자 ID")
+    user_id: str = Field(..., description="사용자 ID (email 또는 UUID)")
     hrv_value: float = Field(..., description="HRV 값 (ms)", gt=0)
     measured_at: datetime = Field(..., description="측정 시각 (ISO 8601)")
 
@@ -49,15 +50,19 @@ async def sync_hrv(
 ):
     """
     HealthKit에서 HRV 데이터 동기화
+    request.user_id: 사용자 email 또는 UUID
 
     iOS 앱에서 주기적으로 호출:
     - 새 HRV 값이 생성되면 즉시 전송
     - 또는 30분마다 최신 값 조회 후 전송
     """
     try:
+        # user_identifier를 UUID로 변환
+        user_uuid = get_user_uuid_by_identifier(db, request.user_id)
+
         hrv_log = hrv_service.sync_hrv_from_healthkit(
             db=db,
-            user_id=request.user_id,
+            user_id=user_uuid,
             hrv_value=request.hrv_value,
             measured_at=request.measured_at
         )
@@ -78,25 +83,31 @@ async def sync_hrv(
             synced_at=hrv_log.synced_at
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"❌ HRV sync error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"HRV 동기화 실패: {str(e)}")
 
 
-@router.get("/fatigue/{user_id}", response_model=FatigueStatusResponse)
+@router.get("/fatigue/{user_identifier}", response_model=FatigueStatusResponse)
 async def get_fatigue_status(
-    user_id: str,
+    user_identifier: str,
     db: Session = Depends(get_db)
 ):
     """
     사용자의 현재 피로도 상태 조회
+    user_identifier: 사용자 email 또는 UUID
     """
     try:
+        # user_identifier를 UUID로 변환
+        user_uuid = get_user_uuid_by_identifier(db, user_identifier)
+
         # 최신 HRV 로그
-        latest_log = hrv_service.get_latest_hrv_log(db, user_id)
+        latest_log = hrv_service.get_latest_hrv_log(db, user_uuid)
 
         # 최근 7일 평균 피로도
-        avg_fatigue = hrv_service.calculate_average_fatigue(db, user_id, days=7)
+        avg_fatigue = hrv_service.calculate_average_fatigue(db, user_uuid, days=7)
 
         fatigue_labels = {
             1: "좋음",
@@ -107,7 +118,7 @@ async def get_fatigue_status(
 
         if latest_log:
             return FatigueStatusResponse(
-                user_id=user_id,
+                user_id=user_identifier,
                 current_fatigue_level=latest_log.fatigue_level,
                 fatigue_label=fatigue_labels[latest_log.fatigue_level],
                 latest_hrv_value=latest_log.hrv_value,
@@ -116,7 +127,7 @@ async def get_fatigue_status(
             )
         else:
             return FatigueStatusResponse(
-                user_id=user_id,
+                user_id=user_identifier,
                 current_fatigue_level=None,
                 fatigue_label=None,
                 latest_hrv_value=None,
@@ -124,6 +135,8 @@ async def get_fatigue_status(
                 average_fatigue_7days=None
             )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"❌ Fatigue status error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"피로도 조회 실패: {str(e)}")

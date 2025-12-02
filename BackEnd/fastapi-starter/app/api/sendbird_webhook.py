@@ -141,7 +141,7 @@ async def process_and_respond(
     from app.services.appliance_control_service import appliance_control_service
     from app.models.user import User
     from app.models.location import UserLocation
-    from uuid import UUID
+    from app.utils.user_utils import get_user_by_identifier
     import os
 
     db = SessionLocal()
@@ -153,32 +153,21 @@ async def process_and_respond(
         logger.info(f"   Message: {message}")
         logger.info(f"   Channel: {channel_url}")
 
-        # Sendbird user_id를 실제 DB user_id로 변환
-        # Sendbird의 user_id는 이메일로 설정되어 있을 수 있음
-        actual_user = None
+        # Sendbird user_id(email 또는 UUID)를 실제 DB User로 변환
+        actual_user = get_user_by_identifier(db, user_id)
 
-        # 1. UUID로 직접 매칭 시도
-        try:
-            actual_user = db.query(User).filter(User.id == UUID(user_id)).first()
-            if actual_user:
-                logger.info(f"✅ [USER-MAPPING] Found user by UUID: {actual_user.email}")
-        except (ValueError, TypeError):
-            # UUID 변환 실패 - 이메일일 가능성
-            logger.info(f"ℹ️ [USER-MAPPING] {user_id} is not a valid UUID, trying email lookup...")
-
-        # 2. 이메일로 매칭 시도
         if not actual_user:
-            actual_user = db.query(User).filter(User.email == user_id).first()
-            if actual_user:
-                logger.info(f"✅ [USER-MAPPING] Found user by email: {user_id}")
+            logger.error(f"❌ [USER-MAPPING] User not found: {user_id}")
+            # 에러 메시지 전송
+            await chat_client.send_message(
+                channel_url=channel_url,
+                message="죄송해요, 사용자 정보를 찾을 수 없습니다. 다시 로그인해주세요.",
+                user_id=user_id
+            )
+            return
 
-        if actual_user:
-            actual_user_id = str(actual_user.id)
-            logger.info(f"✅ [USER-MAPPING] Mapped Sendbird user {user_id} to DB user {actual_user_id} ({actual_user.email})")
-        else:
-            # 매핑 실패 시 원래 user_id 사용
-            actual_user_id = user_id
-            logger.warning(f"⚠️ [USER-MAPPING] Could not find DB user for Sendbird user {user_id}, using as-is")
+        actual_user_id = str(actual_user.id)
+        logger.info(f"✅ [USER-MAPPING] Mapped Sendbird user {user_id} to DB user {actual_user_id} ({actual_user.email})")
 
         # 대화 히스토리 조회
         history = memory_service.get_history(user_id)
@@ -306,16 +295,10 @@ async def process_and_respond(
         # 3. 가전 제어가 필요한 경우
         logger.info("🏠 [RESPONSE-DEBUG] Appliance control needed - getting context...")
 
-        # 사용자 정보 조회 (실제 DB user_id 사용)
-        user = db.query(User).filter(User.id == UUID(actual_user_id)).first()
-        if not user:
-            logger.warning(f"⚠️ User {actual_user_id} not found, using defaults")
-            home_lat = 37.5665
-            home_lng = 126.9780
-        else:
-            user_location = db.query(UserLocation).filter(UserLocation.user_id == UUID(actual_user_id)).first()
-            home_lat = user_location.home_latitude if user_location else 37.5665
-            home_lng = user_location.home_longitude if user_location else 126.9780
+        # 사용자 위치 정보 조회 (actual_user는 이미 조회됨)
+        user_location = db.query(UserLocation).filter(UserLocation.user_id == actual_user.id).first()
+        home_lat = user_location.home_latitude if user_location else 37.5665
+        home_lng = user_location.home_longitude if user_location else 126.9780
 
         # 날씨 정보 조회
         logger.info("🌤️ [RESPONSE-DEBUG] Fetching weather data...")
@@ -329,9 +312,9 @@ async def process_and_respond(
         logger.info(f"   Humidity: {weather_data.get('humidity')}%")
         logger.info(f"   PM10: {weather_data.get('pm10')} ㎍/㎥")
 
-        # 피로도 조회 (실제 DB user_id 사용)
+        # 피로도 조회 (DB user UUID 사용)
         logger.info("💪 [RESPONSE-DEBUG] Fetching fatigue level...")
-        fatigue_level = hrv_service.get_latest_fatigue_level(db, UUID(actual_user_id))
+        fatigue_level = hrv_service.get_latest_fatigue_level(db, actual_user.id)
         if fatigue_level is None:
             fatigue_level = 2
             logger.warning(f"⚠️ No fatigue level, using default: {fatigue_level}")

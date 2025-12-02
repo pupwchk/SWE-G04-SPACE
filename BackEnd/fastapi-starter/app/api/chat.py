@@ -23,6 +23,7 @@ from app.models.user import User
 from app.models.location import UserLocation
 from app.models.appliance import UserAppliancePreference
 from app.cruds import chat as chat_cruds
+from app.utils.user_utils import get_user_uuid_by_identifier
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/chat", tags=["Chat"])
@@ -129,14 +130,15 @@ def get_or_create_session(user_id: str) -> str:
 
 # ========== API 엔드포인트 ==========
 
-@router.post("/{user_id}/message", response_model=ChatMessageResponse)
+@router.post("/{user_identifier}/message", response_model=ChatMessageResponse)
 async def send_chat_message(
-    user_id: str,
+    user_identifier: str,
     request: ChatMessageRequest,
     db: Session = Depends(get_db)
 ):
     """
     시나리오 2 - 사용자 메시지 처리 (1단계)
+    user_identifier: 사용자 email 또는 UUID
 
     플로우:
     1. 사용자 메시지 수신 ("덥다", "건조하다" 등)
@@ -166,14 +168,18 @@ async def send_chat_message(
         }
     """
     try:
+        # user_identifier를 UUID로 변환
+        user_uuid = get_user_uuid_by_identifier(db, user_identifier)
+        user_id = str(user_uuid)
+
         # 메모리 세션 (빠른 응답용)
-        session_id = get_or_create_session(user_id)
+        session_id = get_or_create_session(user_identifier)
         session = chat_sessions[session_id]
 
         # DB 세션 (영구 저장용)
         db_session = chat_cruds.get_or_create_session(
             db=db,
-            user_id=UUID(user_id),
+            user_id=user_uuid,
             persona_id=request.character_id,
             persona_nickname=None  # 나중에 업데이트
         )
@@ -391,14 +397,15 @@ async def send_chat_message(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/{user_id}/approve", response_model=ApplianceApprovalResponse)
+@router.post("/{user_identifier}/approve", response_model=ApplianceApprovalResponse)
 async def approve_appliance_control(
-    user_id: str,
+    user_identifier: str,
     request: ApplianceApprovalRequest,
     db: Session = Depends(get_db)
 ):
     """
     시나리오 2 - 가전 제어 승인 처리 (2단계)
+    user_identifier: 사용자 email 또는 UUID
 
     플로우:
     1. 사용자 승인/거절/수정 응답 수신
@@ -462,7 +469,11 @@ async def approve_appliance_control(
         }
     """
     try:
-        session_id = get_or_create_session(user_id)
+        # user_identifier를 UUID로 변환
+        user_uuid = get_user_uuid_by_identifier(db, user_identifier)
+        user_id = str(user_uuid)
+
+        session_id = get_or_create_session(user_identifier)
         session = chat_sessions[session_id]
 
         # 1. 승인/거절/수정 파싱
@@ -502,7 +513,7 @@ async def approve_appliance_control(
         has_modification = approval_result.get("has_modification", False)
 
         # 현재 피로도 조회 (선호 세팅 저장용)
-        fatigue_level = hrv_service.get_latest_fatigue_level(db, UUID(user_id))
+        fatigue_level = hrv_service.get_latest_fatigue_level(db, user_uuid)
         if fatigue_level is None:
             fatigue_level = 2  # 기본값
 
@@ -541,7 +552,7 @@ async def approve_appliance_control(
                 # ✨ 선호 세팅 학습: UserAppliancePreference에 저장
                 try:
                     preference = db.query(UserAppliancePreference).filter(
-                        UserAppliancePreference.user_id == UUID(user_id),
+                        UserAppliancePreference.user_id == user_uuid,
                         UserAppliancePreference.fatigue_level == fatigue_level,
                         UserAppliancePreference.appliance_type == appliance_type
                     ).first()
@@ -553,7 +564,7 @@ async def approve_appliance_control(
                     else:
                         # 새로운 선호 세팅 생성
                         new_preference = UserAppliancePreference(
-                            user_id=UUID(user_id),
+                            user_id=user_uuid,
                             fatigue_level=fatigue_level,
                             appliance_type=appliance_type,
                             settings_json=settings
@@ -623,13 +634,15 @@ async def approve_appliance_control(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/{user_id}/history")
+@router.get("/{user_identifier}/history")
 async def get_chat_history(
-    user_id: str,
-    limit: int = 20
+    user_identifier: str,
+    limit: int = 20,
+    db: Session = Depends(get_db)
 ):
     """
     채팅 히스토리 조회
+    user_identifier: 사용자 email 또는 UUID
 
     Returns:
         {
@@ -642,33 +655,45 @@ async def get_chat_history(
         }
     """
     try:
-        session_id = get_or_create_session(user_id)
+        # user_identifier 검증
+        user_uuid = get_user_uuid_by_identifier(db, user_identifier)
+
+        session_id = get_or_create_session(user_identifier)
         session = chat_sessions[session_id]
 
         history = session["conversation_history"][-limit:]
 
         return {
-            "user_id": user_id,
+            "user_id": user_identifier,
             "session_id": session_id,
             "conversation_history": history,
             "has_pending_suggestions": session["pending_suggestions"] is not None
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"❌ History error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.delete("/{user_id}/session")
-async def clear_chat_session(user_id: str):
+@router.delete("/{user_identifier}/session")
+async def clear_chat_session(
+    user_identifier: str,
+    db: Session = Depends(get_db)
+):
     """
     채팅 세션 초기화
+    user_identifier: 사용자 email 또는 UUID
 
     Returns:
         {"status": "ok", "message": "Session cleared"}
     """
     try:
-        session_id = f"session_{user_id}"
+        # user_identifier 검증
+        user_uuid = get_user_uuid_by_identifier(db, user_identifier)
+
+        session_id = f"session_{user_identifier}"
         if session_id in chat_sessions:
             del chat_sessions[session_id]
             logger.info(f"🗑️ Session cleared: {session_id}")
@@ -678,6 +703,8 @@ async def clear_chat_session(user_id: str):
             "message": "Session cleared"
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"❌ Clear session error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

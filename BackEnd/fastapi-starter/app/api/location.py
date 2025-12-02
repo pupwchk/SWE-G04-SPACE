@@ -15,6 +15,7 @@ from app.services.geofence_service import geofence_service
 from app.services.llm_service import llm_service, memory_service
 from app.services.sendbird_client import SendbirdChatClient, SendbirdCallsClient
 from app.config.sendbird import SendbirdConfig
+from app.utils.user_utils import get_user_uuid_by_identifier
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/location", tags=["Location"])
@@ -26,7 +27,7 @@ calls_client = SendbirdCallsClient()
 
 class LocationUpdate(BaseModel):
     """위치 업데이트 요청"""
-    user_id: str = Field(..., description="사용자 ID")
+    user_id: str = Field(..., description="사용자 ID (email 또는 UUID)")
     latitude: float = Field(..., description="위도")
     longitude: float = Field(..., description="경도")
     accuracy: Optional[float] = Field(None, description="GPS 정확도 (미터)")
@@ -48,6 +49,7 @@ async def update_location(
 ):
     """
     위치 업데이트 수신 (10분 간격 추천)
+    location.user_id: 사용자 email 또는 UUID
 
     iOS 앱에서 주기적으로 호출
     - Geofence 진입/이탈 감지
@@ -56,10 +58,13 @@ async def update_location(
     try:
         logger.info(f"📍 Location update from {location.user_id}: ({location.latitude}, {location.longitude})")
 
+        # user_identifier를 UUID로 변환
+        user_uuid = get_user_uuid_by_identifier(db, location.user_id)
+
         # Geofence 확인 (DB에 기록됨)
         result = geofence_service.check_geofence_trigger(
             db=db,
-            user_id=location.user_id,
+            user_id=str(user_uuid),
             latitude=location.latitude,
             longitude=location.longitude,
             accuracy=location.accuracy
@@ -69,7 +74,7 @@ async def update_location(
         if result["triggered"] and result["event"] in ["APPROACHING_DETECTED", "ENTER"]:
             background_tasks.add_task(
                 trigger_auto_call,
-                location.user_id,
+                str(user_uuid),
                 result["distance"],
                 result["event"]
             )
@@ -216,34 +221,38 @@ async def trigger_auto_call(user_id: str, distance: float, event_type: str):
         logger.error(f"❌ [Scenario 1] Error: {str(e)}", exc_info=True)
 
 
-@router.get("/status/{user_id}")
-async def get_location_status(user_id: str, db: Session = Depends(get_db)):
+@router.get("/status/{user_identifier}")
+async def get_location_status(user_identifier: str, db: Session = Depends(get_db)):
     """
     사용자 위치 상태 조회
+    user_identifier: 사용자 email 또는 UUID
 
     최근 추적 기록과 이벤트 히스토리 반환
     """
     try:
+        # user_identifier를 UUID로 변환
+        user_uuid = get_user_uuid_by_identifier(db, user_identifier)
+
         # 사용자 위치 설정
-        location = geofence_service.get_user_location_settings(db, user_id)
+        location = geofence_service.get_user_location_settings(db, str(user_uuid))
 
         # 최근 추적 기록
         from app.models.location import GeofenceTracking
         from sqlalchemy import desc
 
         latest_tracking = db.query(GeofenceTracking)\
-            .filter(GeofenceTracking.user_id == user_id)\
+            .filter(GeofenceTracking.user_id == user_uuid)\
             .order_by(desc(GeofenceTracking.tracked_at))\
             .first()
 
         # 최근 이벤트
-        recent_events = geofence_service.get_recent_events(db, user_id, hours=24)
+        recent_events = geofence_service.get_recent_events(db, str(user_uuid), hours=24)
 
         if not latest_tracking:
             raise HTTPException(status_code=404, detail="No location data found for this user")
 
         return {
-            "user_id": user_id,
+            "user_id": user_identifier,
             "home_location": {
                 "latitude": location.home_latitude,
                 "longitude": location.home_longitude,
@@ -273,19 +282,23 @@ async def get_location_status(user_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/geofence/config/{user_id}")
+@router.post("/geofence/config/{user_identifier}")
 async def configure_geofence(
-    user_id: str,
+    user_identifier: str,
     config: GeofenceConfig,
     db: Session = Depends(get_db)
 ):
     """
     사용자별 Geofence 설정 (집 위치 및 반경)
+    user_identifier: 사용자 email 또는 UUID
     """
     try:
+        # user_identifier를 UUID로 변환
+        user_uuid = get_user_uuid_by_identifier(db, user_identifier)
+
         location = geofence_service.update_home_location(
             db=db,
-            user_id=user_id,
+            user_id=str(user_uuid),
             latitude=config.latitude,
             longitude=config.longitude,
             radius_meters=config.radius_meters
@@ -295,7 +308,7 @@ async def configure_geofence(
             "status": "ok",
             "message": "Geofence configured successfully",
             "config": {
-                "user_id": user_id,
+                "user_id": user_identifier,
                 "latitude": location.home_latitude,
                 "longitude": location.home_longitude,
                 "radius_meters": location.geofence_radius_meters
@@ -307,16 +320,20 @@ async def configure_geofence(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/geofence/config/{user_id}")
-async def get_geofence_config(user_id: str, db: Session = Depends(get_db)):
+@router.get("/geofence/config/{user_identifier}")
+async def get_geofence_config(user_identifier: str, db: Session = Depends(get_db)):
     """
     사용자 Geofence 설정 조회
+    user_identifier: 사용자 email 또는 UUID
     """
     try:
-        location = geofence_service.get_user_location_settings(db, user_id)
+        # user_identifier를 UUID로 변환
+        user_uuid = get_user_uuid_by_identifier(db, user_identifier)
+
+        location = geofence_service.get_user_location_settings(db, str(user_uuid))
 
         return {
-            "user_id": user_id,
+            "user_id": user_identifier,
             "latitude": location.home_latitude,
             "longitude": location.home_longitude,
             "radius_meters": location.geofence_radius_meters

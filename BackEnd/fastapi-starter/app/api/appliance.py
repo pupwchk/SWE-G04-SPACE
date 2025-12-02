@@ -14,6 +14,7 @@ from app.services.appliance_control_service import appliance_control_service
 from app.services.appliance_rule_engine import appliance_rule_engine
 from app.services.weather_service import weather_service
 from app.models.appliance import ApplianceConditionRule
+from app.utils.user_utils import get_user_uuid_by_identifier
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -279,40 +280,50 @@ def get_light_config(
 
 # ========== 새로운 제어 API ==========
 
-@router.post("/smart-control/{user_id}")
+@router.post("/smart-control/{user_identifier}")
 async def smart_control_appliances(
-    user_id: str,
+    user_identifier: str,
     request: ApplianceControlRequest,
     db: Session = Depends(get_db)
 ):
     """
     가전 스마트 제어 (Rule Engine 기반)
+    user_identifier: 사용자 email 또는 UUID
     """
     try:
+        # user_identifier를 UUID로 변환
+        user_uuid = get_user_uuid_by_identifier(db, user_identifier)
+
         result = appliance_control_service.execute_command(
             db=db,
-            user_id=user_id,
+            user_id=str(user_uuid),
             appliance_type=request.appliance_type,
             action=request.action,
             settings=request.settings,
             triggered_by="manual"
         )
         return result
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"❌ Control error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/recommend/{user_id}")
+@router.post("/recommend/{user_identifier}")
 async def recommend_appliances(
-    user_id: str,
+    user_identifier: str,
     request: ApplianceRecommendRequest,
     db: Session = Depends(get_db)
 ):
     """
     현재 상황 기반 가전 제어 추천 (피로도 + 날씨 분석)
+    user_identifier: 사용자 email 또는 UUID
     """
     try:
+        # user_identifier를 UUID로 변환
+        user_uuid = get_user_uuid_by_identifier(db, user_identifier)
+
         weather_data = await weather_service.get_combined_weather(
             db=db,
             latitude=request.latitude,
@@ -322,12 +333,12 @@ async def recommend_appliances(
 
         recommendations = appliance_rule_engine.get_appliances_to_control(
             db=db,
-            user_id=user_id,
+            user_id=str(user_uuid),
             weather_data=weather_data
         )
 
         return {
-            "user_id": user_id,
+            "user_id": user_identifier,
             "weather": {
                 "temperature": weather_data.get("temperature"),
                 "humidity": weather_data.get("humidity"),
@@ -336,80 +347,101 @@ async def recommend_appliances(
             },
             "recommendations": recommendations
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"❌ Recommend error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/smart-status/{user_id}")
+@router.get("/smart-status/{user_identifier}")
 async def get_smart_status(
-    user_id: str,
+    user_identifier: str,
     appliance_type: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
     """
     가전 스마트 상태 조회
+    user_identifier: 사용자 email 또는 UUID
     """
     try:
+        # user_identifier를 UUID로 변환
+        user_uuid = get_user_uuid_by_identifier(db, user_identifier)
+
         statuses = appliance_control_service.get_appliance_status(
             db=db,
-            user_id=user_id,
+            user_id=str(user_uuid),
             appliance_type=appliance_type
         )
-        return {"user_id": user_id, "appliances": statuses}
+        return {"user_id": user_identifier, "appliances": statuses}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"❌ Status error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/smart-history/{user_id}")
+@router.get("/smart-history/{user_identifier}")
 async def get_smart_history(
-    user_id: str,
+    user_identifier: str,
     limit: int = 20,
     db: Session = Depends(get_db)
 ):
     """
     가전 제어 히스토리
+    user_identifier: 사용자 email 또는 UUID
     """
     try:
+        # user_identifier를 UUID로 변환
+        user_uuid = get_user_uuid_by_identifier(db, user_identifier)
+
         history = appliance_control_service.get_command_history(
             db=db,
-            user_id=user_id,
+            user_id=str(user_uuid),
             limit=limit
         )
-        return {"user_id": user_id, "history": history}
+        return {"user_id": user_identifier, "history": history}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"❌ History error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/setup-rules/{user_id}")
+@router.post("/setup-rules/{user_identifier}")
 async def setup_default_rules(
-    user_id: str,
+    user_identifier: str,
     db: Session = Depends(get_db)
 ):
     """
     사용자를 위한 기본 가전 규칙 생성
+    user_identifier: 사용자 email 또는 UUID
     """
     try:
-        appliance_rule_engine.create_default_rules(db, user_id)
+        # user_identifier를 UUID로 변환
+        user_uuid = get_user_uuid_by_identifier(db, user_identifier)
+
+        appliance_rule_engine.create_default_rules(db, str(user_uuid))
         return {
             "status": "ok",
             "message": "Default rules created successfully"
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"❌ Setup error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.patch("/rules/{user_id}")
+@router.patch("/rules/{user_identifier}")
 async def modify_appliance_rule(
-    user_id: str,
+    user_identifier: str,
     request: RuleModifyRequest,
     db: Session = Depends(get_db)
 ):
     """
     가전 자동 작동 조건 수정 API
+    user_identifier: 사용자 email 또는 UUID
 
     사용 예시:
     1. 제습기 자동 작동 끄기: operation="disable", appliance_type="제습기"
@@ -417,16 +449,19 @@ async def modify_appliance_rule(
     3. 제습기 다시 켜기: operation="enable", appliance_type="제습기"
     """
     try:
+        # user_identifier를 UUID로 변환
+        user_uuid = get_user_uuid_by_identifier(db, user_identifier)
+
         # fatigue_level이 없으면 모든 레벨에 적용
         if request.fatigue_level:
             rules = db.query(ApplianceConditionRule).filter(
-                ApplianceConditionRule.user_id == UUID(user_id),
+                ApplianceConditionRule.user_id == user_uuid,
                 ApplianceConditionRule.appliance_type == request.appliance_type,
                 ApplianceConditionRule.fatigue_level == request.fatigue_level
             ).all()
         else:
             rules = db.query(ApplianceConditionRule).filter(
-                ApplianceConditionRule.user_id == UUID(user_id),
+                ApplianceConditionRule.user_id == user_uuid,
                 ApplianceConditionRule.appliance_type == request.appliance_type
             ).all()
 
@@ -493,19 +528,23 @@ async def modify_appliance_rule(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/rules/{user_id}")
+@router.get("/rules/{user_identifier}")
 async def get_appliance_rules(
-    user_id: str,
+    user_identifier: str,
     appliance_type: Optional[str] = None,
     fatigue_level: Optional[int] = None,
     db: Session = Depends(get_db)
 ):
     """
     사용자의 가전 규칙 조회
+    user_identifier: 사용자 email 또는 UUID
     """
     try:
+        # user_identifier를 UUID로 변환
+        user_uuid = get_user_uuid_by_identifier(db, user_identifier)
+
         query = db.query(ApplianceConditionRule).filter(
-            ApplianceConditionRule.user_id == UUID(user_id)
+            ApplianceConditionRule.user_id == user_uuid
         )
 
         if appliance_type:
@@ -517,7 +556,7 @@ async def get_appliance_rules(
         rules = query.all()
 
         return {
-            "user_id": user_id,
+            "user_id": user_identifier,
             "rules": [
                 {
                     "id": str(rule.id),
@@ -532,6 +571,8 @@ async def get_appliance_rules(
                 for rule in rules
             ]
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"❌ Get rules error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
