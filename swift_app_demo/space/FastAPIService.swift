@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 class FastAPIService {
     static let shared = FastAPIService()
@@ -527,6 +528,228 @@ class FastAPIService {
         return workoutSuccess && allSlotsSuccess
     }
 
+    // MARK: - Appliance API
+
+    /// Fetch appliances and their smart-status from backend and convert to UI models
+    /// - Parameter userId: FastAPI user ID
+    /// - Returns: Array of appliances mapped to UI state
+    func fetchApplianceItems(userId: String) async -> [ApplianceItem] {
+        async let applianceListTask = getApplianceList(userId: userId)
+        async let smartStatusTask = getSmartStatus(userId: userId)
+
+        let appliances = await applianceListTask ?? []
+        let smartStatus = await smartStatusTask
+
+        let statusByType: [ApplianceType: BackendApplianceStatus] = Dictionary(
+            (smartStatus?.appliances ?? []).compactMap { status in
+                guard let type = ApplianceType.resolve(
+                    backendCode: nil,
+                    backendLabel: status.applianceType
+                ) else {
+                    return nil
+                }
+                return (type, status)
+            },
+            uniquingKeysWith: { first, _ in first }
+        )
+
+        return appliances.compactMap { appliance in
+            let type = ApplianceType.resolve(backendCode: appliance.applianceCode)
+            let matchedStatus = type.flatMap { statusByType[$0] }
+            return ApplianceItem(backend: appliance, status: matchedStatus)
+        }
+    }
+
+    private func getApplianceList(userId: String) async -> [BackendAppliance]? {
+        let urlString = "\(baseURL)/api/appliances/user/\(userId)"
+        guard let url = URL(string: urlString) else {
+            print("❌ [FastAPI] Invalid appliances URL")
+            return nil
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                print("❌ [FastAPI] Invalid response for appliance list")
+                return nil
+            }
+
+            if httpResponse.statusCode == 200 {
+                let decoder = JSONDecoder()
+                let appliances = try decoder.decode([BackendAppliance].self, from: data)
+                print("✅ [FastAPI] Retrieved \(appliances.count) appliances")
+                return appliances
+            } else {
+                if let errorString = String(data: data, encoding: .utf8) {
+                    print("❌ [FastAPI] Get appliances failed (\(httpResponse.statusCode)): \(errorString)")
+                }
+                return nil
+            }
+
+        } catch {
+            print("❌ [FastAPI] Network error fetching appliances: \(error.localizedDescription)")
+            return nil
+        }
+    }
+
+    private func getSmartStatus(userId: String) async -> SmartStatusResponse? {
+        guard let url = URL(string: "\(baseURL)/api/appliances/smart-status/\(userId)") else {
+            print("❌ [FastAPI] Invalid URL for smart status")
+            return nil
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                print("❌ [FastAPI] Invalid response for smart status")
+                return nil
+            }
+
+            if httpResponse.statusCode == 200 {
+                let decoder = JSONDecoder()
+                let status = try decoder.decode(SmartStatusResponse.self, from: data)
+                print("✅ [FastAPI] Retrieved smart status for \(status.appliances.count) appliances")
+                return status
+            } else {
+                if let errorString = String(data: data, encoding: .utf8) {
+                    print("❌ [FastAPI] Get smart status failed (\(httpResponse.statusCode)): \(errorString)")
+                }
+                return nil
+            }
+
+        } catch {
+            print("❌ [FastAPI] Network error fetching smart status: \(error.localizedDescription)")
+            return nil
+        }
+    }
+
+    /// Smart-control an appliance (on/off/set) via `/api/appliances/smart-control/{user_id}`
+    /// - Parameters:
+    ///   - userId: FastAPI user ID
+    ///   - applianceType: Appliance type label expected by backend (예: "에어컨", "조명")
+    ///   - action: "on", "off", "set"
+    ///   - settings: Optional settings payload (numeric fan speeds, etc.)
+    /// - Returns: Success boolean
+    func controlAppliance(
+        userId: String,
+        applianceType: String,
+        action: String,
+        settings: [String: Any]?
+    ) async -> Bool {
+        guard let url = URL(string: "\(baseURL)/api/appliances/smart-control/\(userId)") else {
+            print("❌ [FastAPI] Invalid URL for smart-control")
+            return false
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        var body: [String: Any] = [
+            "appliance_type": applianceType,
+            "action": action
+        ]
+
+        if let settings, !settings.isEmpty {
+            body["settings"] = settings
+        }
+
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                print("❌ [FastAPI] Invalid response for smart-control")
+                return false
+            }
+
+            if httpResponse.statusCode == 200 {
+                print("✅ [FastAPI] Smart-control success (\(applianceType), action: \(action))")
+                return true
+            } else {
+                if let errorString = String(data: data, encoding: .utf8) {
+                    print("❌ [FastAPI] Smart-control failed (\(httpResponse.statusCode)): \(errorString)")
+                }
+                return false
+            }
+
+        } catch {
+            print("❌ [FastAPI] Network error for smart-control: \(error.localizedDescription)")
+            return false
+        }
+    }
+
+    /// Update appliance configuration
+    /// - Parameters:
+    ///   - applianceId: Appliance ID
+    ///   - applianceType: Type of appliance (ac, tv, light, etc.)
+    ///   - config: Configuration dictionary to update
+    /// - Returns: Success boolean
+    func updateApplianceConfig(applianceId: String, applianceType: ApplianceType, config: [String: Any]) async -> Bool {
+        let endpoint: String
+        switch applianceType {
+        case .airConditioner:
+            endpoint = "ac"
+        case .tv:
+            endpoint = "tv"
+        case .lighting:
+            endpoint = "light"
+        case .airPurifier:
+            endpoint = "air_purifier"
+        case .humidifier:
+            endpoint = "humidifier"
+        case .dehumidifier:
+            endpoint = "dehumidifier"
+        }
+
+        guard let url = URL(string: "\(baseURL)/api/appliances/config/\(endpoint)") else {
+            print("❌ [FastAPI] Invalid URL for update config")
+            return false
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        var body = config
+        body["appliance_id"] = applianceId
+
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                print("❌ [FastAPI] Invalid response for update config")
+                return false
+            }
+
+            if httpResponse.statusCode == 200 || httpResponse.statusCode == 201 {
+                print("✅ [FastAPI] Appliance config updated successfully")
+                return true
+            } else {
+                if let errorString = String(data: data, encoding: .utf8) {
+                    print("❌ [FastAPI] Update config failed (\(httpResponse.statusCode)): \(errorString)")
+                }
+                return false
+            }
+
+        } catch {
+            print("❌ [FastAPI] Network error updating config: \(error.localizedDescription)")
+            return false
+        }
+    }
+
     // MARK: - Chat API
 
     /// Send chat message and get AI response with appliance suggestions
@@ -541,7 +764,7 @@ class FastAPIService {
         message: String,
         personaContext: String? = nil,
         characterId: String? = nil
-    ) async -> ChatResponse? {
+    ) async -> ChatMessageResponse? {
         guard let url = URL(string: "\(baseURL)/api/chat/\(userId)/message") else {
             print("❌ [FastAPI] Invalid URL for send chat message")
             return nil
@@ -573,7 +796,7 @@ class FastAPIService {
 
             if httpResponse.statusCode == 200 {
                 let decoder = JSONDecoder()
-                let chatResponse = try decoder.decode(ChatResponse.self, from: data)
+                let chatResponse = try decoder.decode(ChatMessageResponse.self, from: data)
                 print("✅ [FastAPI] Chat message sent successfully")
                 return chatResponse
             } else {
@@ -641,10 +864,16 @@ class FastAPIService {
     /// Get chat conversation history
     /// - Parameters:
     ///   - userId: User ID
+    ///   - personaId: Optional persona ID to filter history
     ///   - limit: Maximum number of messages to retrieve (default 50)
     /// - Returns: Array of chat history items
-    func getChatHistory(userId: String, limit: Int = 50) async -> [ChatHistoryItem]? {
-        guard let url = URL(string: "\(baseURL)/api/chat/\(userId)/history?limit=\(limit)") else {
+    func getChatHistory(userId: String, personaId: String? = nil, limit: Int = 50) async -> [ChatHistoryItem]? {
+        var urlString = "\(baseURL)/api/chat/\(userId)/history?limit=\(limit)"
+        if let personaId = personaId {
+            urlString += "&persona_id=\(personaId)"
+        }
+
+        guard let url = URL(string: urlString) else {
             print("❌ [FastAPI] Invalid URL for chat history")
             return nil
         }
@@ -754,125 +983,5 @@ class FastAPIService {
     }
 }
 
-// MARK: - Chat Response Models
-
-/// Response from send chat message endpoint
-struct ChatResponse: Codable {
-    let aiMessage: String
-    let intentType: String?
-    let needsControl: Bool?
-    let suggestions: [ApplianceSuggestionResponse]?
-
-    enum CodingKeys: String, CodingKey {
-        case aiMessage = "ai_response"
-        case intentType = "intent_type"
-        case needsControl = "needs_control"
-        case suggestions
-    }
-}
-
-/// Appliance suggestion from AI
-struct ApplianceSuggestionResponse: Codable {
-    let applianceType: String
-    let action: String
-    let settings: [String: AnyCodableValue]?
-
-    enum CodingKeys: String, CodingKey {
-        case applianceType = "appliance_type"
-        case action
-        case settings
-    }
-}
-
-/// Response from approve endpoint
-struct ApplianceApprovalResponse: Codable {
-    let status: String
-    let message: String
-    let results: [ApplianceControlResult]?
-}
-
-/// Result of appliance control operation
-struct ApplianceControlResult: Codable {
-    let applianceType: String
-    let success: Bool
-    let message: String?
-
-    enum CodingKeys: String, CodingKey {
-        case applianceType = "appliance_type"
-        case success
-        case message
-    }
-}
-
-/// Chat history response
-struct ChatHistoryResponse: Codable {
-    let userId: String
-    let sessionId: String
-    let conversationHistory: [ChatHistoryItem]
-
-    enum CodingKeys: String, CodingKey {
-        case userId = "user_id"
-        case sessionId = "session_id"
-        case conversationHistory = "conversation_history"
-    }
-}
-
-/// Individual chat history item
-struct ChatHistoryItem: Codable {
-    let role: String  // "user" or "assistant"
-    let message: String
-    let intent: [String: AnyCodableValue]?
-    let suggestions: [ApplianceSuggestionResponse]?
-    let timestamp: String?
-}
-
-/// Helper for decoding Any values in JSON
-struct AnyCodableValue: Codable {
-    let value: Any
-
-    init(_ value: Any) {
-        self.value = value
-    }
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.singleValueContainer()
-
-        if let intValue = try? container.decode(Int.self) {
-            value = intValue
-        } else if let doubleValue = try? container.decode(Double.self) {
-            value = doubleValue
-        } else if let stringValue = try? container.decode(String.self) {
-            value = stringValue
-        } else if let boolValue = try? container.decode(Bool.self) {
-            value = boolValue
-        } else if let arrayValue = try? container.decode([AnyCodableValue].self) {
-            value = arrayValue.map { $0.value }
-        } else if let dictValue = try? container.decode([String: AnyCodableValue].self) {
-            value = dictValue.mapValues { $0.value }
-        } else {
-            value = NSNull()
-        }
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.singleValueContainer()
-
-        if let intValue = value as? Int {
-            try container.encode(intValue)
-        } else if let doubleValue = value as? Double {
-            try container.encode(doubleValue)
-        } else if let stringValue = value as? String {
-            try container.encode(stringValue)
-        } else if let boolValue = value as? Bool {
-            try container.encode(boolValue)
-        } else if let arrayValue = value as? [Any] {
-            let codableArray = arrayValue.map { AnyCodableValue($0) }
-            try container.encode(codableArray)
-        } else if let dictValue = value as? [String: Any] {
-            let codableDict = dictValue.mapValues { AnyCodableValue($0) }
-            try container.encode(codableDict)
-        } else {
-            try container.encodeNil()
-        }
-    }
-}
+// MARK: - Models are now imported from separate files
+// See: ChatModels.swift, UserModels.swift, CharacterModels.swift, etc.

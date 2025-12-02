@@ -15,7 +15,7 @@ class SupabaseManager: ObservableObject {
     private let supabaseURL = "https://aghsjspkzivcpibwwzvu.supabase.co"
     private let supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFnaHNqc3Breml2Y3BpYnd3enZ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0OTI0OTMsImV4cCI6MjA3ODA2ODQ5M30.vtas9X3hNPoJaepihOc2C3Yxx5l38U3_-bTkKnYLAew"
 
-    @Published var currentUser: User?
+    @Published var currentUser: SupabaseUser?
     @Published var isAuthenticated = false
 
     private init() {
@@ -26,7 +26,7 @@ class SupabaseManager: ObservableObject {
     // MARK: - Authentication Methods
 
     /// Sign up a new user with email and password
-    func signUp(email: String, password: String, name: String) async throws -> User {
+    func signUp(email: String, password: String, name: String) async throws -> SupabaseUser {
         guard let url = URL(string: "\(supabaseURL)/auth/v1/signup") else {
             throw AuthError.invalidURL
         }
@@ -81,7 +81,7 @@ class SupabaseManager: ObservableObject {
                 // Normal flow with session - save it
                 saveSession(session)
 
-                let user = User(
+                let user = SupabaseUser(
                     id: userObj.id,
                     email: userObj.email,
                     name: name
@@ -122,7 +122,7 @@ class SupabaseManager: ObservableObject {
                 print("✉️ User ID: \(userId), Email: \(userEmail)")
 
                 // For development: just show success message without requiring confirmation
-                _ = User(
+                _ = SupabaseUser(
                     id: userId,
                     email: userEmail,
                     name: authResponse.userMetadata?.name ?? name
@@ -144,7 +144,7 @@ class SupabaseManager: ObservableObject {
     }
 
     /// Sign in with email and password
-    func signIn(email: String, password: String) async throws -> User {
+    func signIn(email: String, password: String) async throws -> SupabaseUser {
         guard let url = URL(string: "\(supabaseURL)/auth/v1/token?grant_type=password") else {
             throw AuthError.invalidURL
         }
@@ -210,7 +210,7 @@ class SupabaseManager: ObservableObject {
             saveSession(session)
 
             let userName = userObj.userMetadata?.name ?? ""
-            let user = User(
+            let user = SupabaseUser(
                 id: userObj.id,
                 email: userObj.email,
                 name: userName
@@ -912,10 +912,10 @@ class SupabaseManager: ObservableObject {
 
             let userObj = try JSONDecoder().decode(SupabaseUser.self, from: data)
 
-            let user = User(
+            let user = SupabaseUser(
                 id: userObj.id,
                 email: userObj.email,
-                name: userObj.userMetadata?.name ?? ""
+                name: userObj.name
             )
 
             // Ensure user exists in FastAPI backend
@@ -963,10 +963,35 @@ class SupabaseManager: ObservableObject {
 
 // MARK: - Models
 
-struct User: Codable, Identifiable {
+struct SupabaseUser: Codable, Identifiable {
     let id: String
     let email: String
-    let name: String
+    let userMetadata: UserMetadata?
+
+    // Computed property for name (from user_metadata or empty string)
+    var name: String {
+        return userMetadata?.name ?? ""
+    }
+
+    init(id: String, email: String, name: String, userMetadata: UserMetadata? = nil) {
+        self.id = id
+        self.email = email
+        // If userMetadata is nil but name is provided, create UserMetadata
+        if let metadata = userMetadata {
+            self.userMetadata = metadata
+        } else if !name.isEmpty {
+            // Create a simple UserMetadata with just the name
+            self.userMetadata = try? UserMetadata(name: name)
+        } else {
+            self.userMetadata = nil
+        }
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case email
+        case userMetadata = "user_metadata"
+    }
 }
 
 struct UserProfile: Codable {
@@ -1062,22 +1087,15 @@ struct AuthResponse: Codable {
     }
 }
 
-struct SupabaseUser: Codable {
-    let id: String
-    let email: String
-    let userMetadata: UserMetadata?
-
-    enum CodingKeys: String, CodingKey {
-        case id
-        case email
-        case userMetadata = "user_metadata"
-    }
-}
-
 struct UserMetadata: Codable {
     let name: String?
 
-    // Custom decoder to handle any additional fields
+    // Simple initializer for creating UserMetadata with name
+    init(name: String?) {
+        self.name = name
+    }
+
+    // Custom decoder to handle any additional fields from API
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: DynamicCodingKeys.self)
         var nameValue: String?

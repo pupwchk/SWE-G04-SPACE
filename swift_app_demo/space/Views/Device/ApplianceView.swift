@@ -9,8 +9,9 @@ import SwiftUI
 
 /// Appliance screen - manages home appliances
 struct ApplianceView: View {
-    @State private var appliances: [ApplianceItem] = ApplianceItem.sampleAppliances
+    @State private var appliances: [ApplianceItem] = []
     @State private var selectedAppliance: ApplianceItem?
+    @State private var isLoadingAppliances = false
 
     var body: some View {
         NavigationStack {
@@ -32,6 +33,11 @@ struct ApplianceView: View {
                                             if let index = appliances.firstIndex(where: { $0.id == appliance.id }) {
                                                 appliances[index].isOn = newValue
                                                 appliances[index].syncStatusFromControls()
+                                                Task {
+                                                    let action = newValue ? "on" : "off"
+                                                    _ = await appliances[index].saveToBackend(action: action)
+                                                    await loadAppliances()  // Reload after save
+                                                }
                                             }
                                         }
                                     )
@@ -78,10 +84,19 @@ struct ApplianceView: View {
             .navigationDestination(item: $selectedAppliance) { appliance in
                 if let binding = binding(for: appliance) {
                     ApplianceDetailView(appliance: binding)
+                        .onDisappear {
+                            // Reload appliances when returning from detail view
+                            Task {
+                                await loadAppliances()
+                            }
+                        }
                 } else {
                     Text("선택한 기기를 불러올 수 없습니다.")
                 }
             }
+        }
+        .task {
+            await loadAppliances()
         }
     }
 
@@ -95,6 +110,31 @@ struct ApplianceView: View {
     private func handleAddAppliance() {
         // TODO: Navigate to add appliance screen
         print("Add appliance tapped")
+    }
+
+    private func loadAppliances() async {
+        guard !isLoadingAppliances else {
+            print("⏳ [ApplianceView] Already loading appliances, skipping...")
+            return
+        }
+
+        guard let fastAPIUserId = UserDefaults.standard.string(forKey: "fastapi_user_id") else {
+            print("⚠️ [ApplianceView] FastAPI user ID not found")
+            return
+        }
+
+        await MainActor.run {
+            isLoadingAppliances = true
+        }
+
+        print("🔄 [ApplianceView] Reloading appliances from backend...")
+        let items = await FastAPIService.shared.fetchApplianceItems(userId: fastAPIUserId)
+
+        await MainActor.run {
+            appliances = items
+            isLoadingAppliances = false
+            print("✅ [ApplianceView] Loaded \(items.count) appliances")
+        }
     }
 }
 
@@ -223,6 +263,7 @@ enum ApplianceType: String, CaseIterable, Identifiable {
 
 struct ApplianceItem: Identifiable, Hashable {
     let id: UUID
+    let backendId: String?  // Original backend ID for API calls
     let type: ApplianceType
     var location: String
     var status: String
@@ -234,6 +275,7 @@ struct ApplianceItem: Identifiable, Hashable {
 
     init(
         id: UUID = UUID(),
+        backendId: String? = nil,
         type: ApplianceType,
         location: String,
         status: String,
@@ -244,6 +286,7 @@ struct ApplianceItem: Identifiable, Hashable {
         hasCustomStatus: Bool = false
     ) {
         self.id = id
+        self.backendId = backendId
         self.type = type
         self.location = location
         self.status = status
@@ -279,12 +322,13 @@ extension ApplianceItem {
         case .airConditioner:
             status = "\(mode) · \(Int(primaryValue))°C"
         case .lighting:
-            let colorTemp = Int(secondaryValue ?? 4000)
-            status = "색온도 \(colorTemp)K"
-        case .airPurifier:
-            if status.isEmpty {
-                status = "공기질 보통"
+            if let colorTemp = secondaryValue {
+                status = "색온도 \(Int(colorTemp))K"
+            } else {
+                status = ""
             }
+        case .airPurifier:
+            break
         case .dehumidifier:
             status = "\(mode) · 목표 \(Int(primaryValue))%"
         case .humidifier:
@@ -294,62 +338,79 @@ extension ApplianceItem {
         }
     }
 
-    static let sampleAppliances: [ApplianceItem] = [
-        ApplianceItem(
-            type: .airConditioner,
-            location: "거실",
-            status: "실내 27°C",
-            mode: "냉방",
-            isOn: true,
-            primaryValue: 23,
-            secondaryValue: 3
-        ),
-        ApplianceItem(
-            type: .lighting,
-            location: "거실",
-            status: "따뜻한 색온도",
-            mode: "집중",
-            isOn: true,
-            primaryValue: 70,
-            secondaryValue: 4200
-        ),
-        ApplianceItem(
-            type: .airPurifier,
-            location: "거실",
-            status: "공기질 좋음",
-            mode: "자동",
-            isOn: true,
-            primaryValue: 3,
-            secondaryValue: 12
-        ),
-        ApplianceItem(
-            type: .dehumidifier,
-            location: "안방",
-            status: "세탁물 건조",
-            mode: "세탁물",
-            isOn: true,
-            primaryValue: 45,
-            secondaryValue: 2
-        ),
-        ApplianceItem(
-            type: .humidifier,
-            location: "아이방",
-            status: "수면 모드",
-            mode: "수면",
-            isOn: true,
-            primaryValue: 50,
-            secondaryValue: 2
-        ),
-        ApplianceItem(
-            type: .tv,
-            location: "거실",
-            status: "OTT 시청 중",
-            mode: "OTT",
-            isOn: true,
-            primaryValue: 18,
-            secondaryValue: 65
+    /// Save current appliance state to backend using smart-control
+    /// - Parameter action: Optional explicit action ("on" / "off" / "set"). Defaults to "set" when isOn, otherwise "off".
+    func saveToBackend(action actionOverride: String? = nil) async -> Bool {
+        guard let userId = UserDefaults.standard.string(forKey: "fastapi_user_id") else {
+            print("⚠️ [ApplianceItem] FastAPI user ID not found")
+            return false
+        }
+
+        let action = actionOverride ?? (isOn ? "set" : "off")
+        let settings = buildSmartControlSettings()
+
+        print("📤 [ApplianceItem] Smart-control \(type.displayName) (action: \(action))")
+        return await FastAPIService.shared.controlAppliance(
+            userId: userId,
+            applianceType: type.displayName,
+            action: action,
+            settings: settings
         )
-    ]
+    }
+
+    /// Build smart-control settings payload with numeric fan speeds
+    private func buildSmartControlSettings() -> [String: Any] {
+        var settings: [String: Any] = [:]
+
+        switch type {
+        case .airConditioner:
+            settings["mode"] = mode
+            settings["target_temp_c"] = Int(primaryValue)
+            if let fanSpeed = fanSpeedLevel(secondaryValue) {
+                settings["fan_speed"] = fanSpeed
+            }
+
+        case .lighting:
+            settings["scene"] = mode
+            settings["brightness_pct"] = Int(primaryValue)
+            if let colorTemp = secondaryValue {
+                settings["color_temperature_k"] = Int(colorTemp)
+            }
+
+        case .airPurifier:
+            settings["mode"] = mode
+            settings["fan_speed"] = Int(primaryValue)
+
+        case .dehumidifier:
+            settings["mode"] = mode
+            settings["target_humidity_pct"] = Int(primaryValue)
+            if let fanSpeed = fanSpeedLevel(secondaryValue) {
+                settings["fan_speed"] = fanSpeed
+            }
+
+        case .humidifier:
+            settings["mode"] = mode
+            settings["target_humidity_pct"] = Int(primaryValue)
+            if let mistLevel = secondaryValue {
+                settings["mist_level"] = Int(mistLevel)
+            }
+
+        case .tv:
+            settings["input_source"] = mode
+            settings["volume"] = Int(primaryValue)
+            if let brightness = secondaryValue {
+                settings["brightness"] = Int(brightness)
+            }
+        }
+
+        return settings
+    }
+
+    /// Convert fan-speed slider value to backend numeric level
+    private func fanSpeedLevel(_ value: Double?) -> Int? {
+        guard let value else { return nil }
+        return Int(value)
+    }
 }
 
 #Preview {

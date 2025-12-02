@@ -84,7 +84,7 @@ class ChatService: ObservableObject {
         }
 
         // First try to load from FastAPI backend for persistence
-        if let backendHistory = await loadHistoryFromBackend(userId: userId, limit: limit) {
+        if let backendHistory = await loadHistoryFromBackend(userId: userId, personaId: personaId, limit: limit) {
             return backendHistory
         }
 
@@ -111,20 +111,22 @@ class ChatService: ObservableObject {
     /// Load conversation history from FastAPI backend
     /// - Parameters:
     ///   - userId: Current user ID
+    ///   - personaId: Persona ID to filter conversation
     ///   - limit: Number of messages to load
     /// - Returns: Array of chat messages or nil if failed
-    private func loadHistoryFromBackend(userId: String, limit: Int) async -> [ChatMessage]? {
-        print("📥 [ChatService] Attempting to load history from backend...")
+    private func loadHistoryFromBackend(userId: String, personaId: String, limit: Int) async -> [ChatMessage]? {
+        print("📥 [ChatService] Attempting to load history from backend for persona: \(personaId)...")
 
         guard let historyItems = await fastAPIService.getChatHistory(
             userId: userId,
+            personaId: personaId,
             limit: limit
         ) else {
             print("⚠️ [ChatService] Failed to load history from backend, will fallback to Sendbird")
             return nil
         }
 
-        let messages = historyItems.map { item -> ChatMessage in
+        let messages = historyItems.enumerated().map { (index, item) -> ChatMessage in
             // Parse timestamp (ISO8601 format expected)
             let timestamp: Date
             if let timestampStr = item.timestamp,
@@ -134,8 +136,8 @@ class ChatService: ObservableObject {
                 timestamp = Date()
             }
 
-            // Generate unique ID from timestamp and role
-            let messageId = "\(item.role)_\(timestamp.timeIntervalSince1970)"
+            // Generate unique ID from timestamp, role, and index to prevent duplicates
+            let messageId = "\(item.role)_\(timestamp.timeIntervalSince1970)_\(index)"
 
             return ChatMessage(
                 id: messageId,
@@ -193,13 +195,13 @@ class ChatService: ObservableObject {
 
     /// Approve appliance changes via backend
     /// - Parameters:
-    ///   - userId: Current user ID
+    ///   - userId: Current user ID (Supabase)
     ///   - changes: Array of appliance changes to approve
     ///   - userResponse: User's approval message (e.g., "좋아", "에어컨은 24도로")
     ///   - metadata: Original message metadata containing suggestions
     /// - Returns: Success status
     func approveChanges(userId: String, changes: [ApplianceChange], userResponse: String = "좋아", metadata: MessageMetadata?) async throws -> Bool {
-        print("📤 [ChatService] Approving appliance changes for user: \(userId)")
+        print("📤 [ChatService] Approving appliance changes for Supabase user: \(userId)")
         print("   Changes: \(changes.count) appliances")
         print("   User response: \(userResponse)")
 
@@ -207,6 +209,13 @@ class ChatService: ObservableObject {
             print("❌ [ChatService] No metadata available for approval")
             throw ChatServiceError.parseError
         }
+
+        // Get FastAPI user ID from UserDefaults
+        guard let fastAPIUserId = UserDefaults.standard.string(forKey: "fastapi_user_id") else {
+            print("❌ [ChatService] FastAPI user ID not found in UserDefaults")
+            throw ChatServiceError.userNotAuthenticated
+        }
+        print("📝 [ChatService] Using FastAPI user ID: \(fastAPIUserId)")
 
         // Convert ApplianceSuggestion to original_plan format
         let recommendations = metadata.applianceSuggestions.map { suggestion -> [String: Any] in
@@ -231,9 +240,9 @@ class ChatService: ObservableObject {
             "recommendations": recommendations
         ]
 
-        // Call FastAPI approval endpoint
+        // Call FastAPI approval endpoint with FastAPI user ID
         guard let response = await fastAPIService.approveChatChanges(
-            userId: userId,
+            userId: fastAPIUserId,
             userResponse: userResponse,
             originalPlan: originalPlan
         ) else {
@@ -242,11 +251,13 @@ class ChatService: ObservableObject {
         }
 
         print("✅ [ChatService] Appliance changes approved")
-        print("   Approved: \(response.approved)")
-        print("   Has modification: \(response.hasModification)")
-        print("   AI response: \(response.aiResponse)")
+        print("   Status: \(response.status)")
+        print("   Message: \(response.message)")
+        if let results = response.results {
+            print("   Results: \(results.count) appliance(s) controlled")
+        }
 
-        return response.approved
+        return response.status == "success"
     }
 
     /// Clear chat session
@@ -355,7 +366,7 @@ extension ChatMessage {
 /// Message metadata model from Sendbird
 struct MessageMetadata: Codable {
     let applianceSuggestions: [ApplianceSuggestion]
-    let weather: WeatherInfo?
+    let weather: MessageWeatherInfo?
     let fatigueLevel: Int?
 
     enum CodingKeys: String, CodingKey {
@@ -365,8 +376,8 @@ struct MessageMetadata: Codable {
     }
 }
 
-/// Weather info from metadata
-struct WeatherInfo: Codable {
+/// Weather info from message metadata (renamed to avoid conflict with TimelineDataModel.WeatherInfo)
+struct MessageWeatherInfo: Codable {
     let temperature: Double?
     let humidity: Double?
     let pm10: Double?

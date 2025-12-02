@@ -9,18 +9,10 @@ import SwiftUI
 
 /// Home screen - main dashboard view
 struct HomeView: View {
-    @State private var hasAppliances = true
+    @State private var appliances: [ApplianceItem] = []
+    @State private var isLoadingAppliances = false
     @StateObject private var deviceManager = DeviceManager.shared
     @StateObject private var connectivityManager = WatchConnectivityManager.shared
-
-    let sampleAppliances = [
-        (icon: "wind", title: "거실", subtitle: "에어컨", status: "24°C · 냉방"),
-        (icon: "lightbulb.fill", title: "거실", subtitle: "조명", status: "밝기 70%"),
-        (icon: "aqi.medium", title: "거실", subtitle: "공기청정기", status: "자동 · 공기질 좋음"),
-        (icon: "drop.circle.fill", title: "안방", subtitle: "제습기", status: "목표 45%"),
-        (icon: "drop.fill", title: "아이방", subtitle: "가습기", status: "목표 50%"),
-        (icon: "tv.fill", title: "거실", subtitle: "TV", status: "OTT · 볼륨 18")
-    ]
 
     var body: some View {
         NavigationStack {
@@ -97,36 +89,17 @@ struct HomeView: View {
 
                             Spacer()
 
-                            if hasAppliances {
-                                Button(action: {
-                                    withAnimation {
-                                        hasAppliances = false
-                                    }
-                                }) {
-                                    Image(systemName: "plus.circle.fill")
-                                        .font(.system(size: 22))
-                                        .foregroundColor(Color(hex: "A50034"))
-                                }
+                            Button(action: {
+                                handleApplianceAdd()
+                            }) {
+                                Image(systemName: "plus.circle.fill")
+                                    .font(.system(size: 22))
+                                    .foregroundColor(Color(hex: "A50034"))
                             }
                         }
                         .padding(.horizontal, 20)
 
-                        if hasAppliances {
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 16) {
-                                    ForEach(0..<sampleAppliances.count, id: \.self) { index in
-                                        ApplianceCard(
-                                                icon: sampleAppliances[index].icon,
-                                                title: sampleAppliances[index].title,
-                                                subtitle: sampleAppliances[index].subtitle,
-                                                status: sampleAppliances[index].status,
-                                                isOn: index == 0
-                                            )
-                                    }
-                                }
-                                .padding(.horizontal, 20)
-                            }
-                        } else {
+                        if appliances.isEmpty {
                             AddItemWidget(
                                 title: "가전제품 추가",
                                 action: {
@@ -134,6 +107,21 @@ struct HomeView: View {
                                 }
                             )
                             .padding(.horizontal, 20)
+                        } else {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 16) {
+                                    ForEach(appliances) { appliance in
+                                        ApplianceCard(
+                                            icon: appliance.iconName,
+                                            title: appliance.location,
+                                            subtitle: appliance.type.displayName,
+                                            status: appliance.statusSummary,
+                                            isOn: appliance.isOn
+                                        )
+                                    }
+                                }
+                                .padding(.horizontal, 20)
+                            }
                         }
                     }
 
@@ -147,6 +135,9 @@ struct HomeView: View {
             .onAppear {
                 // Refresh device list when view appears
                 deviceManager.refresh()
+            }
+            .task {
+                await loadAppliances()
             }
         }
     }
@@ -220,11 +211,27 @@ struct HomeView: View {
 
     // MARK: - Actions
 
-    private func handleApplianceAdd() {
-        // Simulate adding appliances
-        withAnimation {
-            hasAppliances = true
+    private func loadAppliances() async {
+        guard !isLoadingAppliances else { return }
+
+        guard let fastAPIUserId = UserDefaults.standard.string(forKey: "fastapi_user_id") else {
+            print("⚠️ [HomeView] FastAPI user ID not found")
+            return
         }
+
+        await MainActor.run {
+            isLoadingAppliances = true
+        }
+
+        let items = await FastAPIService.shared.fetchApplianceItems(userId: fastAPIUserId)
+
+        await MainActor.run {
+            appliances = items
+            isLoadingAppliances = false
+        }
+    }
+
+    private func handleApplianceAdd() {
         print("Appliance add tapped")
     }
 }

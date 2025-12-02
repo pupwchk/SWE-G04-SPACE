@@ -10,6 +10,8 @@ import SwiftUI
 /// Detailed view for a specific appliance with contextual controls
 struct ApplianceDetailView: View {
     @Binding var appliance: ApplianceItem
+    @State private var isSaving = false
+    @State private var saveError: String?
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -91,7 +93,13 @@ struct ApplianceDetailView: View {
 
                 Spacer()
 
-                Toggle("", isOn: $appliance.isOn)
+                Toggle("", isOn: Binding(
+                    get: { appliance.isOn },
+                    set: { newValue in
+                        appliance.isOn = newValue
+                        saveChanges(actionOverride: newValue ? "on" : "off")
+                    }
+                ))
                     .labelsHidden()
                     .tint(appliance.accentColor)
             }
@@ -158,13 +166,14 @@ struct ApplianceDetailView: View {
         VStack(spacing: 12) {
             controlCard(title: "운전 모드", subtitle: appliance.mode) {
                 Picker("운전 모드", selection: $appliance.mode) {
-                    ForEach(["냉방", "제습", "송풍", "자동"], id: \.self) { mode in
+                    ForEach(["냉방", "난방", "제습", "송풍", "자동"], id: \.self) { mode in
                         Text(mode).tag(mode)
                     }
                 }
                 .pickerStyle(.segmented)
                 .onChange(of: appliance.mode) { _ in
                     appliance.syncStatusFromControls()
+                    saveChanges()
                 }
             }
 
@@ -178,18 +187,27 @@ struct ApplianceDetailView: View {
                         }
                     ),
                     in: 18...28,
-                    step: 1
+                    step: 1,
+                    onEditingChanged: { editing in
+                        if !editing {
+                            saveChanges()
+                        }
+                    }
                 )
                 sliderLabels(min: "18°C", value: "\(Int(appliance.primaryValue))°C", max: "28°C")
             }
 
-            controlCard(title: "바람 세기", subtitle: "\(Int(secondaryBinding(defaultValue: 3).wrappedValue))단") {
-                Slider(value: secondaryBinding(defaultValue: 3), in: 1...5, step: 1)
-                sliderLabels(
-                    min: "1단",
-                    value: "\(Int(secondaryBinding(defaultValue: 3).wrappedValue))단",
-                    max: "5단"
-                )
+            if let fanSpeed = secondaryBinding() {
+                controlCard(title: "바람 세기", subtitle: "\(Int(fanSpeed.wrappedValue))단") {
+                    Slider(value: fanSpeed, in: 1...5, step: 1, onEditingChanged: { editing in
+                        if !editing { saveChanges() }
+                    })
+                    sliderLabels(
+                        min: "1단",
+                        value: "\(Int(fanSpeed.wrappedValue))단",
+                        max: "5단"
+                    )
+                }
             }
         }
     }
@@ -205,6 +223,7 @@ struct ApplianceDetailView: View {
                 .pickerStyle(.segmented)
                 .onChange(of: appliance.mode) { _ in
                     appliance.syncStatusFromControls()
+                    saveChanges()
                 }
             }
 
@@ -218,18 +237,25 @@ struct ApplianceDetailView: View {
                         }
                     ),
                     in: 0...100,
-                    step: 1
+                    step: 1,
+                    onEditingChanged: { editing in
+                        if !editing { saveChanges() }
+                    }
                 )
                 sliderLabels(min: "0%", value: "\(Int(appliance.primaryValue))%", max: "100%")
             }
 
-            controlCard(title: "색온도", subtitle: "\(Int(secondaryBinding(defaultValue: 4200).wrappedValue))K") {
-                Slider(value: secondaryBinding(defaultValue: 4200), in: 2700...6500, step: 100)
-                sliderLabels(
-                    min: "2700K",
-                    value: "\(Int(secondaryBinding(defaultValue: 4200).wrappedValue))K",
-                    max: "6500K"
-                )
+            if let colorTemp = secondaryBinding() {
+                controlCard(title: "색온도", subtitle: "\(Int(colorTemp.wrappedValue))K") {
+                    Slider(value: colorTemp, in: 2700...6500, step: 100, onEditingChanged: { editing in
+                        if !editing { saveChanges() }
+                    })
+                    sliderLabels(
+                        min: "2700K",
+                        value: "\(Int(colorTemp.wrappedValue))K",
+                        max: "6500K"
+                    )
+                }
             }
         }
     }
@@ -245,6 +271,7 @@ struct ApplianceDetailView: View {
                 .pickerStyle(.segmented)
                 .onChange(of: appliance.mode) { _ in
                     appliance.syncStatusFromControls()
+                    saveChanges()
                 }
             }
 
@@ -258,7 +285,10 @@ struct ApplianceDetailView: View {
                         }
                     ),
                     in: 1...5,
-                    step: 1
+                    step: 1,
+                    onEditingChanged: { editing in
+                        if !editing { saveChanges() }
+                    }
                 )
                 sliderLabels(min: "1단", value: "\(Int(appliance.primaryValue))단", max: "5단")
             }
@@ -285,6 +315,7 @@ struct ApplianceDetailView: View {
                 .pickerStyle(.segmented)
                 .onChange(of: appliance.mode) { _ in
                     appliance.syncStatusFromControls()
+                    saveChanges()
                 }
             }
 
@@ -298,18 +329,25 @@ struct ApplianceDetailView: View {
                         }
                     ),
                     in: 35...60,
-                    step: 1
+                    step: 1,
+                    onEditingChanged: { editing in
+                        if !editing { saveChanges() }
+                    }
                 )
                 sliderLabels(min: "35%", value: "\(Int(appliance.primaryValue))%", max: "60%")
             }
 
-            controlCard(title: "송풍 세기", subtitle: "\(Int(secondaryBinding(defaultValue: 2).wrappedValue))단") {
-                Slider(value: secondaryBinding(defaultValue: 2), in: 1...4, step: 1)
-                sliderLabels(
-                    min: "1단",
-                    value: "\(Int(secondaryBinding(defaultValue: 2).wrappedValue))단",
-                    max: "4단"
-                )
+            if let fanSpeed = secondaryBinding() {
+                controlCard(title: "송풍 세기", subtitle: "\(Int(fanSpeed.wrappedValue))단") {
+                    Slider(value: fanSpeed, in: 1...4, step: 1, onEditingChanged: { editing in
+                        if !editing { saveChanges() }
+                    })
+                    sliderLabels(
+                        min: "1단",
+                        value: "\(Int(fanSpeed.wrappedValue))단",
+                        max: "4단"
+                    )
+                }
             }
         }
     }
@@ -325,6 +363,7 @@ struct ApplianceDetailView: View {
                 .pickerStyle(.segmented)
                 .onChange(of: appliance.mode) { _ in
                     appliance.syncStatusFromControls()
+                    saveChanges()
                 }
             }
 
@@ -338,18 +377,25 @@ struct ApplianceDetailView: View {
                         }
                     ),
                     in: 40...65,
-                    step: 1
+                    step: 1,
+                    onEditingChanged: { editing in
+                        if !editing { saveChanges() }
+                    }
                 )
                 sliderLabels(min: "40%", value: "\(Int(appliance.primaryValue))%", max: "65%")
             }
 
-            controlCard(title: "분무 세기", subtitle: "\(Int(secondaryBinding(defaultValue: 2).wrappedValue))단") {
-                Slider(value: secondaryBinding(defaultValue: 2), in: 1...4, step: 1)
-                sliderLabels(
-                    min: "1단",
-                    value: "\(Int(secondaryBinding(defaultValue: 2).wrappedValue))단",
-                    max: "4단"
-                )
+            if let mistLevel = secondaryBinding() {
+                controlCard(title: "분무 세기", subtitle: "\(Int(mistLevel.wrappedValue))단") {
+                    Slider(value: mistLevel, in: 1...4, step: 1, onEditingChanged: { editing in
+                        if !editing { saveChanges() }
+                    })
+                    sliderLabels(
+                        min: "1단",
+                        value: "\(Int(mistLevel.wrappedValue))단",
+                        max: "4단"
+                    )
+                }
             }
         }
     }
@@ -365,6 +411,7 @@ struct ApplianceDetailView: View {
                 .pickerStyle(.segmented)
                 .onChange(of: appliance.mode) { _ in
                     appliance.syncStatusFromControls()
+                    saveChanges()
                 }
             }
 
@@ -378,18 +425,25 @@ struct ApplianceDetailView: View {
                         }
                     ),
                     in: 0...100,
-                    step: 1
+                    step: 1,
+                    onEditingChanged: { editing in
+                        if !editing { saveChanges() }
+                    }
                 )
                 sliderLabels(min: "0", value: "\(Int(appliance.primaryValue))", max: "100")
             }
 
-            controlCard(title: "화면 밝기", subtitle: "\(Int(secondaryBinding(defaultValue: 65).wrappedValue))%") {
-                Slider(value: secondaryBinding(defaultValue: 65), in: 30...100, step: 1)
-                sliderLabels(
-                    min: "30%",
-                    value: "\(Int(secondaryBinding(defaultValue: 65).wrappedValue))%",
-                    max: "100%"
-                )
+            if let brightness = secondaryBinding() {
+                controlCard(title: "화면 밝기", subtitle: "\(Int(brightness.wrappedValue))%") {
+                    Slider(value: brightness, in: 30...100, step: 1, onEditingChanged: { editing in
+                        if !editing { saveChanges() }
+                    })
+                    sliderLabels(
+                        min: "30%",
+                        value: "\(Int(brightness.wrappedValue))%",
+                        max: "100%"
+                    )
+                }
             }
         }
     }
@@ -494,12 +548,17 @@ struct ApplianceDetailView: View {
         .cornerRadius(14)
     }
 
-    private func secondaryBinding(defaultValue: Double) -> Binding<Double> {
-        Binding(
-            get: { appliance.secondaryValue ?? defaultValue },
+    private func secondaryBinding(autoSave: Bool = false) -> Binding<Double>? {
+        guard appliance.secondaryValue != nil else { return nil }
+
+        return Binding(
+            get: { appliance.secondaryValue ?? 0 },
             set: { newValue in
                 appliance.secondaryValue = newValue
                 appliance.syncStatusFromControls()
+                if autoSave {
+                    saveChanges()
+                }
             }
         )
     }
@@ -521,6 +580,30 @@ struct ApplianceDetailView: View {
             Text(max)
                 .font(.system(size: 12))
                 .foregroundColor(.gray)
+        }
+    }
+
+    // MARK: - Backend Save
+
+    private func saveChanges(actionOverride: String? = nil) {
+        guard !isSaving else { return }
+
+        Task {
+            await MainActor.run { isSaving = true }
+
+            let success = await appliance.saveToBackend(action: actionOverride)
+
+            await MainActor.run {
+                isSaving = false
+                if !success {
+                    saveError = "설정 저장에 실패했습니다"
+                    // Show error for 3 seconds
+                    Task {
+                        try? await Task.sleep(nanoseconds: 3_000_000_000)
+                        saveError = nil
+                    }
+                }
+            }
         }
     }
 }
