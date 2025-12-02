@@ -511,8 +511,21 @@ TV:
         """
         try:
             appliance_info = []
+            has_preference_settings = False
+
             for app in appliances:
-                info = f"{app['appliance_type']}: {app['settings']}"
+                settings_source = app.get('settings_source', 'default')
+
+                # 선호 세팅 사용 여부 표시
+                if settings_source == "preference":
+                    has_preference_settings = True
+                    source_label = " [학습된 선호 세팅]"
+                elif settings_source == "user_input":
+                    source_label = " [사용자 지정값]"
+                else:
+                    source_label = ""
+
+                info = f"{app['appliance_type']}: {app['settings']}{source_label}"
                 if app.get('reason'):
                     info += f" ({app['reason']})"
                 appliance_info.append(info)
@@ -539,14 +552,44 @@ TV:
                         prompt += f" (설정: {app['current_settings']})"
                     prompt += "\n"
 
-            prompt += """
+            # 선호 세팅 사용 시 추가 지침
+            preference_note = ""
+            if has_preference_settings:
+                preference_note = f"""
+**중요: 학습된 선호 세팅 사용**
+- "[학습된 선호 세팅]" 표시가 있는 가전은 **반드시 "지난번 설정하셨던"이나 "선호하시는"과 같은 표현**을 사용하세요
+- 사용자가 이전에 학습한 설정임을 명확히 알려주세요
+- 피로도 레벨 {fatigue_level}에 최적화된 설정임을 언급해도 좋습니다
+
+**선호 세팅 사용 예시:**
+- "지난번에 설정하셨던 23도 냉방 모드로 에어컨을 켜드릴까요?"
+- "선호하시는 습도 50%로 가습기를 켜드릴까요?"
+- "평소 설정하셨던 자동 모드로 공기청정기를 켜드릴까요?"
+"""
+
+            prompt += f"""
 위 정보를 바탕으로 사용자에게 자연스럽게 가전 제어를 제안하는 메시지를 생성하세요.
+{preference_note}
+**기본 규칙:**
+1. **반드시 구체적인 설정값을 포함**하여 제안하세요
+   - 온도(target_temp_c): "23도로"
+   - 습도(target_humidity_pct): "습도 50%로"
+   - 모드(mode): "냉방 모드로", "자동 모드로"
+   - 밝기(brightness_pct): "밝기 80%로"
+2. 위에 나열된 등록된 가전만 언급하세요
+3. 등록되지 않은 가전은 절대 언급하지 마세요
+4. 현재 상황(온도, 습도 등)을 간단히 언급하여 제안 이유를 설명하세요
 
-**중요:**
-- 위에 나열된 등록된 가전만 언급하세요
-- 등록되지 않은 가전은 절대 언급하지 마세요
+**좋은 예시 (일반):**
+- "현재 온도가 28도로 높네요. 에어컨을 23도 냉방 모드로 켜드릴까요?"
+- "습도가 30%로 건조하네요. 가습기를 습도 50% 자동 모드로 켜드릴까요?"
+- "미세먼지가 80㎍/㎥로 나쁨 상태예요. 공기청정기를 자동 모드로 켜드릴까요?"
 
-형식: "현재 [날씨 설명]. [가전 제어 제안]할까요?"
+**나쁜 예시 (절대 하지 마세요):**
+- "에어컨을 틀어드릴게요" (설정값 누락)
+- "가습기를 켜드릴까요?" (목표 습도 누락)
+- "공기청정기 켤까요?" (모드 누락)
+
 반드시 일반 텍스트로만 응답하세요 (JSON 아님).
 """
 

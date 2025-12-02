@@ -317,21 +317,109 @@ async def send_chat_message(
 
         # 피로도
         fatigue_level = hrv_service.get_latest_fatigue_level(db, UUID(user_id))
+        if fatigue_level is None:
+            fatigue_level = 2  # 기본값
 
-        # 3-2. 가전 제어 추천 생성
-        recommendations = appliance_rule_engine.get_appliances_to_control(
-            db=db,
-            user_id=user_id,
-            weather_data=weather_data
+        # 3-2. 사용자 메시지 기반 가전 제어 추천
+        # Step 1: LLM이 사용자 메시지를 분석하여 어떤 가전이 필요한지 판단
+        history_for_llm = [
+            {"role": msg["role"], "content": msg["message"]}
+            for msg in session["conversation_history"][-10:]
+        ]
+
+        suggestion_result = await llm_service.generate_user_request_suggestion(
+            user_message=request.message,
+            appliance_states=appliance_states,
+            weather=weather_data,
+            fatigue_level=fatigue_level,
+            persona=persona,
+            conversation_history=history_for_llm
         )
 
+        llm_appliances = suggestion_result.get("appliances", [])
+
+        # Step 2: LLM이 추천한 가전에 대해 선호 세팅 테이블에서 실제 설정값 조회
+        recommendations = []
+        for llm_app in llm_appliances:
+            appliance_type = llm_app["appliance_type"]
+            action = llm_app.get("action", "on")
+            llm_settings = llm_app.get("settings", {})
+            settings_source = "default"  # "preference" | "user_input" | "default"
+
+            if action == "on":
+                # 선호 세팅 테이블 조회
+                preference = db.query(UserAppliancePreference).filter(
+                    UserAppliancePreference.user_id == UUID(user_id),
+                    UserAppliancePreference.fatigue_level == fatigue_level,
+                    UserAppliancePreference.appliance_type == appliance_type
+                ).first()
+
+                if preference and preference.settings_json:
+                    # 학습된 선호 세팅 사용
+                    settings_json = preference.settings_json
+                    settings_source = "preference"
+
+                    # 에어컨의 경우 냉방/난방 모드 선택
+                    if appliance_type == "에어컨" and isinstance(settings_json, dict):
+                        # 현재 온도 기반으로 냉방/난방 판단
+                        current_temp = weather_data.get('temperature', 20)
+                        if current_temp >= 24:
+                            # 더우면 냉방
+                            mode_key = "cool"
+                        else:
+                            # 추우면 난방
+                            mode_key = "heat"
+
+                        # cool/heat 키가 있으면 선택, 없으면 전체 사용
+                        if mode_key in settings_json:
+                            settings = settings_json[mode_key]
+                        elif "cool" in settings_json or "heat" in settings_json:
+                            # cool만 있거나 heat만 있는 경우
+                            settings = settings_json.get(mode_key) or settings_json.get("cool") or settings_json.get("heat")
+                        else:
+                            # 직접 설정값인 경우
+                            settings = settings_json
+                    else:
+                        settings = settings_json
+
+                    logger.info(f"📚 Using preference for {appliance_type}: {settings}")
+                elif llm_settings:
+                    # LLM이 제안한 설정 사용 (사용자가 구체적인 값을 말한 경우)
+                    settings = llm_settings
+                    settings_source = "user_input"
+                    logger.info(f"🤖 Using LLM settings for {appliance_type}: {settings}")
+                else:
+                    # 기본값 사용
+                    from app.services.appliance_control_service import appliance_control_service
+                    settings = appliance_control_service._get_default_settings(appliance_type)
+                    settings_source = "default"
+                    logger.info(f"⚙️ Using default settings for {appliance_type}: {settings}")
+            else:
+                settings = {}
+
+            recommendations.append({
+                "appliance_type": appliance_type,
+                "action": action,
+                "settings": settings,
+                "reason": llm_app.get("reason", ""),
+                "settings_source": settings_source  # 설정값 출처 추가
+            })
+
         if not recommendations:
-            # 제어가 필요 없는 경우
-            ai_response = "현재 집안 환경은 적절한 상태입니다. 다른 도움이 필요하신가요?"
+            # 제어가 필요 없는 경우 - LLM 응답 사용
+            ai_response = suggestion_result.get("response", "현재 집안 환경은 적절한 상태입니다. 다른 도움이 필요하신가요?")
             session["conversation_history"].append({
                 "role": "assistant",
                 "message": ai_response
             })
+
+            # ✅ DB에 AI 응답 저장
+            chat_cruds.save_message(
+                db=db,
+                session_id=db_session.id,
+                role="assistant",
+                content=ai_response
+            )
 
             return ChatMessageResponse(
                 user_message=request.message,
@@ -341,20 +429,15 @@ async def send_chat_message(
                 session_id=session_id
             )
 
-        # 3-3. 자연어 제안 생성
-        history_for_llm = [
-            {"role": msg["role"], "content": msg["message"]}
-            for msg in session["conversation_history"][-10:]
-        ]
-
+        # Step 3: 실제 설정값을 포함한 자연어 제안 메시지 생성
         ai_response = await llm_service.generate_appliance_suggestion(
             appliances=recommendations,
             weather=weather_data,
             fatigue_level=fatigue_level,
             user_message=request.message,
-            persona=persona,  # 페르소나 적용
-            appliance_states=appliance_states,  # ← 현재 가전 상태 전달
-            conversation_history=history_for_llm  # ← 대화 히스토리 전달
+            persona=persona,
+            appliance_states=appliance_states,
+            conversation_history=history_for_llm
         )
 
         # 3-4. 세션에 저장
@@ -586,17 +669,54 @@ async def approve_appliance_control(
                 })
                 logger.error(f"❌ {appliance_type} {action} error: {str(e)}")
 
-        # 4. 응답 메시지 생성
+        # 4. 응답 메시지 생성 - 자세한 실행 결과 포함
         success_count = sum(1 for r in execution_results if r["status"] == "success")
         total_count = len(execution_results)
 
+        # 성공한 가전들의 상세 정보
+        success_details = []
+        for r in execution_results:
+            if r["status"] == "success":
+                appliance_name = r["appliance"]
+                action = r["action"]
+                settings = r.get("settings", {})
+
+                if action == "on":
+                    # 설정값이 있으면 포함
+                    if settings:
+                        # 주요 설정만 추출
+                        details = []
+                        if "target_temp_c" in settings:
+                            details.append(f"{settings['target_temp_c']}도")
+                        if "target_humidity_pct" in settings:
+                            details.append(f"습도 {settings['target_humidity_pct']}%")
+                        if "mode" in settings:
+                            details.append(f"{settings['mode']} 모드")
+                        if "brightness_pct" in settings:
+                            details.append(f"밝기 {settings['brightness_pct']}%")
+
+                        if details:
+                            success_details.append(f"{appliance_name}을(를) {', '.join(details)}로 켰습니다")
+                        else:
+                            success_details.append(f"{appliance_name}을(를) 켰습니다")
+                    else:
+                        success_details.append(f"{appliance_name}을(를) 켰습니다")
+                elif action == "off":
+                    success_details.append(f"{appliance_name}을(를) 껐습니다")
+                elif action == "set":
+                    success_details.append(f"{appliance_name} 설정을 변경했습니다")
+
         if success_count == total_count:
             if has_modification:
-                ai_response = f"수정하신 내용으로 {success_count}개 가전을 제어했습니다."
+                ai_response = f"수정하신 내용으로 제어했습니다. {', '.join(success_details)}."
             else:
-                ai_response = f"{success_count}개 가전을 제어했습니다."
+                ai_response = f"{', '.join(success_details)}."
         else:
-            ai_response = f"{success_count}/{total_count}개 가전 제어에 성공했습니다."
+            # 일부만 성공한 경우
+            if success_details:
+                ai_response = f"{', '.join(success_details)}. (총 {success_count}/{total_count}개 성공)"
+            else:
+                ai_response = f"가전 제어에 실패했습니다. ({success_count}/{total_count}개 성공)"
 
         # 세션 업데이트
         session["conversation_history"].append({
