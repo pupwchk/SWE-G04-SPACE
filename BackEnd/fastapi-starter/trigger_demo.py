@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-시연용 스크립트 - AI 자동 전화 트리거
+시연용 스크립트 - AI 자동 알림 트리거
 
 사용법:
     python3 trigger_demo.py
@@ -17,7 +17,7 @@ USER_EMAIL = "djwnsgh0248@gmail.com"
 # 또는 직접: localhost:11325
 url = f"http://13.125.85.158:11325/api/location/trigger/demo/{USER_EMAIL}"
 
-print(f"🎬 시연용 AI 자동 전화 트리거 중...")
+print(f"🎬 시연용 AI 자동 알림 트리거 중...")
 print(f"   사용자: {USER_EMAIL}")
 print(f"   URL: {url}")
 print()
@@ -34,7 +34,7 @@ try:
         print(f"   상태: {data.get('status')}")
         print(f"   메시지: {data.get('message')}")
         print()
-        print("📱 iOS 앱에서 잠시 후 전화가 올 것입니다...")
+        print("💬 iOS 앱에서 잠시 후 채팅 메시지가 도착할 것입니다...")
 
 except urllib.error.HTTPError as e:
     print(f"❌ 에러 발생: {e.code}")

@@ -73,7 +73,7 @@ async def update_location(
         # APPROACHING_DETECTED 또는 ENTER 시 시나리오 1 트리거
         if result["triggered"] and result["event"] in ["APPROACHING_DETECTED", "ENTER"]:
             background_tasks.add_task(
-                trigger_auto_call,
+                trigger_auto_notification,
                 str(user_uuid),
                 result["distance"],
                 result["event"]
@@ -81,8 +81,8 @@ async def update_location(
 
             return {
                 "status": "ok",
-                "action": "AUTO_CALL",
-                "message": "집에 거의 도착하셨어요. 잠시 후 전화 드릴게요.",
+                "action": "AUTO_NOTIFICATION",
+                "message": "집에 거의 도착하셨어요. 잠시 후 메시지를 보내드릴게요.",
                 "geofence": result
             }
 
@@ -97,16 +97,16 @@ async def update_location(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-async def trigger_auto_call(user_id: str, distance: float, event_type: str):
+async def trigger_auto_notification(user_id: str, distance: float, event_type: str):
     """
-    자동 전화 트리거 (시나리오 1 - Proactive)
+    자동 알림 트리거 (시나리오 1 - Proactive)
 
     흐름:
     1. HRV 피로도 조회
     2. 날씨 데이터 조회 (서울 기본값)
     3. Rule Engine으로 가전 제어 결정
-    4. 가전 제어 실행
-    5. Sendbird 채팅 메시지
+    4. 가장 최근 대화한 페르소나 조회
+    5. Sendbird 채팅으로 승인 요청 메시지 전송
 
     Args:
         user_id: 사용자 ID
@@ -153,20 +153,26 @@ async def trigger_auto_call(user_id: str, distance: float, event_type: str):
 
             logger.info(f"🎛️ Appliances to control: {len(appliances_to_control)}")
 
-            # 4. 가전 제어 실행
-            if appliances_to_control:
-                control_results = appliance_control_service.execute_multiple_commands(
-                    db=db,
-                    user_id=user_id,
-                    commands=appliances_to_control,
-                    triggered_by="scenario1"
-                )
+            # 4. 가장 최근 대화한 페르소나 조회
+            from app.models.chat import ChatSession
+            from sqlalchemy import desc
 
-                success_count = sum(1 for r in control_results if r.get("success"))
-                logger.info(f"✅ Controlled {success_count}/{len(appliances_to_control)} appliances")
+            recent_session = db.query(ChatSession)\
+                .filter(
+                    ChatSession.user_id == user_id,
+                    ChatSession.persona_id.isnot(None)
+                )\
+                .order_by(desc(ChatSession.last_message_at))\
+                .first()
 
-            # 5. Sendbird 채팅 메시지
-            # distinct 채널 생성 또는 가져오기
+            if recent_session and recent_session.persona_nickname:
+                persona_name = recent_session.persona_nickname
+                logger.info(f"👤 Using recent persona: {persona_name}")
+            else:
+                persona_name = "AI 어시스턴트"
+                logger.info(f"👤 No recent persona, using default: {persona_name}")
+
+            # 5. Sendbird 채팅으로 승인 요청 메시지 전송
             try:
                 channel_data = await chat_client.create_channel(
                     channel_url=None,  # 자동 생성
@@ -174,21 +180,57 @@ async def trigger_auto_call(user_id: str, distance: float, event_type: str):
                 )
                 channel_url = channel_data.get("channel_url")
 
-                # 메시지 생성
-                appliance_names = [a["appliance_type"] for a in appliances_to_control]
+                # 승인 요청 메시지 생성
                 if appliances_to_control:
-                    message = f"집에 거의 도착하셨네요! 피로도를 고려해서 {', '.join(appliance_names)}을(를) 켜드렸어요."
+                    # 가전 목록과 설정값을 상세히 설명
+                    appliance_details = []
+                    for cmd in appliances_to_control:
+                        detail = f"- {cmd['appliance_type']}"
+                        if cmd.get('settings'):
+                            # 주요 설정값만 표시
+                            settings_str = ", ".join([f"{k}: {v}" for k, v in list(cmd['settings'].items())[:3]])
+                            detail += f" ({settings_str})"
+                        appliance_details.append(detail)
+
+                    appliance_list = "\n".join(appliance_details)
+
+                    message = f"""[{persona_name}]
+
+집에 거의 도착하셨네요!
+
+현재 상황:
+- 피로도 레벨: {fatigue_level}
+- 온도: {weather_data.get('temperature', 'N/A')}°C
+- 습도: {weather_data.get('humidity', 'N/A')}%
+
+추천 가전:
+{appliance_list}
+
+위 가전을 작동시킬까요?"""
                 else:
-                    message = "집에 거의 도착하셨네요! 현재 날씨와 피로도 상태가 괜찮아서 따로 켤 가전은 없어요."
+                    message = f"""[{persona_name}]
+
+집에 거의 도착하셨네요!
+
+현재 상황:
+- 피로도 레벨: {fatigue_level}
+- 온도: {weather_data.get('temperature', 'N/A')}°C
+- 습도: {weather_data.get('humidity', 'N/A')}%
+
+현재 날씨와 피로도 상태가 괜찮아서 따로 켤 가전은 없어요."""
 
                 await chat_client.send_message(
                     channel_url=channel_url,
                     message=message,
-                    user_id=user_id
+                    user_id=SendbirdConfig.AI_USER_ID
                 )
-                logger.info(f"💬 Chat message sent to {channel_url}")
+                logger.info(f"💬 Approval request sent to {channel_url}")
+
+                # TODO: 사용자 응답 대기 및 승인 시 가전 실행
+                # 추후 callback endpoint 구현 필요
+
             except Exception as e:
-                logger.warning(f"⚠️ Failed to send chat: {str(e)}")
+                logger.warning(f"⚠️ Failed to send approval request: {str(e)}")
 
             logger.info(f"✅ [Scenario 1] Completed for {user_id}")
 
@@ -323,7 +365,7 @@ async def get_geofence_config(user_identifier: str, db: Session = Depends(get_db
 
 
 @router.post("/trigger/demo/{user_identifier}")
-async def trigger_demo_call(
+async def trigger_demo_notification(
     user_identifier: str,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
@@ -333,7 +375,7 @@ async def trigger_demo_call(
 
     user_identifier: 사용자 email 또는 UUID
 
-    실제 위치 이동 없이 AI 자동 전화를 테스트할 수 있습니다.
+    실제 위치 이동 없이 AI 자동 알림을 테스트할 수 있습니다.
     """
     try:
         logger.info(f"🎬 [DEMO] Manual trigger for {user_identifier}")
@@ -341,9 +383,9 @@ async def trigger_demo_call(
         # user_identifier를 UUID로 변환
         user_uuid = get_user_uuid_by_identifier(db, user_identifier)
 
-        # 백그라운드에서 자동 전화 트리거 (거리 50m, ENTER 이벤트로 시뮬레이션)
+        # 백그라운드에서 자동 알림 트리거 (거리 50m, ENTER 이벤트로 시뮬레이션)
         background_tasks.add_task(
-            trigger_auto_call,
+            trigger_auto_notification,
             str(user_uuid),
             50.0,  # 집에서 50m 거리로 가정
             "ENTER"
@@ -351,7 +393,7 @@ async def trigger_demo_call(
 
         return {
             "status": "ok",
-            "message": "시연용 자동 전화가 트리거되었습니다. 잠시 후 전화가 올 것입니다.",
+            "message": "시연용 자동 알림이 트리거되었습니다. 잠시 후 메시지가 전송됩니다.",
             "user_id": user_identifier
         }
 
