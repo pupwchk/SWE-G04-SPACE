@@ -55,41 +55,6 @@ The system collects data from multiple sources with explicit user consent
 \end{itemize}
 \end{adjustwidth}
 
-\subsection{AI-Driven User State Inference}
-\subsubsection{Data Integration and Modeling Framework}
-\begin{adjustwidth}{1em}{0em}
-\setlength{\parindent}{1em} 
-The system integrates biometric signals from Apple HealthKit, contextual data from GPS-based routine tracking, and environmental factors such as temperature and humidity to infer the user’s overall physical and mental condition. 
-At the early stage, it operates on scientifically validated rule-based algorithms, and as sufficient data accumulates, it transitions into a machine-learning–based model for personalized prediction.
-\end{adjustwidth}
-
-\subsubsection{Condition Indicators}
-\begin{adjustwidth}{1em}{0em}
-\setlength{\parindent}{1em} 
-The core of the system consists of five condition indicators: fatigue, stress, thermal comfort, light preference, and recovery need. 
-Fatigue is calculated from sleep duration, deep-sleep ratio, HRV (Heart Rate Variability), and circadian rhythm patterns. 
-Stress is derived from increased heart rate, decreased HRV, respiratory rate, and environmental noise. 
-Thermal comfort reflects the optimal temperature (18–28 °C) adjusted according to activity intensity, outdoor climate, and humidity. 
-Light preference dynamically adapts brightness and color temperature based on time of day, fatigue, and sleep readiness. 
-Finally, recovery need evaluates post-exercise physical recovery using heart-rate recovery speed, HRV rebound, and respiration rate. 
-Each indicator is normalized by the user’s personal baseline, minimizing physiological variability among individuals.
-\end{adjustwidth}
-
-\subsubsection{Baseline Construction and Adaptive Learning}
-\begin{adjustwidth}{1em}{0em}
-\setlength{\parindent}{1em}
-The baseline is established after at least seven days of data collection and includes metrics such as HRV, resting heart rate, sleep duration, and activity levels. 
-It is automatically updated on a weekly basis, allowing the system to adjust to the user’s long-term physiological trends. 
-Once a sufficient dataset ($\geq$30 days and $\geq$200 feedback samples) has been accumulated, the rule-based engine is replaced by a XGBoost model, enabling adaptive, data-driven condition estimation.
-\end{adjustwidth}
-
-\subsubsection{Generative AI Condition Interpretation}
-\begin{adjustwidth}{1em}{0em}
-\setlength{\parindent}{1em}
-The analyzed condition output is passed to a Generative AI module, which converts it into a structured prompt describing the user’s current physiological and environmental context. 
-The AI then generates personalized appliance-control commands—for example, ``activate dehumidifying mode at 27 °C after exercise,'' or ``set lighting to 50\% brightness and 3500 K color temperature for relaxation.'' 
-Each recommendation includes concise scientific rationale (e.g., HRV recovery facilitation or melatonin preservation) derived from established sources such as WHO, ISO 7730, and AASM sleep guidelines.
-\end{adjustwidth}
 
 \subsubsection{RLHF Feedback Loop and Continuous Optimization}
 \begin{adjustwidth}{1em}{0em}

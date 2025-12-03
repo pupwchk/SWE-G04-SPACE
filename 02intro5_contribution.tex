@@ -1,0 +1,17 @@
+\subsection{Contributions}
+This project presents HARU, an adaptive smart-home automation system that integrates wearable physiological sensing, multi-modal context awareness, and LLM-based reasoning. The major contributions of this work are summarized as follows:
+
+\subsubsection{HRV-Based Real-Time Wellness Estimation:}
+We design a lightweight yet effective fatigue–stress scoring model based on Apple Watch HRV (RMSSD, SDNN), heart rate, sleep stages, and activity intensity. Unlike rule-based systems, HARU incorporates temporal patterns (TimeSlot) and environmental cues to refine wellness estimation.
+
+\subsubsection{LLM-Driven Natural-Language Home Automation:}
+We propose a novel pipeline where GPT-based language models interpret the user’s physiological state and contextual factors to generate natural-language appliance policies. These policies are parsed into structured control commands for lighting, HVAC, and humidity systems.
+
+\subsubsection{Context-Aware Multi-Modal Integration:}
+HARU unifies diverse data streams—including weather forecasts, GPS-based indoor/outdoor inference, and historical appliance usage—into a cohesive decision-making framework. This enables proactive and personalized adjustments beyond traditional sensor-triggered automation.
+
+\subsubsection{Adaptive User Preference Learning:}
+We develop an iterative preference-learning mechanism that updates user-specific comfort profiles (e.g., preferred temperature, lighting level) based on historical behavior and fatigue level. This allows HARU to autonomously evolve toward personalized routines.
+
+\subsubsection{End-to-End Smart Health–Home Ecosystem:}
+We implement a fully operational end-to-end prototype across iOS/watchOS, FastAPI backend, Supabase PostgreSQL, OpenAI GPT, and Sendbird. This validates the feasibility of a health-driven smart-home system in real-world environments.

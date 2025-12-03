@@ -1,4 +1,3 @@
-\clearpage
 \subsection{Task Distribution}
 
 \subsubsection{Project Manager - Junho Uh}
@@ -39,4 +38,17 @@ The design process includes creating mockups that display predicted user conditi
 AI developers build machine learning pipelines and LLM integration systems that predict user wellness states and generate optimal home automation commands. They collect and preprocess multi-modal data from HealthKit (heart rate, HRV, sleep, activity), CoreLocation (GPS, location patterns), and environmental sensors to extract features for stress prediction and fatigue detection models. The AI workflow implements machine learning algorithms that analyze correlations between physiological patterns and contextual factors, then feeds these predictions into OpenAI's GPT API to generate natural language commands for smart home devices. 
 
 They design the integration pipeline where predicted states (e.g., "user is stressed and approaching home") trigger LLM prompts that determine appropriate environmental adjustments (dimmed lighting, cooler temperature, calming music). AI developers train and evaluate models using metrics such as prediction accuracy and user comfort scores, while optimizing the LLM prompt engineering to ensure reliable and contextually appropriate appliance control. They ensure the GPT API's responses are parsed correctly and translated into specific device commands, maintaining low latency between state prediction and home automation execution to provide seamless, anticipatory environmental optimization based on real-time health intelligence.
+\end{adjustwidth}
+
+\subsubsection{Server Manager - Dogyeom Kim}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+The Server Manager is responsible for ensuring stable backend deployment, scalable infrastructure, and reliable system operation.
+They manage the AWS EC2 instance hosting the FastAPI backend, configure NGINX as a reverse proxy, and maintain Docker-based container orchestration.
+
+Their responsibilities include setting up secure connections, monitoring system performance, and configuring logs using system tools such as CloudWatch or Docker logs.
+They also implement CI/CD pipelines using GitHub Actions, automate Docker image builds, and maintain environment variables and version management across development and production environments.
+
+They ensure the backend remains stable under real-time streaming from iOS/watchOS devices, manage API rate limits for OpenAI and KMA, and monitor failures or latency issues across LLM-based automation tasks.
+Their work ensures that the HARU system can reliably process biometric streams, execute real-time predictions, and deliver seamless home-automation responses.
 \end{adjustwidth}
