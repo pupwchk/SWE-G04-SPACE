@@ -51,9 +51,18 @@ def get_user_by_identifier(db: Session, user_identifier: str) -> Optional[User]:
         # UUID 형식이지만 서버 DB에 없는 경우 → Supabase UUID일 가능성
         UUID(user_identifier)  # UUID 형식인지 확인
 
-        # Supabase 매핑은 선택적 기능이므로 실패해도 괜찮음
-        # (SendBird 인증 시에는 사용되지 않음)
-        logger.debug(f"ℹ️ [USER-MAPPING] UUID {user_identifier} not found in server DB (might be Supabase UUID)")
+        # Supabase에서 이메일 조회 시도
+        email = _get_email_from_supabase(user_identifier)
+        if email:
+            # 이메일로 다시 조회
+            user = db.query(User).filter(User.email == email).first()
+            if user:
+                logger.info(f"✅ [USER-MAPPING] Mapped Supabase UUID {user_identifier} → Email {email} → Server UUID {user.id}")
+                return user
+            else:
+                logger.warning(f"⚠️ [USER-MAPPING] Email {email} found in Supabase but not in server DB")
+        else:
+            logger.debug(f"ℹ️ [USER-MAPPING] UUID {user_identifier} not found in server DB (might be Supabase UUID)")
     except (ValueError, TypeError):
         # UUID 형식도 아님
         pass

@@ -758,11 +758,13 @@ async def approve_appliance_control(
 async def get_chat_history(
     user_identifier: str,
     limit: int = 20,
+    persona_id: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
     """
     채팅 히스토리 조회
-    user_identifier: 사용자 email 또는 UUID
+    user_identifier: 사용자 email 또는 UUID (서버 DB UUID 또는 Supabase UUID)
+    persona_id: 페르소나 ID (선택적, 향후 페르소나별 히스토리 필터링 지원 가능)
 
     Returns:
         {
@@ -775,19 +777,27 @@ async def get_chat_history(
         }
     """
     try:
-        # user_identifier 검증
+        # user_identifier 검증 (Supabase UUID → 이메일 → 서버 DB UUID 변환 포함)
         user_uuid = get_user_uuid_by_identifier(db, user_identifier)
 
-        session_id = get_or_create_session(user_identifier)
+        # 세션 ID는 이메일 기반으로 생성 (일관성 유지)
+        user = db.query(User).filter(User.id == user_uuid).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # 이메일을 기준으로 세션 ID 생성 (메모리 세션은 이메일 기반)
+        session_id = get_or_create_session(user.email)
         session = chat_sessions[session_id]
 
         history = session["conversation_history"][-limit:]
 
         return {
-            "user_id": user_identifier,
+            "user_id": str(user_uuid),
+            "email": user.email,
             "session_id": session_id,
             "conversation_history": history,
-            "has_pending_suggestions": session["pending_suggestions"] is not None
+            "has_pending_suggestions": session["pending_suggestions"] is not None,
+            "persona_id": persona_id  # 요청된 페르소나 ID 반환 (향후 활용)
         }
 
     except HTTPException:
