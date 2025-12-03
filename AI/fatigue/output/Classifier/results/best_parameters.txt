@@ -1,0 +1,14 @@
+Best Hyperparameters
+============================================================
+
+colsample_bytree    : 0.8066785029706267
+gamma               : 0.3285556642500834
+learning_rate       : 0.1363451406165884
+max_depth           : 7
+min_child_weight    : 7
+n_estimators        : 175
+reg_alpha           : 0.5660372104940763
+reg_lambda          : 1.317292895284982
+subsample           : 0.6480658591222569
+
+Best CV Score (f1_macro): 0.3261
