@@ -106,26 +106,46 @@ def _get_email_from_supabase(user_id: str) -> Optional[str]:
         except Exception as e:
             logger.debug(f"ℹ️ [SUPABASE-MAPPING] Auth API query failed: {str(e)}")
 
-        # 방법 2: Supabase Database의 auth.users 테이블 직접 조회
+        # 방법 2: Supabase Database의 users 테이블 직접 조회
         try:
-            logger.debug(f"🔍 [SUPABASE-MAPPING] Trying direct database query for {user_id}")
-            # auth.users는 직접 접근 불가능하므로 public.users 또는 profiles 테이블 시도
-            result = client.table("users").select("email").eq("id", user_id).maybe_single().execute()
-            if result.data and result.data.get("email"):
-                email = result.data.get("email")
-                logger.info(f"✅ [SUPABASE-MAPPING] Found email via DB query: {email} for UUID {user_id}")
-                return email
-        except Exception as e:
-            logger.debug(f"ℹ️ [SUPABASE-MAPPING] DB query failed: {str(e)}")
+            logger.debug(f"🔍 [SUPABASE-MAPPING] Trying users table query for {user_id}")
+            result = client.table("users").select("id, email").eq("id", user_id).execute()
 
-        # 방법 3: profiles 테이블 시도 (일반적인 Supabase 패턴)
+            # 결과 확인 - data가 리스트인 경우와 단일 객체인 경우 모두 처리
+            if result.data:
+                if isinstance(result.data, list) and len(result.data) > 0:
+                    email = result.data[0].get("email")
+                elif isinstance(result.data, dict):
+                    email = result.data.get("email")
+                else:
+                    email = None
+
+                if email:
+                    logger.info(f"✅ [SUPABASE-MAPPING] Found email via users table: {email} for UUID {user_id}")
+                    return email
+                else:
+                    logger.debug(f"ℹ️ [SUPABASE-MAPPING] Users table returned data but no email field")
+            else:
+                logger.debug(f"ℹ️ [SUPABASE-MAPPING] Users table query returned no data")
+        except Exception as e:
+            logger.debug(f"ℹ️ [SUPABASE-MAPPING] Users table query failed: {str(e)}")
+
+        # 방법 3: profiles 테이블 시도 (fallback)
         try:
             logger.debug(f"🔍 [SUPABASE-MAPPING] Trying profiles table for {user_id}")
-            result = client.table("profiles").select("email").eq("id", user_id).maybe_single().execute()
-            if result.data and result.data.get("email"):
-                email = result.data.get("email")
-                logger.info(f"✅ [SUPABASE-MAPPING] Found email via profiles: {email} for UUID {user_id}")
-                return email
+            result = client.table("profiles").select("id, email").eq("id", user_id).execute()
+
+            if result.data:
+                if isinstance(result.data, list) and len(result.data) > 0:
+                    email = result.data[0].get("email")
+                elif isinstance(result.data, dict):
+                    email = result.data.get("email")
+                else:
+                    email = None
+
+                if email:
+                    logger.info(f"✅ [SUPABASE-MAPPING] Found email via profiles: {email} for UUID {user_id}")
+                    return email
         except Exception as e:
             logger.debug(f"ℹ️ [SUPABASE-MAPPING] Profiles query failed: {str(e)}")
 

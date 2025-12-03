@@ -156,34 +156,43 @@ class SupabasePersonaService:
             except Exception as e:
                 logger.debug(f"ℹ️ [SUPABASE-PERSONA] Auth Admin API not available: {str(e)}")
 
-            # 방법 2: profiles 테이블에서 email로 조회
+            # 방법 2: users 테이블에서 email로 조회 (우선순위)
             try:
-                profile_result = self.client.table("profiles")\
+                user_result = self.client.table("users")\
                     .select("id, email")\
                     .eq("email", email)\
-                    .maybe_single()\
                     .execute()
 
-                if profile_result.data:
-                    supabase_user_id = profile_result.data.get("id")
-                    logger.debug(f"✅ [SUPABASE-PERSONA] Found user_id via profiles: {supabase_user_id}")
-            except Exception as e:
-                logger.debug(f"ℹ️ [SUPABASE-PERSONA] Profiles query failed: {str(e)}")
+                if user_result.data:
+                    # 결과 확인 - data가 리스트인 경우와 단일 객체인 경우 모두 처리
+                    if isinstance(user_result.data, list) and len(user_result.data) > 0:
+                        supabase_user_id = user_result.data[0].get("id")
+                    elif isinstance(user_result.data, dict):
+                        supabase_user_id = user_result.data.get("id")
 
-            # 방법 3: users 테이블에서 email로 조회 (fallback)
+                    if supabase_user_id:
+                        logger.debug(f"✅ [SUPABASE-PERSONA] Found user_id via users table: {supabase_user_id}")
+            except Exception as e:
+                logger.debug(f"ℹ️ [SUPABASE-PERSONA] Users table query failed: {str(e)}")
+
+            # 방법 3: profiles 테이블에서 email로 조회 (fallback)
             if not supabase_user_id:
                 try:
-                    user_result = self.client.table("users")\
+                    profile_result = self.client.table("profiles")\
                         .select("id, email")\
                         .eq("email", email)\
-                        .maybe_single()\
                         .execute()
 
-                    if user_result.data:
-                        supabase_user_id = user_result.data.get("id")
-                        logger.debug(f"✅ [SUPABASE-PERSONA] Found user_id via users table: {supabase_user_id}")
+                    if profile_result.data:
+                        if isinstance(profile_result.data, list) and len(profile_result.data) > 0:
+                            supabase_user_id = profile_result.data[0].get("id")
+                        elif isinstance(profile_result.data, dict):
+                            supabase_user_id = profile_result.data.get("id")
+
+                        if supabase_user_id:
+                            logger.debug(f"✅ [SUPABASE-PERSONA] Found user_id via profiles: {supabase_user_id}")
                 except Exception as e:
-                    logger.debug(f"ℹ️ [SUPABASE-PERSONA] Users table query failed: {str(e)}")
+                    logger.debug(f"ℹ️ [SUPABASE-PERSONA] Profiles query failed: {str(e)}")
 
             if not supabase_user_id:
                 logger.warning(f"⚠️ [SUPABASE-PERSONA] Could not find Supabase user_id for email: {email}")
