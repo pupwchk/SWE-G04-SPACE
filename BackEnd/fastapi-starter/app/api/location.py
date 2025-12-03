@@ -154,31 +154,49 @@ async def trigger_auto_notification(user_id: str, distance: float, event_type: s
             logger.info(f"🎛️ Appliances to control: {len(appliances_to_control)}")
 
             # 4. 가장 최근 대화한 페르소나 조회
-            from app.models.chat import ChatSession
-            from sqlalchemy import desc
+            persona_name = "AI 어시스턴트"  # 기본값
+            sendbird_channel_url = None  # 페르소나 채널 URL
+            try:
+                from app.models.chat import ChatSession
+                from sqlalchemy import desc
 
-            recent_session = db.query(ChatSession)\
-                .filter(
-                    ChatSession.user_id == user_id,
-                    ChatSession.persona_id.isnot(None)
-                )\
-                .order_by(desc(ChatSession.last_message_at))\
-                .first()
+                recent_session = db.query(ChatSession)\
+                    .filter(
+                        ChatSession.user_id == user_id,
+                        ChatSession.persona_id.isnot(None)
+                    )\
+                    .order_by(desc(ChatSession.last_message_at))\
+                    .first()
 
-            if recent_session and recent_session.persona_nickname:
-                persona_name = recent_session.persona_nickname
-                logger.info(f"👤 Using recent persona: {persona_name}")
-            else:
-                persona_name = "AI 어시스턴트"
-                logger.info(f"👤 No recent persona, using default: {persona_name}")
+                if recent_session:
+                    if recent_session.persona_nickname:
+                        persona_name = recent_session.persona_nickname
+                    if recent_session.sendbird_channel_url:
+                        sendbird_channel_url = recent_session.sendbird_channel_url
+                        logger.info(f"👤 Using recent persona: {persona_name}, channel: {sendbird_channel_url}")
+                    else:
+                        logger.info(f"👤 Using recent persona: {persona_name}, but no channel URL saved")
+                else:
+                    logger.info(f"👤 No recent persona found, using default: {persona_name}")
+            except Exception as e:
+                # chat_sessions 테이블이 없거나 조회 실패 시 기본값 사용
+                logger.warning(f"⚠️ Failed to get recent persona: {str(e)}, using default: {persona_name}")
 
             # 5. Sendbird 채팅으로 승인 요청 메시지 전송
             try:
-                channel_data = await chat_client.create_channel(
-                    channel_url=None,  # 자동 생성
-                    user_ids=[user_id, SendbirdConfig.AI_USER_ID]
-                )
-                channel_url = channel_data.get("channel_url")
+                # 최근 페르소나의 채널이 있으면 사용, 없으면 새로 생성
+                if sendbird_channel_url:
+                    # 기존 페르소나 채널 사용
+                    channel_url = sendbird_channel_url
+                    logger.info(f"📱 Using existing persona channel: {channel_url}")
+                else:
+                    # 새 채널 생성 (페르소나 채널이 없는 경우)
+                    channel_data = await chat_client.create_channel(
+                        channel_url=None,  # 자동 생성
+                        user_ids=[user_id, SendbirdConfig.AI_USER_ID]
+                    )
+                    channel_url = channel_data.get("channel_url")
+                    logger.info(f"📱 Created new channel: {channel_url}")
 
                 # 승인 요청 메시지 생성
                 if appliances_to_control:

@@ -54,6 +54,9 @@ class ChatSession(Base):
     persona_id = Column(String, nullable=True)
     persona_nickname = Column(String, nullable=True)  # 캐싱용
 
+    # Sendbird 채널 URL (페르소나별 채팅방 구분용)
+    sendbird_channel_url = Column(String, nullable=True)
+
     started_at = Column(
         DateTime(timezone=True),
         nullable=False,
