@@ -468,15 +468,70 @@ async def sendbird_calls_webhook(request: Request):
 
 
 async def handle_call_ended(payload: Dict[str, Any]):
-    """통화 종료 처리"""
+    """
+    통화 종료 처리
+
+    통화 종료 시 수행되는 작업:
+    1. 통화 기록 로깅
+    2. 통화 시간 기록
+    3. 메모리 서비스에 통화 이벤트 저장
+    4. 필요 시 통화 내용 요약 (향후 구현)
+    """
+    from app.config.db import SessionLocal
+
+    db = SessionLocal()
+
     try:
+        # 페이로드에서 통화 정보 추출
         call_id = payload.get("call_id")
         duration = payload.get("duration", 0)
-        
-        # TODO: 통화 내용 요약, 메모리 업데이트 등
-        logger.info(f"📴 Call ended: {call_id}, duration: {duration}s")
-    
+        caller = payload.get("caller", {})
+        callee = payload.get("callee", {})
+        end_result = payload.get("end_result")  # completed, canceled, declined, timed_out 등
+
+        caller_id = caller.get("user_id") if isinstance(caller, dict) else None
+        callee_id = callee.get("user_id") if isinstance(callee, dict) else None
+
+        logger.info(f"📴 Call ended: {call_id}")
+        logger.info(f"   Caller: {caller_id}")
+        logger.info(f"   Callee: {callee_id}")
+        logger.info(f"   Duration: {duration}s")
+        logger.info(f"   End result: {end_result}")
+
+        # 통화 기록을 메모리 서비스에 저장
+        if caller_id and callee_id:
+            # AI가 발신자인 경우와 수신자인 경우 구분
+            user_id = callee_id if caller_id == SendbirdConfig.AI_USER_ID else caller_id
+
+            # 통화 이벤트 메시지 생성
+            call_summary = f"통화 종료 (시간: {duration}초, 결과: {end_result})"
+
+            # 메모리에 통화 기록 추가
+            memory_service.add_message(user_id, "system", call_summary)
+            logger.info(f"💾 Call record saved to memory for user: {user_id}")
+
+            # 장기 메모리에 통화 통계 업데이트 (선택적)
+            long_term = memory_service.get_long_term_memory(user_id)
+            call_count = long_term.get("call_count", 0) + 1
+            total_call_duration = long_term.get("total_call_duration", 0) + duration
+
+            # 각 키-값 쌍을 개별적으로 업데이트
+            memory_service.update_long_term_memory(user_id, "call_count", call_count)
+            memory_service.update_long_term_memory(user_id, "total_call_duration", total_call_duration)
+            memory_service.update_long_term_memory(user_id, "last_call_ended_at", payload.get("ended_at"))
+
+            logger.info(f"📊 Call statistics updated: {call_count} calls, {total_call_duration}s total")
+
+        # TODO: 향후 구현 사항
+        # 1. DB에 통화 기록 영구 저장 (CallHistory 테이블)
+        # 2. 통화 내용 녹음이 있는 경우 STT 처리
+        # 3. AI 통화 내용 요약 생성
+        # 4. 통화 중 언급된 가전 제어 요청 처리
+
     except Exception as e:
         logger.error(f"❌ Call ended handling error: {str(e)}")
+        logger.error(f"   Payload: {payload}")
+    finally:
+        db.close()
 
 
