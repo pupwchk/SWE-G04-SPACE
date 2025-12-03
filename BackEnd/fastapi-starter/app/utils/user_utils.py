@@ -18,8 +18,8 @@ def get_user_by_identifier(db: Session, user_identifier: str) -> Optional[User]:
     사용자 식별자(email 또는 서버 DB UUID)로 User 조회
 
     우선순위:
-    1. 서버 DB UUID로 조회
-    2. Email로 조회
+    1. Email로 조회 (가장 확실한 방법)
+    2. 서버 DB UUID로 조회
     3. Supabase UUID인 경우 → Supabase에서 이메일 조회 → Email로 조회
 
     Args:
@@ -29,45 +29,49 @@ def get_user_by_identifier(db: Session, user_identifier: str) -> Optional[User]:
     Returns:
         User 객체 또는 None
     """
-    # 1. 서버 DB UUID로 시도
+    logger.debug(f"🔍 [USER-MAPPING] Looking up user_identifier: {user_identifier}")
+
+    # 1. Email로 먼저 시도 (@ 포함 여부로 이메일 판단)
+    if "@" in user_identifier:
+        user = db.query(User).filter(User.email == user_identifier).first()
+        if user:
+            logger.debug(f"✅ [USER-MAPPING] Found by email: {user_identifier} → Server UUID {user.id}")
+            return user
+        else:
+            logger.warning(f"⚠️ [USER-MAPPING] Email not found in server DB: {user_identifier}")
+            return None
+
+    # 2. UUID 형식인 경우
     try:
         user_uuid = UUID(user_identifier)
+
+        # 2-1. 서버 DB UUID로 조회
         user = db.query(User).filter(User.id == user_uuid).first()
         if user:
+            logger.debug(f"✅ [USER-MAPPING] Found by server UUID: {user_identifier}")
             return user
-    except (ValueError, TypeError):
-        # UUID 변환 실패 - email로 간주
-        pass
 
-    # 2. Email로 시도
-    user = db.query(User).filter(User.email == user_identifier).first()
-    if user:
-        return user
-
-    # 3. Supabase UUID인 경우 (서버 DB에 없지만 UUID 형식인 경우)
-    # NOTE: SendBird 인증은 이메일만 받으므로 이 케이스는 발생하지 않음
-    # Supabase UUID가 전달되는 경우는 채팅 API 등 다른 엔드포인트에서만 발생
-    try:
-        # UUID 형식이지만 서버 DB에 없는 경우 → Supabase UUID일 가능성
-        UUID(user_identifier)  # UUID 형식인지 확인
-
-        # Supabase에서 이메일 조회 시도
+        # 2-2. 서버 DB에 없으면 Supabase UUID일 가능성 - Supabase에서 이메일 조회
+        logger.info(f"🔄 [USER-MAPPING] UUID not found in server DB, checking Supabase: {user_identifier}")
         email = _get_email_from_supabase(user_identifier)
+
         if email:
-            # 이메일로 다시 조회
+            # 이메일로 서버 DB 재조회
             user = db.query(User).filter(User.email == email).first()
             if user:
                 logger.info(f"✅ [USER-MAPPING] Mapped Supabase UUID {user_identifier} → Email {email} → Server UUID {user.id}")
                 return user
             else:
                 logger.warning(f"⚠️ [USER-MAPPING] Email {email} found in Supabase but not in server DB")
+                return None
         else:
-            logger.debug(f"ℹ️ [USER-MAPPING] UUID {user_identifier} not found in server DB (might be Supabase UUID)")
-    except (ValueError, TypeError):
-        # UUID 형식도 아님
-        pass
+            logger.warning(f"⚠️ [USER-MAPPING] UUID {user_identifier} not found in Supabase either")
+            return None
 
-    return None
+    except (ValueError, TypeError):
+        # UUID 형식도 아니고 이메일도 아닌 경우
+        logger.error(f"❌ [USER-MAPPING] Invalid user_identifier format: {user_identifier}")
+        return None
 
 
 def _get_email_from_supabase(user_id: str) -> Optional[str]:
@@ -84,33 +88,52 @@ def _get_email_from_supabase(user_id: str) -> Optional[str]:
         from app.services.supabase_service import supabase_persona_service
 
         if not supabase_persona_service.is_available():
+            logger.warning(f"⚠️ [SUPABASE-MAPPING] Supabase service not available")
             return None
 
-        # Supabase Auth API를 통해 사용자 정보 조회
         client = supabase_persona_service.client
 
-        # Supabase Admin API를 사용하여 사용자 정보 조회
-        # auth.admin.get_user_by_id() 메서드 사용
+        # 방법 1: Supabase Auth Admin API로 사용자 조회
         try:
+            logger.debug(f"🔍 [SUPABASE-MAPPING] Trying auth.admin.get_user_by_id for {user_id}")
             response = client.auth.admin.get_user_by_id(user_id)
-            if response and response.user:
+            if response and response.user and response.user.email:
                 email = response.user.email
-                logger.info(f"✅ [SUPABASE-MAPPING] Found email {email} for Supabase UUID {user_id}")
+                logger.info(f"✅ [SUPABASE-MAPPING] Found email via Auth API: {email} for UUID {user_id}")
                 return email
-        except AttributeError:
-            # admin API가 없는 경우, 직접 DB 조회 시도
-            result = client.table("users").select("email").eq("id", user_id).single().execute()
-            if result.data:
+        except AttributeError as e:
+            logger.debug(f"ℹ️ [SUPABASE-MAPPING] Admin API not available: {str(e)}")
+        except Exception as e:
+            logger.debug(f"ℹ️ [SUPABASE-MAPPING] Auth API query failed: {str(e)}")
+
+        # 방법 2: Supabase Database의 auth.users 테이블 직접 조회
+        try:
+            logger.debug(f"🔍 [SUPABASE-MAPPING] Trying direct database query for {user_id}")
+            # auth.users는 직접 접근 불가능하므로 public.users 또는 profiles 테이블 시도
+            result = client.table("users").select("email").eq("id", user_id).maybe_single().execute()
+            if result.data and result.data.get("email"):
                 email = result.data.get("email")
-                if email:
-                    logger.info(f"✅ [SUPABASE-MAPPING] Found email {email} for Supabase UUID {user_id}")
-                    return email
+                logger.info(f"✅ [SUPABASE-MAPPING] Found email via DB query: {email} for UUID {user_id}")
+                return email
+        except Exception as e:
+            logger.debug(f"ℹ️ [SUPABASE-MAPPING] DB query failed: {str(e)}")
+
+        # 방법 3: profiles 테이블 시도 (일반적인 Supabase 패턴)
+        try:
+            logger.debug(f"🔍 [SUPABASE-MAPPING] Trying profiles table for {user_id}")
+            result = client.table("profiles").select("email").eq("id", user_id).maybe_single().execute()
+            if result.data and result.data.get("email"):
+                email = result.data.get("email")
+                logger.info(f"✅ [SUPABASE-MAPPING] Found email via profiles: {email} for UUID {user_id}")
+                return email
+        except Exception as e:
+            logger.debug(f"ℹ️ [SUPABASE-MAPPING] Profiles query failed: {str(e)}")
 
         logger.warning(f"⚠️ [SUPABASE-MAPPING] No email found for Supabase UUID {user_id}")
         return None
 
     except Exception as e:
-        logger.error(f"❌ [SUPABASE-MAPPING] Error querying Supabase: {str(e)}")
+        logger.error(f"❌ [SUPABASE-MAPPING] Unexpected error querying Supabase: {str(e)}", exc_info=True)
         return None
 
 
