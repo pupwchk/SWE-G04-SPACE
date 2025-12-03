@@ -168,11 +168,81 @@ class SendbirdChatClient:
 
 class SendbirdCallsClient:
     """Sendbird Calls API 클라이언트"""
-    
+
     def __init__(self):
         self.base_url = SendbirdConfig.CALLS_API_BASE
         self.headers = SendbirdConfig.get_calls_headers()
-    
+
+    async def authenticate_user(
+        self,
+        user_id: str,
+        access_token: str = ""
+    ) -> Dict[str, Any]:
+        """
+        사용자를 SendBird Calls에 인증
+
+        Args:
+            user_id: SendBird 사용자 ID
+            access_token: 선택적 액세스 토큰
+
+        Returns:
+            인증 결과 딕셔너리
+        """
+        url = f"{self.base_url}/authenticate"
+
+        payload = {
+            "user_id": user_id,
+            "access_token": access_token
+        }
+
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    url,
+                    headers=self.headers,
+                    json=payload,
+                    timeout=10.0
+                )
+                response.raise_for_status()
+
+                logger.info(f"✅ User '{user_id}' authenticated with SendBird Calls")
+                return response.json()
+
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 400:
+                logger.info(f"ℹ️ User '{user_id}' already authenticated")
+                return {"status": "already_authenticated", "user_id": user_id}
+            else:
+                logger.error(f"❌ Failed to authenticate user: {e.response.status_code} - {e.response.text}")
+                raise
+        except Exception as e:
+            logger.error(f"❌ Error authenticating user: {str(e)}")
+            raise
+
+    async def register_ai_assistant(
+        self,
+        assistant_id: str = None
+    ) -> Dict[str, Any]:
+        """
+        AI assistant를 SendBird Calls에 자동 등록
+
+        Args:
+            assistant_id: AI assistant의 사용자 ID (기본값: SendbirdConfig.AI_USER_ID)
+
+        Returns:
+            등록 결과 딕셔너리
+        """
+        if assistant_id is None:
+            assistant_id = SendbirdConfig.AI_USER_ID
+
+        try:
+            result = await self.authenticate_user(assistant_id)
+            logger.info(f"✅ AI assistant '{assistant_id}' registered successfully")
+            return result
+        except Exception as e:
+            logger.error(f"❌ Failed to register AI assistant: {e}")
+            raise
+
     async def make_call(
         self,
         caller_id: str,
