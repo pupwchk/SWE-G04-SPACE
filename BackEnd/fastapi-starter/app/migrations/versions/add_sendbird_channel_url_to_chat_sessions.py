@@ -1,7 +1,7 @@
 """add sendbird_channel_url to chat_sessions
 
 Revision ID: add_sendbird_channel
-Revises: e0bbb0017a7b
+Revises: chat_001
 Create Date: 2025-12-03 00:00:00.000000
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = 'add_sendbird_channel'
-down_revision: Union[str, None] = 'e0bbb0017a7b'
+down_revision: Union[str, None] = 'chat_001'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
