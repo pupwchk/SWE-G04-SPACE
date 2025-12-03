@@ -22,7 +22,9 @@ class SupabasePersonaService:
 
     def __init__(self):
         self.url = os.getenv("SUPABASE_URL", "")
-        self.key = os.getenv("SUPABASE_ANON_KEY", "")
+        # SERVICE_ROLE_KEY 사용 (RLS 우회 가능)
+        # 백엔드에서만 사용하므로 안전함
+        self.key = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "") or os.getenv("SUPABASE_ANON_KEY", "")
         self.client = None
 
         # Supabase 클라이언트 초기화
@@ -30,13 +32,14 @@ class SupabasePersonaService:
             try:
                 from supabase import create_client, Client
                 self.client: Client = create_client(self.url, self.key)
-                logger.info("✅ Supabase client initialized")
+                key_type = "SERVICE_ROLE" if os.getenv("SUPABASE_SERVICE_ROLE_KEY") else "ANON"
+                logger.info(f"✅ Supabase client initialized with {key_type} key")
             except ImportError:
                 logger.warning("⚠️ supabase-py not installed. Run: pip install supabase")
             except Exception as e:
                 logger.error(f"❌ Supabase initialization error: {str(e)}")
         else:
-            logger.warning("⚠️ SUPABASE_URL or SUPABASE_ANON_KEY not set")
+            logger.warning("⚠️ SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set")
 
     def is_available(self) -> bool:
         """Supabase 사용 가능 여부"""
