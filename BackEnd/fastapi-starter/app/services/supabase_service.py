@@ -308,6 +308,110 @@ class SupabasePersonaService:
             "description": final_prompt
         }
 
+    def get_latest_persona_by_email(self, email: str) -> Optional[Dict[str, Any]]:
+        """
+        사용자의 가장 최근에 생성된 페르소나 조회 (created_at 기준)
+
+        Args:
+            email: 사용자 이메일 (Supabase와 PostgreSQL 공통 키)
+
+        Returns:
+            페르소나 데이터 (adjectives 포함) 또는 None
+            {
+                "id": "uuid",
+                "user_id": "uuid",  # Supabase Auth UUID
+                "nickname": "하루",
+                "adjective_ids": [...],
+                "custom_instructions": "...",
+                "final_prompt": "...",
+                "created_at": "2025-12-01T...",
+                "adjectives": [...]
+            }
+        """
+        if not self.is_available():
+            logger.warning("⚠️ Supabase not available, returning None")
+            return None
+
+        try:
+            # 1. email로 Supabase user_id 찾기
+            supabase_user_id = None
+
+            # users 테이블에서 email로 조회
+            try:
+                user_result = self.client.table("users")\
+                    .select("id, email")\
+                    .eq("email", email)\
+                    .execute()
+
+                if user_result.data:
+                    if isinstance(user_result.data, list) and len(user_result.data) > 0:
+                        supabase_user_id = user_result.data[0].get("id")
+                    elif isinstance(user_result.data, dict):
+                        supabase_user_id = user_result.data.get("id")
+
+                    if supabase_user_id:
+                        logger.debug(f"✅ [SUPABASE-PERSONA] Found user_id via users table: {supabase_user_id}")
+            except Exception as e:
+                logger.debug(f"ℹ️ [SUPABASE-PERSONA] Users table query failed: {str(e)}")
+
+            # profiles 테이블에서 email로 조회 (fallback)
+            if not supabase_user_id:
+                try:
+                    profile_result = self.client.table("profiles")\
+                        .select("id, email")\
+                        .eq("email", email)\
+                        .execute()
+
+                    if profile_result.data:
+                        if isinstance(profile_result.data, list) and len(profile_result.data) > 0:
+                            supabase_user_id = profile_result.data[0].get("id")
+                        elif isinstance(profile_result.data, dict):
+                            supabase_user_id = profile_result.data.get("id")
+
+                        if supabase_user_id:
+                            logger.debug(f"✅ [SUPABASE-PERSONA] Found user_id via profiles: {supabase_user_id}")
+                except Exception as e:
+                    logger.debug(f"ℹ️ [SUPABASE-PERSONA] Profiles query failed: {str(e)}")
+
+            if not supabase_user_id:
+                logger.warning(f"⚠️ [SUPABASE-PERSONA] Could not find Supabase user_id for email: {email}")
+                return None
+
+            # 2. 해당 user_id의 가장 최근 페르소나 조회 (created_at 기준 정렬)
+            result = self.client.table("personas")\
+                .select("*")\
+                .eq("user_id", supabase_user_id)\
+                .order("created_at", desc=True)\
+                .limit(1)\
+                .execute()
+
+            if not result.data or len(result.data) == 0:
+                logger.info(f"ℹ️ No personas found for email {email} (Supabase user_id: {supabase_user_id})")
+                return None
+
+            persona_data = result.data[0]
+
+            # 3. adjectives 조회 (adjective_ids 배열 기반)
+            adjective_ids = persona_data.get("adjective_ids", [])
+            adjectives = []
+
+            if adjective_ids:
+                adj_result = self.client.table("adjectives")\
+                    .select("*")\
+                    .in_("id", adjective_ids)\
+                    .execute()
+
+                adjectives = adj_result.data if adj_result.data else []
+
+            persona_data["adjectives"] = adjectives
+
+            logger.info(f"✅ Latest persona loaded for {email}: {persona_data.get('nickname')} (created_at: {persona_data.get('created_at')})")
+            return persona_data
+
+        except Exception as e:
+            logger.error(f"❌ Error fetching latest persona for email {email}: {str(e)}")
+            return None
+
 
 # 싱글톤 인스턴스
 supabase_persona_service = SupabasePersonaService()

@@ -153,50 +153,86 @@ async def trigger_auto_notification(user_id: str, distance: float, event_type: s
 
             logger.info(f"🎛️ Appliances to control: {len(appliances_to_control)}")
 
-            # 4. 가장 최근 대화한 페르소나 조회
+            # 4. 가장 최근 생성된 페르소나 조회 (Supabase)
             persona_name = "AI 어시스턴트"  # 기본값
-            sendbird_channel_url = None  # 페르소나 채널 URL
+            persona_id = None  # Supabase 페르소나 ID
+
             try:
-                from app.models.chat import ChatSession
-                from sqlalchemy import desc
+                from app.models.user import User
+                from app.services.supabase_service import supabase_persona_service
 
-                recent_session = db.query(ChatSession)\
-                    .filter(
-                        ChatSession.user_id == user_id,
-                        ChatSession.persona_id.isnot(None)
-                    )\
-                    .order_by(desc(ChatSession.last_message_at))\
-                    .first()
+                # 4-1. 서버 DB에서 user_id로 email 조회
+                user = db.query(User).filter(User.id == user_id).first()
 
-                if recent_session:
-                    if recent_session.persona_nickname:
-                        persona_name = recent_session.persona_nickname
-                    if recent_session.sendbird_channel_url:
-                        sendbird_channel_url = recent_session.sendbird_channel_url
-                        logger.info(f"👤 Using recent persona: {persona_name}, channel: {sendbird_channel_url}")
-                    else:
-                        logger.info(f"👤 Using recent persona: {persona_name}, but no channel URL saved")
+                if not user or not user.email:
+                    logger.warning(f"⚠️ User {user_id} not found or has no email")
+                    raise Exception("User email not found")
+
+                user_email = user.email
+                logger.info(f"📧 User email: {user_email}")
+
+                # 4-2. Supabase에서 email로 가장 최근 페르소나 조회
+                latest_persona = supabase_persona_service.get_latest_persona_by_email(user_email)
+
+                if latest_persona:
+                    persona_id = latest_persona.get("id")
+                    persona_name = latest_persona.get("nickname", "AI 어시스턴트")
+                    logger.info(f"👤 Latest persona from Supabase: {persona_name} (id: {persona_id})")
                 else:
-                    logger.info(f"👤 No recent persona found, using default: {persona_name}")
+                    logger.info(f"ℹ️ No personas found in Supabase for {user_email}, using default")
+
             except Exception as e:
-                # chat_sessions 테이블이 없거나 조회 실패 시 기본값 사용
-                logger.warning(f"⚠️ Failed to get recent persona: {str(e)}, using default: {persona_name}")
+                # Supabase 조회 실패 시 기본값 사용
+                logger.warning(f"⚠️ Failed to get latest persona from Supabase: {str(e)}, using default: {persona_name}")
 
             # 5. Sendbird 채팅으로 승인 요청 메시지 전송
             try:
-                # 최근 페르소나의 채널이 있으면 사용, 없으면 새로 생성
-                if sendbird_channel_url:
-                    # 기존 페르소나 채널 사용
-                    channel_url = sendbird_channel_url
-                    logger.info(f"📱 Using existing persona channel: {channel_url}")
-                else:
-                    # 새 채널 생성 (페르소나 채널이 없는 경우)
-                    channel_data = await chat_client.create_channel(
-                        channel_url=None,  # 자동 생성
-                        user_ids=[user_id, SendbirdConfig.AI_USER_ID]
-                    )
-                    channel_url = channel_data.get("channel_url")
-                    logger.info(f"📱 Created new channel: {channel_url}")
+                # Sendbird의 is_distinct=True로 채널 조회/생성
+                # 같은 멤버 조합이 있으면 기존 채널 반환, 없으면 새로 생성
+                channel_data = await chat_client.create_channel(
+                    channel_url=None,  # 자동 생성
+                    user_ids=[user_id, SendbirdConfig.AI_USER_ID],
+                    name=f"Chat with {persona_name}"
+                )
+                channel_url = channel_data.get("channel_url")
+                logger.info(f"📱 Using channel: {channel_url} (persona: {persona_name})")
+
+                # ChatSession에 기록 저장 (선택적, 추후 분석용)
+                if persona_id:
+                    try:
+                        from app.models.chat import ChatSession
+                        from datetime import datetime, timezone
+
+                        # 기존 세션이 있으면 업데이트, 없으면 생성
+                        existing_session = db.query(ChatSession)\
+                            .filter(
+                                ChatSession.user_id == user_id,
+                                ChatSession.persona_id == persona_id
+                            )\
+                            .first()
+
+                        if existing_session:
+                            # 기존 세션 업데이트
+                            existing_session.sendbird_channel_url = channel_url
+                            existing_session.persona_nickname = persona_name
+                            existing_session.last_message_at = datetime.now(timezone.utc)
+                            logger.info(f"💾 Updated ChatSession")
+                        else:
+                            # 새 세션 생성
+                            new_session = ChatSession(
+                                user_id=user_id,
+                                persona_id=persona_id,
+                                persona_nickname=persona_name,
+                                sendbird_channel_url=channel_url,
+                                is_active=True
+                            )
+                            db.add(new_session)
+                            logger.info(f"💾 Created new ChatSession")
+
+                        db.commit()
+                    except Exception as e:
+                        logger.warning(f"⚠️ Failed to save ChatSession: {str(e)}")
+                        db.rollback()
 
                 # 승인 요청 메시지 생성
                 if appliances_to_control:
