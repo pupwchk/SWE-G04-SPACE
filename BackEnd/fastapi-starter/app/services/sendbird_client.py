@@ -217,12 +217,15 @@ class SendbirdCallsClient:
                 return response.json()
 
         except httpx.HTTPStatusError as e:
-            if e.response.status_code == 400 and "already exists" in e.response.text.lower():
-                logger.info(f"ℹ️ AI assistant '{assistant_id}' already exists")
-                return {"status": "already_exists", "user_id": assistant_id}
-            else:
-                logger.error(f"❌ Failed to register AI assistant: {e.response.status_code} - {e.response.text}")
-                raise
+            # 400 에러 + unique constraint 위반 = 이미 존재하는 사용자
+            if e.response.status_code == 400:
+                error_text = e.response.text.lower()
+                if "unique constraint" in error_text or "already exists" in error_text:
+                    logger.info(f"ℹ️ AI assistant '{assistant_id}' already exists")
+                    return {"status": "already_exists", "user_id": assistant_id}
+
+            logger.error(f"❌ Failed to register AI assistant: {e.response.status_code} - {e.response.text}")
+            raise
         except Exception as e:
             logger.error(f"❌ Error registering AI assistant: {str(e)}")
             raise
