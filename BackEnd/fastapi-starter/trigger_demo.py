@@ -15,7 +15,7 @@ USER_EMAIL = "djwnsgh0248@gmail.com"
 # API 엔드포인트
 # Docker 환경: localhost:80 (Nginx를 통해)
 # 또는 직접: localhost:11325
-url = f"http://13.125.85.158/:11325/api/location/trigger/demo/{USER_EMAIL}"
+url = f"http://13.125.85.158:11325/api/location/trigger/demo/{USER_EMAIL}"
 
 print(f"🎬 시연용 AI 자동 전화 트리거 중...")
 print(f"   사용자: {USER_EMAIL}")
