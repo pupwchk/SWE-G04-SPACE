@@ -336,9 +336,9 @@ class SupabasePersonaService:
             # 1. email로 Supabase user_id 찾기
             supabase_user_id = None
 
-            # users 테이블에서 email로 조회
+            # user_profiles 테이블에서 email로 조회 (우선순위 1)
             try:
-                user_result = self.client.table("users")\
+                user_result = self.client.table("user_profiles")\
                     .select("id, email")\
                     .eq("email", email)\
                     .execute()
@@ -350,11 +350,30 @@ class SupabasePersonaService:
                         supabase_user_id = user_result.data.get("id")
 
                     if supabase_user_id:
-                        logger.debug(f"✅ [SUPABASE-PERSONA] Found user_id via users table: {supabase_user_id}")
+                        logger.debug(f"✅ [SUPABASE-PERSONA] Found user_id via user_profiles table: {supabase_user_id}")
             except Exception as e:
-                logger.debug(f"ℹ️ [SUPABASE-PERSONA] Users table query failed: {str(e)}")
+                logger.debug(f"ℹ️ [SUPABASE-PERSONA] user_profiles table query failed: {str(e)}")
 
-            # profiles 테이블에서 email로 조회 (fallback)
+            # users 테이블에서 email로 조회 (fallback 1)
+            if not supabase_user_id:
+                try:
+                    user_result = self.client.table("users")\
+                        .select("id, email")\
+                        .eq("email", email)\
+                        .execute()
+
+                    if user_result.data:
+                        if isinstance(user_result.data, list) and len(user_result.data) > 0:
+                            supabase_user_id = user_result.data[0].get("id")
+                        elif isinstance(user_result.data, dict):
+                            supabase_user_id = user_result.data.get("id")
+
+                        if supabase_user_id:
+                            logger.debug(f"✅ [SUPABASE-PERSONA] Found user_id via users table: {supabase_user_id}")
+                except Exception as e:
+                    logger.debug(f"ℹ️ [SUPABASE-PERSONA] Users table query failed: {str(e)}")
+
+            # profiles 테이블에서 email로 조회 (fallback 2)
             if not supabase_user_id:
                 try:
                     profile_result = self.client.table("profiles")\
