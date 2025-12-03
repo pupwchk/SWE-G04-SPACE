@@ -392,35 +392,41 @@ class SendbirdCallsClient:
             "calls_authenticated": True
         }
 
-    async def make_call(
+    async def create_direct_call(
         self,
         caller_id: str,
         callee_id: str,
         call_type: str = "voice"
     ) -> Dict[str, Any]:
         """
-        전화 발신
-        
+        Direct Call 생성 (서버-투-서버 API)
+
+        SendBird Calls Direct Call API를 사용하여 서버에서 통화 생성.
+        양쪽 사용자가 Calls SDK에 인증되어 있지 않아도 동작.
+
         Args:
-            caller_id: 발신자 ID (보통 AI assistant)
-            callee_id: 수신자 ID (사용자)
+            caller_id: 발신자 ID
+            callee_id: 수신자 ID
             call_type: 통화 타입 (voice/video)
-        
+
         Returns:
-            API 응답
+            {
+                "call_id": str,
+                "caller": {"user_id": str},
+                "callee": {"user_id": str},
+                "status": str,
+                "call_type": str
+            }
         """
-        url = f"{self.base_url}/calls"
-        
+        url = f"{self.base_url}/direct_calls"
+
         payload = {
-            "caller": {
-                "user_id": caller_id
-            },
-            "callee": {
-                "user_id": callee_id
-            },
-            "call_type": call_type
+            "caller_id": caller_id,
+            "callee_id": callee_id,
+            "call_type": call_type,
+            "is_video_call": call_type == "video"
         }
-        
+
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.post(
@@ -430,21 +436,60 @@ class SendbirdCallsClient:
                     timeout=10.0
                 )
                 response.raise_for_status()
-                
-                logger.info(f"✅ Call initiated: {caller_id} -> {callee_id}")
-                return response.json()
-                
+
+                result = response.json()
+                logger.info(f"✅ Direct call created: {result.get('call_id')} ({caller_id} -> {callee_id})")
+                return result
+
         except httpx.HTTPStatusError as e:
-            logger.error(f"❌ Failed to make call: {e.response.status_code} - {e.response.text}")
+            logger.error(f"❌ Failed to create direct call: {e.response.status_code} - {e.response.text}")
             raise
         except Exception as e:
-            logger.error(f"❌ Error making call: {str(e)}")
+            logger.error(f"❌ Error creating direct call: {str(e)}")
             raise
+
+    async def make_call(
+        self,
+        caller_id: str,
+        callee_id: str,
+        call_type: str = "voice"
+    ) -> Dict[str, Any]:
+        """
+        전화 발신 (레거시 메서드, create_direct_call 사용 권장)
+
+        Args:
+            caller_id: 발신자 ID (보통 AI assistant)
+            callee_id: 수신자 ID (사용자)
+            call_type: 통화 타입 (voice/video)
+
+        Returns:
+            API 응답
+        """
+        return await self.create_direct_call(caller_id, callee_id, call_type)
     
+    async def get_call_info(self, call_id: str) -> Dict[str, Any]:
+        """통화 정보 조회"""
+        url = f"{self.base_url}/calls/{call_id}"
+
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    url,
+                    headers=self.headers,
+                    timeout=10.0
+                )
+                response.raise_for_status()
+
+                return response.json()
+
+        except Exception as e:
+            logger.error(f"❌ Error getting call info: {str(e)}")
+            raise
+
     async def end_call(self, call_id: str) -> Dict[str, Any]:
         """통화 종료"""
         url = f"{self.base_url}/calls/{call_id}"
-        
+
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.delete(
@@ -453,10 +498,10 @@ class SendbirdCallsClient:
                     timeout=10.0
                 )
                 response.raise_for_status()
-                
+
                 logger.info(f"✅ Call ended: {call_id}")
                 return response.json()
-                
+
         except Exception as e:
             logger.error(f"❌ Error ending call: {str(e)}")
             raise

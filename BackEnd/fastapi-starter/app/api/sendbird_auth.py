@@ -152,3 +152,47 @@ async def check_sendbird_auth_status(
     except Exception as e:
         logger.error(f"❌ Status check error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/auth/ai-token")
+async def get_ai_assistant_token():
+    """
+    AI assistant의 access_token 발급
+
+    무료 플랜에서는 iOS 앱이 AI assistant로도 인증해야 함.
+    이 엔드포인트를 호출하여 AI assistant의 access_token을 받아서
+    iOS 앱에서 SendBirdCall.authenticate() 호출.
+
+    Returns:
+        {
+            "user_id": "home_ai_assistant",
+            "access_token": str,
+            "calls_ready": bool
+        }
+    """
+    try:
+        from app.config.sendbird import SendbirdConfig
+
+        logger.info(f"🔑 Requesting AI assistant token for iOS app")
+
+        # SendBird Calls 클라이언트로 AI assistant 등록 및 토큰 발급
+        calls_client = SendbirdCallsClient()
+        result = await calls_client.register_ai_assistant()
+
+        if not result.get("access_token"):
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to obtain AI assistant access_token"
+            )
+
+        logger.info(f"✅ AI assistant token ready for iOS")
+
+        return {
+            "user_id": SendbirdConfig.AI_USER_ID,
+            "access_token": result["access_token"],
+            "calls_ready": result.get("calls_ready", True)
+        }
+
+    except Exception as e:
+        logger.error(f"❌ AI token error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
