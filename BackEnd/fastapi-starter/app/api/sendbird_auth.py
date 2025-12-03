@@ -71,7 +71,7 @@ async def get_sendbird_auth_token(
         }
     """
     try:
-        # 1. DB에서 사용자 확인
+        # 1. DB에서 사용자 확인 (이메일 또는 UUID로 조회)
         user = get_user_by_identifier(db, request.user_id)
         if not user:
             raise HTTPException(
@@ -79,13 +79,18 @@ async def get_sendbird_auth_token(
                 detail=f"User not found: {request.user_id}"
             )
 
-        logger.info(f"🔐 Authenticating user '{request.user_id}' with SendBird Calls")
+        # FastAPI DB의 UUID를 SendBird user_id로 사용
+        # SendBird는 이메일 형식을 user_id로 허용하지 않음
+        fastapi_user_id = str(user.id)
+        user_email = user.email
 
-        # 2. SendBird Calls 클라이언트로 인증
+        logger.info(f"🔐 Authenticating user email='{user_email}' with FastAPI UUID='{fastapi_user_id}'")
+
+        # 2. SendBird Calls 클라이언트로 인증 (FastAPI UUID 사용)
         calls_client = SendbirdCallsClient()
         result = await calls_client.authenticate_user(
-            user_id=request.user_id,
-            nickname=request.nickname,
+            user_id=fastapi_user_id,  # ← FastAPI DB UUID 사용
+            nickname=request.nickname or user_email,
             profile_url=request.profile_url
         )
 
