@@ -61,10 +61,10 @@ This enables a highly adaptive environment that goes beyond simple “if tired �
 |------|-----------|
 | **Client (iOS / watchOS)** | SwiftUI, HealthKit, MapKit, WatchConnectivity, URLSession / async networking |
 | **Backend** | Python 3.10, FastAPI (REST API), SQLAlchemy ORM, Pydantic, Docker + Docker Compose, NGINX reverse proxy, AWS EC2 (Ubuntu) |
-| **Database** | Supabase (managed PostgreSQL), PostgreSQL 15, PostGIS (optional future extension) |
+| **Database** | Supabase (managed PostgreSQL), PostgreSQL 15 |
 | **AI / Chat** | OpenAI GPT APIs, Sendbird Chat Platform |
 | **External APIs** | KMA Weather API (Ultra-short-term forecast) |
-| **DevOps / Tools** | GitHub Actions (optional future CI), Postman / Bruno (API testing), VSCode Remote SSH |
+| **DevOps / Tools** |Postman / Bruno (API testing), VSCode Remote SSH |
 
 ---
 ## 🎥 Video
@@ -85,4 +85,5 @@ This enables a highly adaptive environment that goes beyond simple “if tired �
 
 Copyright (c) 2025 HARU
 This project is licensed under the MIT License — see the [LICENSE](./LICENSE) file for details.
+
 
