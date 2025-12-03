@@ -454,13 +454,22 @@ async def sendbird_calls_webhook(request: Request):
         # 🔍 전체 페이로드 로깅 (디버깅용)
         logger.info(f"📦 [CALLS-WEBHOOK] Full payload: {payload}")
 
-        event_type = payload.get("type")
-        call_id = payload.get("call_id")
+        # Sendbird Calls 웹훅 페이로드 구조
+        category = payload.get("category")  # "direct_call:dial", "direct_call:accept", "direct_call:end"
+        direct_call = payload.get("direct_call", {})
+        call_id = direct_call.get("call_id")
 
-        logger.info(f"📞 Calls webhook: {event_type} - {call_id}")
+        logger.info(f"📞 Calls webhook: {category} - {call_id}")
 
-        # 통화 종료 시 요약 생성 등
-        if event_type == "call.ended":
+        # 이벤트별 처리
+        if category == "direct_call:dial":
+            # 전화 발신 시
+            await handle_call_dialing(payload)
+        elif category == "direct_call:accept":
+            # 전화 수락 시
+            await handle_call_established(payload)
+        elif category == "direct_call:end":
+            # 통화 종료 시
             await handle_call_ended(payload)
 
         return {"status": "ok"}
@@ -486,14 +495,13 @@ async def handle_call_ended(payload: Dict[str, Any]):
 
     try:
         # 페이로드에서 통화 정보 추출
-        call_id = payload.get("call_id")
-        duration = payload.get("duration", 0)
-        caller = payload.get("caller", {})
-        callee = payload.get("callee", {})
-        end_result = payload.get("end_result")  # completed, canceled, declined, timed_out 등
-
-        caller_id = caller.get("user_id") if isinstance(caller, dict) else None
-        callee_id = callee.get("user_id") if isinstance(callee, dict) else None
+        direct_call = payload.get("direct_call", {})
+        call_id = direct_call.get("call_id")
+        duration = direct_call.get("duration", 0)
+        caller_id = direct_call.get("caller_id")
+        callee_id = direct_call.get("callee_id")
+        end_result = direct_call.get("end_result")  # completed, canceled, declined, timed_out 등
+        ended_at = direct_call.get("ended_at")
 
         logger.info(f"📴 Call ended: {call_id}")
         logger.info(f"   Caller: {caller_id}")
@@ -521,7 +529,7 @@ async def handle_call_ended(payload: Dict[str, Any]):
             # 각 키-값 쌍을 개별적으로 업데이트
             memory_service.update_long_term_memory(user_id, "call_count", call_count)
             memory_service.update_long_term_memory(user_id, "total_call_duration", total_call_duration)
-            memory_service.update_long_term_memory(user_id, "last_call_ended_at", payload.get("ended_at"))
+            memory_service.update_long_term_memory(user_id, "last_call_ended_at", ended_at)
 
             logger.info(f"📊 Call statistics updated: {call_count} calls, {total_call_duration}s total")
 
@@ -538,9 +546,9 @@ async def handle_call_ended(payload: Dict[str, Any]):
         db.close()
 
 
-async def handle_incoming_call(payload: Dict[str, Any]):
+async def handle_call_dialing(payload: Dict[str, Any]):
     """
-    수신 통화 처리 (AI 자동 응답)
+    전화 발신 처리 (AI 자동 응답)
 
     AI assistant가 전화를 받아야 하는 경우:
     1. callee가 AI assistant인지 확인
@@ -548,12 +556,10 @@ async def handle_incoming_call(payload: Dict[str, Any]):
     3. 통화 시작
     """
     try:
-        call_id = payload.get("call_id")
-        caller = payload.get("caller", {})
-        callee = payload.get("callee", {})
-
-        caller_id = caller.get("user_id") if isinstance(caller, dict) else None
-        callee_id = callee.get("user_id") if isinstance(callee, dict) else None
+        direct_call = payload.get("direct_call", {})
+        call_id = direct_call.get("call_id")
+        caller_id = direct_call.get("caller_id")
+        callee_id = direct_call.get("callee_id")
 
         logger.info(f"📞 [CALL-INCOMING] Call received!")
         logger.info(f"   Call ID: {call_id}")
@@ -587,12 +593,10 @@ async def handle_call_established(payload: Dict[str, Any]):
     3. TTS로 인사말 재생 (향후 구현)
     """
     try:
-        call_id = payload.get("call_id")
-        caller = payload.get("caller", {})
-        callee = payload.get("callee", {})
-
-        caller_id = caller.get("user_id") if isinstance(caller, dict) else None
-        callee_id = callee.get("user_id") if isinstance(callee, dict) else None
+        direct_call = payload.get("direct_call", {})
+        call_id = direct_call.get("call_id")
+        caller_id = direct_call.get("caller_id")
+        callee_id = direct_call.get("callee_id")
 
         logger.info(f"✅ [CALL-ESTABLISHED] Call connected!")
         logger.info(f"   Call ID: {call_id}")
