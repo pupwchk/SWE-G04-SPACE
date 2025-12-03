@@ -83,7 +83,21 @@ struct GeneralView: View {
                     Button(action: {
                         showCallErrorHistory = true
                     }) {
-                        GeneralRow(title: "전화 오약 기록", fontSize: fontSizeManager.fontSize)
+                        GeneralRow(title: "전화 요약 기록", fontSize: fontSizeManager.fontSize)
+                    }
+                    .buttonStyle(.plain)
+
+                    Divider()
+                        .padding(.vertical, 16)
+
+                    // 건강 section (for testing)
+                    SectionHeader(title: "건강 데이터")
+
+                    Button(action: {
+                        print("🔄 Triggering manual HRV sync...")
+                        HealthKitManager.shared.syncHRVNow()
+                    }) {
+                        GeneralRow(title: "HRV 데이터 동기화 (테스트)", fontSize: fontSizeManager.fontSize)
                     }
                     .buttonStyle(.plain)
                 }

@@ -205,12 +205,6 @@ class SendbirdManager: ObservableObject {
                         completion(false, error)
                     }
                 }
-
-            } catch {
-                print("❌ [Sendbird] Authentication process error: \(error)")
-                await MainActor.run {
-                    completion(false, error)
-                }
             }
         }
     }

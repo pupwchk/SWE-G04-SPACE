@@ -46,6 +46,11 @@ class HealthKitManager: ObservableObject {
     private var caloriesObserver: HKObserverQuery?
     private var stepsObserver: HKObserverQuery?
     private var distanceObserver: HKObserverQuery?
+    private var hrvObserver: HKObserverQuery?
+
+    // HRV sync tracking
+    private var lastHRVSyncDate: Date?
+    private var hrvSyncTimer: Timer?
 
     // MARK: - Initialization
 
@@ -368,6 +373,10 @@ class HealthKitManager: ObservableObject {
         startCaloriesObserver()
         startStepsObserver()
         startDistanceObserver()
+        startHRVObserver()
+
+        // Start periodic HRV sync (every 30 minutes)
+        startPeriodicHRVSync()
 
         print(" Real-time health observers started")
     }
@@ -386,6 +395,13 @@ class HealthKitManager: ObservableObject {
         if let observer = distanceObserver {
             healthStore.stop(observer)
         }
+        if let observer = hrvObserver {
+            healthStore.stop(observer)
+        }
+
+        // Stop HRV sync timer
+        hrvSyncTimer?.invalidate()
+        hrvSyncTimer = nil
 
         print("🛑 Real-time health observers stopped")
     }
@@ -572,6 +588,134 @@ class HealthKitManager: ObservableObject {
         }
 
         healthStore.execute(query)
+    }
+
+    // MARK: - HRV Observer and Sync
+
+    private func startHRVObserver() {
+        guard let hrvType = HKObjectType.quantityType(forIdentifier: .heartRateVariabilitySDNN) else { return }
+
+        let query = HKObserverQuery(sampleType: hrvType, predicate: nil) { [weak self] _, completionHandler, error in
+            if let error = error {
+                print("  HRV observer error: \(error.localizedDescription)")
+                completionHandler()
+                return
+            }
+
+            // Fetch and sync latest HRV
+            self?.fetchAndSyncLatestHRV()
+            completionHandler()
+        }
+
+        hrvObserver = query
+        healthStore.execute(query)
+
+        healthStore.enableBackgroundDelivery(for: hrvType, frequency: .hourly) { success, error in
+            if success {
+                print(" HRV background delivery enabled")
+            } else {
+                print("  HRV background delivery failed: \(error?.localizedDescription ?? "Unknown")")
+            }
+        }
+    }
+
+    /// Start periodic HRV sync every 30 minutes
+    private func startPeriodicHRVSync() {
+        // Initial sync
+        fetchAndSyncLatestHRV()
+
+        // Schedule periodic sync (30 minutes)
+        hrvSyncTimer = Timer.scheduledTimer(withTimeInterval: 1800, repeats: true) { [weak self] _ in
+            self?.fetchAndSyncLatestHRV()
+        }
+    }
+
+    /// Public method to manually trigger HRV sync (for testing/debugging)
+    func syncHRVNow() {
+        print("🔄 Manual HRV sync triggered")
+        fetchAndSyncLatestHRV()
+    }
+
+    /// Fetch latest HRV from HealthKit and sync to backend
+    private func fetchAndSyncLatestHRV() {
+        guard let hrvType = HKObjectType.quantityType(forIdentifier: .heartRateVariabilitySDNN) else {
+            print("❌ HRV type not available")
+            return
+        }
+
+        // Get HRV from last 24 hours
+        let calendar = Calendar.current
+        let endDate = Date()
+        let startDate = calendar.date(byAdding: .hour, value: -24, to: endDate)!
+
+        print("🔍 Fetching HRV data from \(startDate) to \(endDate)")
+
+        let predicate = HKQuery.predicateForSamples(withStart: startDate, end: endDate, options: .strictEndDate)
+        let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)
+
+        let query = HKSampleQuery(sampleType: hrvType, predicate: predicate, limit: 1, sortDescriptors: [sortDescriptor]) { [weak self] _, samples, error in
+            if let error = error {
+                print("❌ Error fetching HRV data: \(error.localizedDescription)")
+                return
+            }
+
+            guard let sample = samples?.first as? HKQuantitySample else {
+                print("⚠️ No recent HRV data available in last 24 hours")
+                print("💡 Make sure:")
+                print("   1. Apple Watch is paired and worn")
+                print("   2. Health app has HRV data")
+                print("   3. HealthKit permissions are granted")
+                return
+            }
+
+            let hrvValue = sample.quantity.doubleValue(for: HKUnit.secondUnit(with: .milli))
+            let measuredAt = sample.endDate
+
+            print("📊 Found HRV data: \(String(format: "%.1f", hrvValue))ms measured at \(measuredAt)")
+
+            // Update UI
+            DispatchQueue.main.async {
+                self?.currentHRV = hrvValue
+                print("💓 Latest HRV: \(String(format: "%.1f", hrvValue))ms")
+            }
+
+            // Sync to backend
+            self?.syncHRVToBackend(hrvValue: hrvValue, measuredAt: measuredAt)
+        }
+
+        healthStore.execute(query)
+    }
+
+    /// Sync HRV data to FastAPI backend
+    private func syncHRVToBackend(hrvValue: Double, measuredAt: Date) {
+        // Get FastAPI user ID from UserDefaults
+        guard let fastAPIUserId = UserDefaults.standard.string(forKey: "fastapi_user_id") else {
+            print("⚠️ No FastAPI user ID found, skipping HRV sync")
+            print("💡 User needs to be logged in to sync HRV data")
+            return
+        }
+
+        print("👤 Syncing HRV for user: \(fastAPIUserId)")
+
+        // Check if we already synced this recently (avoid duplicate syncs)
+        if let lastSync = lastHRVSyncDate,
+           Date().timeIntervalSince(lastSync) < 300 { // 5 minutes
+            print("⏭️ Skipping HRV sync (synced recently)")
+            return
+        }
+
+        Task {
+            if let response = await FastAPIService.shared.syncHRV(
+                userId: fastAPIUserId,
+                hrvValue: hrvValue,
+                measuredAt: measuredAt
+            ) {
+                self.lastHRVSyncDate = Date()
+                print("✅ HRV synced to backend: \(hrvValue)ms → Fatigue: \(response.fatigueLevel) (\(response.fatigueLabel))")
+            } else {
+                print("❌ Failed to sync HRV to backend")
+            }
+        }
     }
 }
 

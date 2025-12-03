@@ -83,16 +83,21 @@ class ChatService: ObservableObject {
             throw ChatServiceError.userNotAuthenticated
         }
 
-        // First try to load from FastAPI backend for persistence
-        if let backendHistory = await loadHistoryFromBackend(userId: userId, personaId: personaId, limit: limit) {
-            return backendHistory
-        }
+        print("📥 [ChatService] Loading chat history for persona: \(personaId)")
+        print("   User ID: \(userId)")
 
-        // Fallback to Sendbird history
+        // Load from Sendbird (FastAPI backend doesn't have history endpoint yet)
         do {
+            // Ensure Sendbird is connected first
+            if !sendbirdManager.isConnected {
+                print("⚠️ [ChatService] Sendbird not connected, attempting to connect...")
+                try await sendbirdManager.connect(userId: userId)
+            }
+
             // ✅ Get or create channel and use the REAL channel URL returned
             // This ensures we always use the correct Sendbird channel URL, not a custom one
             let channelUrl = try await chatManager.getOrCreateChannel(userId: userId, personaId: personaId)
+            print("📍 [ChatService] Using channel URL: \(channelUrl)")
 
             let messages = try await chatManager.loadMessages(
                 channelUrl: channelUrl,  // ✅ Use real channel URL, not custom URL
@@ -102,7 +107,8 @@ class ChatService: ObservableObject {
             print("✅ [ChatService] Loaded \(messages.count) messages from Sendbird")
             return messages
         } catch {
-            print("⚠️ [ChatService] Failed to load Sendbird history: \(error)")
+            print("❌ [ChatService] Failed to load Sendbird history: \(error)")
+            print("   Error details: \(error.localizedDescription)")
             // Return empty array instead of throwing - first conversation will be empty
             return []
         }
@@ -110,15 +116,22 @@ class ChatService: ObservableObject {
 
     /// Load conversation history from FastAPI backend
     /// - Parameters:
-    ///   - userId: Current user ID
+    ///   - userId: Current user ID (Supabase - not used for FastAPI)
     ///   - personaId: Persona ID to filter conversation
     ///   - limit: Number of messages to load
     /// - Returns: Array of chat messages or nil if failed
     private func loadHistoryFromBackend(userId: String, personaId: String, limit: Int) async -> [ChatMessage]? {
         print("📥 [ChatService] Attempting to load history from backend for persona: \(personaId)...")
 
+        // Get FastAPI user ID from UserDefaults
+        guard let fastAPIUserId = UserDefaults.standard.string(forKey: "fastapi_user_id") else {
+            print("⚠️ [ChatService] FastAPI user ID not found in UserDefaults, will fallback to Sendbird")
+            return nil
+        }
+        print("📝 [ChatService] Using FastAPI user ID for history: \(fastAPIUserId)")
+
         guard let historyItems = await fastAPIService.getChatHistory(
-            userId: userId,
+            userId: fastAPIUserId,  // ✅ Use FastAPI user ID, not Supabase user ID
             personaId: personaId,
             limit: limit
         ) else {

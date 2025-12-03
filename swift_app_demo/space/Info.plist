@@ -45,6 +45,8 @@
 	<string>We need your location to track your routine in the background and create a complete timeline map.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>We need your location to track your routine and create a timeline map of your activities.</string>
+	<key>NSUserNotificationsUsageDescription</key>
+	<string>채팅 메시지 알림을 받기 위해 알림 권한이 필요합니다.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

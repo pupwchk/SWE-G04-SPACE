@@ -357,6 +357,24 @@ extension SendbirdChatManager: GroupChannelDelegate {
         print("✅ [SendbirdChatManager] Received message: \(chatMessage.text)")
         print("   Is from user: \(chatMessage.isFromUser)")
 
+        // AI로부터 온 메시지인 경우에만 알림 전송
+        if !chatMessage.isFromUser {
+            print("🔔 [SendbirdChatManager] AI message detected, sending notification...")
+
+            // 채널 이름에서 페르소나 이름 추출 (또는 기본값 사용)
+            let personaName = (channel as? GroupChannel)?.name ?? "페르소나"
+            print("   Persona name: \(personaName)")
+
+            // 로컬 알림 전송
+            NotificationManager.shared.sendChatMessageNotification(
+                personaName: personaName,
+                messageText: chatMessage.text,
+                channelUrl: channel.channelURL
+            )
+        } else {
+            print("ℹ️ [SendbirdChatManager] User message, skipping notification")
+        }
+
         // Notify delegate
         print("🔄 [SendbirdChatManager-DEBUG] Notifying delegate...")
         Task { @MainActor in

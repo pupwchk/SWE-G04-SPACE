@@ -11,6 +11,15 @@ import SwiftUI
 struct HaruApp: App {
     // Initialize managers on app launch
     init() {
+        // Request notification permission for chat messages
+        NotificationManager.shared.requestAuthorization { granted in
+            if granted {
+                print("📱 Notification permission granted for chat messages")
+            } else {
+                print("⚠️ Notification permission denied for chat messages")
+            }
+        }
+
         // Initialize Sendbird Chat SDK
         SendbirdManager.shared.initializeChat()
         print("📱 Sendbird Chat SDK initialized")

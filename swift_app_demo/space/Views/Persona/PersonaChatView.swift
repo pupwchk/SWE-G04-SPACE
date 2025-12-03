@@ -173,6 +173,21 @@ struct PersonaChatView: View {
         .onAppear {
             viewModel.loadMessages(for: persona.id, personaName: persona.nickname)
 
+            // 해당 채널의 알림 제거 및 배지 카운트 초기화
+            Task {
+                if let userId = SupabaseManager.shared.currentUser?.id {
+                    do {
+                        let channelUrl = try await SendbirdChatManager.shared.getOrCreateChannel(
+                            userId: userId,
+                            personaId: persona.id
+                        )
+                        NotificationManager.shared.removeNotifications(for: channelUrl)
+                    } catch {
+                        print("⚠️ [PersonaChatView] Failed to get channel for notification cleanup: \(error)")
+                    }
+                }
+            }
+
             // Authenticate user with SendBird Calls using FastAPI user_id
             // NOTE: Must use FastAPI user_id (stored in UserDefaults), not Supabase UUID
             if let fastapiUserId = UserDefaults.standard.string(forKey: "fastapi_user_id") {
@@ -542,9 +557,17 @@ struct ApplianceChangeSummaryWidget: View {
                     Image(systemName: "checklist")
                         .font(.system(size: 16))
                         .foregroundColor(Color(hex: "A50034"))
-                    Text("설정 변경 사항")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(.black)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("가전 제어 요청")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(.black)
+
+                        Text("\(changes.count)개의 기기를 제어하려고 합니다")
+                            .font(.system(size: 12))
+                            .foregroundColor(.gray)
+                    }
+
                     Spacer()
                     Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
                         .font(.system(size: 14, weight: .semibold))
@@ -619,10 +642,11 @@ struct ApplianceChangeRow: View {
                 .frame(width: 24)
 
             // 텍스트
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 6) {
+                // 가전 이름
                 HStack(spacing: 6) {
                     Text(change.applianceName)
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(size: 15, weight: .semibold))
                         .foregroundColor(.black)
 
                     if change.isModified {
@@ -632,22 +656,71 @@ struct ApplianceChangeRow: View {
                     }
                 }
 
-                // 동작 상태 (on/off 등)
-                Text(change.action)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(change.action.lowercased().contains("on") || change.action.lowercased().contains("켜") ? Color(hex: "A50034") : .gray)
+                // 동작 상태와 세부 정보를 한 줄로 표시
+                HStack(spacing: 8) {
+                    // 동작 상태 (on/off 등)
+                    HStack(spacing: 4) {
+                        Image(systemName: getActionIcon(for: change.action))
+                            .font(.system(size: 12))
+                            .foregroundColor(getActionColor(for: change.action))
 
-                // 세부 정보 (온도, 모드 등)
-                if let detail = change.detail {
-                    Text(detail)
-                        .font(.system(size: 12))
-                        .foregroundColor(.gray)
+                        Text(getActionText(for: change.action))
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(getActionColor(for: change.action))
+                    }
+
+                    // 세부 정보 (온도, 모드 등)
+                    if let detail = change.detail, !detail.isEmpty {
+                        Text("•")
+                            .font(.system(size: 12))
+                            .foregroundColor(.gray)
+
+                        Text(detail)
+                            .font(.system(size: 13))
+                            .foregroundColor(.gray)
+                    }
                 }
             }
 
             Spacer()
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 6)
+    }
+
+    // 동작에 따른 아이콘 반환
+    private func getActionIcon(for action: String) -> String {
+        let lowercased = action.lowercased()
+        if lowercased.contains("on") || lowercased.contains("켜") {
+            return "power.circle.fill"
+        } else if lowercased.contains("off") || lowercased.contains("끄") {
+            return "power.circle"
+        } else {
+            return "gearshape.fill"
+        }
+    }
+
+    // 동작에 따른 색상 반환
+    private func getActionColor(for action: String) -> Color {
+        let lowercased = action.lowercased()
+        if lowercased.contains("on") || lowercased.contains("켜") {
+            return Color(hex: "A50034")
+        } else if lowercased.contains("off") || lowercased.contains("끄") {
+            return .gray
+        } else {
+            return Color(hex: "A50034").opacity(0.8)
+        }
+    }
+
+    // 동작 텍스트 한글화
+    private func getActionText(for action: String) -> String {
+        let lowercased = action.lowercased()
+        if lowercased == "on" {
+            return "켜기"
+        } else if lowercased == "off" {
+            return "끄기"
+        } else {
+            return action
+        }
     }
 }
 

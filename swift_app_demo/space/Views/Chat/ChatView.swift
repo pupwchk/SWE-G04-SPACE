@@ -16,118 +16,12 @@ struct Message: Identifiable {
 
 /// Chat screen - messaging and communication
 struct ChatView: View {
-    @State private var selectedMode: CommunicationMode?
-    @State private var showPhoneCall = false
-
     var body: some View {
         NavigationStack {
-            Group {
-                if selectedMode == nil {
-                    // Selection screen
-                    SelectionView(selectedMode: $selectedMode, showPhoneCall: $showPhoneCall)
-                } else if selectedMode == .text {
-                    // Persona chat list view
-                    PersonaChatListView()
-                }
-            }
-            .navigationTitle("채팅")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar(content: chatToolbar)   // 🔹 명시적으로 content 지정
+            PersonaChatListView()
+                .navigationTitle("채팅")
+                .navigationBarTitleDisplayMode(.inline)
         }
-        .fullScreenCover(isPresented: $showPhoneCall) {
-            PhoneCallView(contactName: "My home", callId: nil)
-        }
-    }
-
-    // 🔹 Toolbar 내용을 따로 분리해서 Ambiguous 에러 방지
-    @ToolbarContentBuilder
-    private func chatToolbar() -> some ToolbarContent {
-        ToolbarItem(placement: .navigationBarLeading) {
-            if selectedMode != nil {
-                Button(action: {
-                    selectedMode = nil
-                }) {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(.black)
-                }
-            }
-        }
-
-        ToolbarItem(placement: .navigationBarTrailing) {
-            Button(action: {}) {
-                Image(systemName: "square.dashed")
-                    .font(.system(size: 18))
-                    .foregroundColor(.black)
-            }
-        }
-    }
-}
-
-enum CommunicationMode {
-    case text
-    case call
-}
-
-struct SelectionView: View {
-    @Binding var selectedMode: CommunicationMode?
-    @Binding var showPhoneCall: Bool
-
-    var body: some View {
-        VStack(spacing: 0) {
-            Spacer()
-
-            VStack(spacing: 24) {
-                // Text message button
-                Button(action: {
-                    selectedMode = .text
-                }) {
-                    VStack(spacing: 16) {
-                        Image(systemName: "message.fill")
-                            .font(.system(size: 50))
-                            .foregroundColor(Color(hex: "A50034"))
-
-                        Text("문자")
-                            .font(.system(size: 24, weight: .semibold))
-                            .foregroundColor(.black)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 200)
-                    .background(
-                        RoundedRectangle(cornerRadius: 20)
-                            .fill(Color(red: 0.98, green: 0.95, blue: 0.98))
-                            .shadow(color: .black.opacity(0.08), radius: 10, x: 0, y: 4)
-                    )
-                }
-                .padding(.horizontal, 40)
-
-                // Phone call button
-                Button(action: {
-                    showPhoneCall = true
-                }) {
-                    VStack(spacing: 16) {
-                        Image(systemName: "phone.fill")
-                            .font(.system(size: 50))
-                            .foregroundColor(Color(hex: "A50034"))
-
-                        Text("전화")
-                            .font(.system(size: 24, weight: .semibold))
-                            .foregroundColor(.black)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 200)
-                    .background(
-                        RoundedRectangle(cornerRadius: 20)
-                            .fill(Color(red: 0.98, green: 0.95, blue: 0.98))
-                            .shadow(color: .black.opacity(0.08), radius: 10, x: 0, y: 4)
-                    )
-                }
-                .padding(.horizontal, 40)
-            }
-
-            Spacer()
-        }
-        .background(Color.white)
     }
 }
 

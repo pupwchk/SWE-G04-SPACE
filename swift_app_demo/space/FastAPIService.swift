@@ -1109,6 +1109,64 @@ class FastAPIService {
         }
     }
 
+    // MARK: - HRV (Heart Rate Variability) API
+
+    /// Sync HRV data from HealthKit to backend
+    /// - Parameters:
+    ///   - userId: User ID (email or UUID)
+    ///   - hrvValue: HRV value in milliseconds
+    ///   - measuredAt: When the HRV was measured
+    /// - Returns: Sync response with fatigue level
+    func syncHRV(userId: String, hrvValue: Double, measuredAt: Date) async -> HRVSyncResponse? {
+        guard let url = URL(string: "\(baseURL)/api/health/hrv") else {
+            print("❌ [FastAPI] Invalid URL for HRV sync")
+            return nil
+        }
+
+        var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+
+        let requestBody = HRVSyncRequest(
+            userId: userId,
+            hrvValue: hrvValue,
+            measuredAt: measuredAt
+        )
+
+        do {
+            request.httpBody = try encoder.encode(requestBody)
+
+            let (data, response) = try await apiSession.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                print("❌ [FastAPI] Invalid response for HRV sync")
+                return nil
+            }
+
+            if httpResponse.statusCode == 200 {
+                let decoder = JSONDecoder()
+                decoder.dateDecodingStrategy = .iso8601
+
+                let syncResponse = try decoder.decode(HRVSyncResponse.self, from: data)
+                print("✅ [FastAPI] HRV synced successfully")
+                return syncResponse
+            } else {
+                if let errorString = String(data: data, encoding: .utf8) {
+                    print("❌ [FastAPI] HRV sync failed (\(httpResponse.statusCode)): \(errorString)")
+                }
+                return nil
+            }
+
+        } catch {
+            print("❌ [FastAPI] Network error syncing HRV: \(error.localizedDescription)")
+            return nil
+        }
+    }
+
     // MARK: - Calls API
 
     /// Trigger auto-call when user approaches home (GPS-based)
@@ -1151,4 +1209,4 @@ class FastAPIService {
 }
 
 // MARK: - Models are now imported from separate files
-// See: ChatModels.swift, UserModels.swift, CharacterModels.swift, etc.
+// See: ChatModels.swift, UserModels.swift, CharacterModels.swift, FatigueModels.swift, etc.
