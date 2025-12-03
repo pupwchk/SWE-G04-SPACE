@@ -107,19 +107,23 @@ class SupabasePersonaService:
             logger.error(f"❌ Error fetching persona {persona_id}: {str(e)}")
             return None
 
-    def get_user_selected_personas(self, user_id: str, limit: int = 5) -> List[Dict[str, Any]]:
+    def get_user_selected_personas(self, email: str, limit: int = 5) -> List[Dict[str, Any]]:
         """
         사용자가 선택한 페르소나 목록 조회 (최대 5개)
 
+        ⚠️ 중요: Supabase의 user_id는 Supabase Auth UUID이므로,
+        FastAPI의 PostgreSQL user_id와 다릅니다.
+        이 함수는 email을 받아서 Supabase에서 user_id를 찾은 후 조회합니다.
+
         Args:
-            user_id: 사용자 ID
+            email: 사용자 이메일 (Supabase와 PostgreSQL 모두에서 동일)
             limit: 조회 개수 (기본 5)
 
         Returns:
             [
                 {
                     "id": "uuid",
-                    "user_id": "uuid",
+                    "user_id": "uuid",  # Supabase Auth UUID
                     "persona_id": "uuid",
                     "selection_order": 1,
                     "persona": {
@@ -139,16 +143,62 @@ class SupabasePersonaService:
             return []
 
         try:
-            # 선택된 페르소나 목록 조회
+            # 1. email로 Supabase user_id 찾기 (Supabase Auth UUID)
+            # Supabase의 auth.users는 직접 조회 불가능하므로,
+            # profiles 또는 users 테이블에서 email로 user_id를 찾음
+            supabase_user_id = None
+
+            # 방법 1: Auth Admin API 사용 (권한이 있는 경우)
+            try:
+                # Note: Admin API는 service_role key가 필요할 수 있음
+                # 현재는 anon key를 사용하므로 실패 가능
+                logger.debug(f"🔍 [SUPABASE-PERSONA] Trying to find user_id for email: {email}")
+            except Exception as e:
+                logger.debug(f"ℹ️ [SUPABASE-PERSONA] Auth Admin API not available: {str(e)}")
+
+            # 방법 2: profiles 테이블에서 email로 조회
+            try:
+                profile_result = self.client.table("profiles")\
+                    .select("id, email")\
+                    .eq("email", email)\
+                    .maybe_single()\
+                    .execute()
+
+                if profile_result.data:
+                    supabase_user_id = profile_result.data.get("id")
+                    logger.debug(f"✅ [SUPABASE-PERSONA] Found user_id via profiles: {supabase_user_id}")
+            except Exception as e:
+                logger.debug(f"ℹ️ [SUPABASE-PERSONA] Profiles query failed: {str(e)}")
+
+            # 방법 3: users 테이블에서 email로 조회 (fallback)
+            if not supabase_user_id:
+                try:
+                    user_result = self.client.table("users")\
+                        .select("id, email")\
+                        .eq("email", email)\
+                        .maybe_single()\
+                        .execute()
+
+                    if user_result.data:
+                        supabase_user_id = user_result.data.get("id")
+                        logger.debug(f"✅ [SUPABASE-PERSONA] Found user_id via users table: {supabase_user_id}")
+                except Exception as e:
+                    logger.debug(f"ℹ️ [SUPABASE-PERSONA] Users table query failed: {str(e)}")
+
+            if not supabase_user_id:
+                logger.warning(f"⚠️ [SUPABASE-PERSONA] Could not find Supabase user_id for email: {email}")
+                return []
+
+            # 2. 선택된 페르소나 목록 조회 (Supabase user_id 사용)
             result = self.client.table("user_selected_personas")\
                 .select("*, personas(*)")\
-                .eq("user_id", user_id)\
+                .eq("user_id", supabase_user_id)\
                 .order("selection_order")\
                 .limit(limit)\
                 .execute()
 
             if not result.data:
-                logger.info(f"ℹ️ No selected personas for user {user_id}")
+                logger.info(f"ℹ️ No selected personas for email {email} (Supabase user_id: {supabase_user_id})")
                 return []
 
             selected_personas = result.data
@@ -171,11 +221,11 @@ class SupabasePersonaService:
                     persona_data["adjectives"] = adjectives
                     item["persona"] = persona_data
 
-            logger.info(f"✅ Loaded {len(selected_personas)} selected personas for user {user_id}")
+            logger.info(f"✅ Loaded {len(selected_personas)} selected personas for email {email}")
             return selected_personas
 
         except Exception as e:
-            logger.error(f"❌ Error fetching selected personas for {user_id}: {str(e)}")
+            logger.error(f"❌ Error fetching selected personas for email {email}: {str(e)}")
             return []
 
     def build_final_prompt(self, persona_data: Dict[str, Any]) -> str:

@@ -3,8 +3,9 @@
 실제 가전 제어는 추후 IoT 통합 시 구현
 """
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Union
 from datetime import datetime
+from uuid import UUID
 from sqlalchemy.orm import Session
 
 from app.models.appliance import ApplianceStatus, ApplianceCommandLog
@@ -23,7 +24,7 @@ class ApplianceControlService:
     @staticmethod
     def execute_command(
         db: Session,
-        user_id: str,
+        user_id: Union[str, UUID],
         appliance_type: str,
         action: str,
         settings: Optional[Dict[str, Any]] = None,
@@ -35,7 +36,7 @@ class ApplianceControlService:
 
         Args:
             db: 데이터베이스 세션
-            user_id: 사용자 ID
+            user_id: 사용자 ID (PostgreSQL UUID - 문자열 또는 UUID 객체)
             appliance_type: 가전 종류
             action: 동작 (on/off/set)
             settings: 설정값
@@ -46,7 +47,13 @@ class ApplianceControlService:
             실행 결과
         """
         try:
-            logger.info(f"🎛️ Executing command: {action} {appliance_type} for user {user_id}")
+            # user_id를 UUID로 변환 (문자열로 전달되는 경우 대응)
+            if isinstance(user_id, str):
+                user_id_uuid = UUID(user_id)
+            else:
+                user_id_uuid = user_id
+
+            logger.info(f"🎛️ Executing command: {action} {appliance_type} for user {user_id_uuid}")
 
             # 설정값 검증
             if settings:
@@ -64,18 +71,18 @@ class ApplianceControlService:
             success = True
             error_message = None
 
-            # 가전 상태 업데이트
+            # 가전 상태 업데이트 (PostgreSQL UUID 사용)
             status = db.query(ApplianceStatus)\
                 .filter(
-                    ApplianceStatus.user_id == user_id,
+                    ApplianceStatus.user_id == user_id_uuid,
                     ApplianceStatus.appliance_type == appliance_type
                 )\
                 .first()
 
             if not status:
-                # 새로운 상태 생성
+                # 새로운 상태 생성 (PostgreSQL UUID 사용)
                 status = ApplianceStatus(
-                    user_id=user_id,
+                    user_id=user_id_uuid,
                     appliance_type=appliance_type,
                     is_on=False,
                     current_settings={}
@@ -123,9 +130,9 @@ class ApplianceControlService:
                     success = False
                     error_message = "Cannot set settings when appliance is off"
 
-            # 명령 로그 저장
+            # 명령 로그 저장 (PostgreSQL UUID 사용)
             command_log = ApplianceCommandLog(
-                user_id=user_id,
+                user_id=user_id_uuid,
                 appliance_type=appliance_type,
                 action=action,
                 settings=settings,
@@ -159,9 +166,15 @@ class ApplianceControlService:
         except Exception as e:
             logger.error(f"❌ Command execution error: {str(e)}")
 
-            # 실패 로그 저장
+            # user_id를 UUID로 변환 (에러 로그에도 필요)
+            if isinstance(user_id, str):
+                user_id_uuid = UUID(user_id)
+            else:
+                user_id_uuid = user_id
+
+            # 실패 로그 저장 (PostgreSQL UUID 사용)
             command_log = ApplianceCommandLog(
-                user_id=user_id,
+                user_id=user_id_uuid,
                 appliance_type=appliance_type,
                 action=action,
                 settings=settings,
@@ -227,7 +240,7 @@ class ApplianceControlService:
     @staticmethod
     def get_appliance_status(
         db: Session,
-        user_id: str,
+        user_id: Union[str, UUID],
         appliance_type: Optional[str] = None
     ) -> list[Dict[str, Any]]:
         """
@@ -235,7 +248,7 @@ class ApplianceControlService:
 
         Args:
             db: 데이터베이스 세션
-            user_id: 사용자 ID
+            user_id: 사용자 ID (PostgreSQL UUID - 문자열 또는 UUID 객체)
             appliance_type: 가전 종류 (None이면 전체 조회)
 
         Returns:
@@ -243,7 +256,6 @@ class ApplianceControlService:
         """
         from app.models.info import Appliance
         from app.utils.appliance_mapping import BACKEND_CODE_TO_DISPLAY
-        from uuid import UUID
 
         # user_id를 UUID로 변환 (문자열로 전달되는 경우 대응)
         if isinstance(user_id, str):
@@ -269,10 +281,10 @@ class ApplianceControlService:
             if appliance_type and display_type != appliance_type:
                 continue
 
-            # 해당 가전의 상태 조회
+            # 해당 가전의 상태 조회 (PostgreSQL UUID 사용)
             status = db.query(ApplianceStatus)\
                 .filter(
-                    ApplianceStatus.user_id == user_id,
+                    ApplianceStatus.user_id == user_id_uuid,
                     ApplianceStatus.appliance_type == display_type
                 )\
                 .first()
@@ -347,7 +359,7 @@ class ApplianceControlService:
     @staticmethod
     def get_command_history(
         db: Session,
-        user_id: str,
+        user_id: Union[str, UUID],
         limit: int = 20
     ) -> list[Dict[str, Any]]:
         """
@@ -355,7 +367,7 @@ class ApplianceControlService:
 
         Args:
             db: 데이터베이스 세션
-            user_id: 사용자 ID
+            user_id: 사용자 ID (PostgreSQL UUID - 문자열 또는 UUID 객체)
             limit: 조회 개수
 
         Returns:
@@ -363,8 +375,14 @@ class ApplianceControlService:
         """
         from sqlalchemy import desc
 
+        # user_id를 UUID로 변환 (문자열로 전달되는 경우 대응)
+        if isinstance(user_id, str):
+            user_id_uuid = UUID(user_id)
+        else:
+            user_id_uuid = user_id
+
         logs = db.query(ApplianceCommandLog)\
-            .filter(ApplianceCommandLog.user_id == user_id)\
+            .filter(ApplianceCommandLog.user_id == user_id_uuid)\
             .order_by(desc(ApplianceCommandLog.executed_at))\
             .limit(limit)\
             .all()
