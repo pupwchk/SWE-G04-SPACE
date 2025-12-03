@@ -498,7 +498,7 @@ class SendbirdCallsClient:
         Returns:
             수락 결과
         """
-        url = f"{self.base_url}/calls/{call_id}/accept"
+        url = f"{self.base_url}/direct_calls/{call_id}/accept"
 
         try:
             async with httpx.AsyncClient() as client:
@@ -514,7 +514,7 @@ class SendbirdCallsClient:
                 return response.json()
 
         except httpx.HTTPStatusError as e:
-            logger.error(f"❌ Failed to accept call: {e.response.status_code} - {e.response.text}")
+            logger.error(f"❌ Failed to accept call: {e.response.status_code} - {e.response.text} - {url}")
             raise
         except Exception as e:
             logger.error(f"❌ Error accepting call: {str(e)}")
