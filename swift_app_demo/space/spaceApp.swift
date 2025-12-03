@@ -25,9 +25,10 @@ struct HaruApp: App {
                     // Wait a bit for Supabase to be ready
                     try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
 
-                    if let userEmail = await SupabaseManager.shared.currentUser?.email {
+                    // Use FastAPI user_id from UserDefaults (NOT Supabase UUID or email)
+                    if let fastapiUserId = UserDefaults.standard.string(forKey: "fastapi_user_id") {
                         // Use dual authentication method to register both user and AI assistant
-                        SendbirdManager.shared.authenticateForCalls(userEmail: userEmail) { success, error in
+                        SendbirdManager.shared.authenticateForCalls(userId: fastapiUserId) { success, error in
                             if success {
                                 print("✅ [App] Dual authentication complete - ready for calls")
                             } else {
@@ -35,7 +36,7 @@ struct HaruApp: App {
                             }
                         }
                     } else {
-                        print("⚠️ [App] No user session found, skipping SendBird Calls authentication")
+                        print("⚠️ [App] FastAPI user_id not found in UserDefaults - skipping SendBird Calls authentication")
                     }
                 }
             } else {

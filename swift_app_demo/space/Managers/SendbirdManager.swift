@@ -139,13 +139,13 @@ class SendbirdManager: ObservableObject {
     /// Authenticate both user and AI assistant for Sendbird Calls (free plan workaround)
     /// Since free plan doesn't support Direct Call API, iOS must authenticate as both parties
     /// - Parameters:
-    ///   - userEmail: User email (used as user_id)
+    ///   - userId: FastAPI user ID (UUID from PostgreSQL DB)
     ///   - completion: Completion handler with success status
-    func authenticateForCalls(userEmail: String, completion: @escaping (Bool, Error?) -> Void) {
+    func authenticateForCalls(userId: String, completion: @escaping (Bool, Error?) -> Void) {
         Task {
             do {
-                // Step 1: Get user token from backend
-                guard let userAuth = await FastAPIService.shared.getSendbirdUserToken(userId: userEmail) else {
+                // Step 1: Get user token from backend using FastAPI user_id
+                guard let userAuth = await FastAPIService.shared.getSendbirdUserToken(userId: userId) else {
                     print("❌ [Sendbird] Failed to get user token from backend")
                     await MainActor.run {
                         completion(false, SendbirdError.authenticationFailed)

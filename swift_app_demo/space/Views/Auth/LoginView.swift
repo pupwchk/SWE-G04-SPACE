@@ -216,20 +216,12 @@ struct LoginView: View {
                 let user = try await supabaseManager.signIn(email: email, password: password)
                 print("Login successful: \(user.email)")
 
-                // Authenticate with SendBird Calls (dual authentication for user and AI)
-                SendbirdManager.shared.authenticateForCalls(userEmail: user.email) { success, error in
-                    if success {
-                        print("✅ [Login] SendBird Calls authentication successful")
-                    } else {
-                        print("⚠️ [Login] SendBird Calls authentication failed: \(error?.localizedDescription ?? "unknown")")
-                        // Don't block login on SendBird failure - continue anyway
-                    }
-
-                    Task { @MainActor in
-                        isLoading = false
-                        withAnimation {
-                            isLoggedIn = true
-                        }
+                // NOTE: SendBird Calls authentication is handled in SupabaseManager.signIn()
+                // after FastAPI user registration completes
+                await MainActor.run {
+                    isLoading = false
+                    withAnimation {
+                        isLoggedIn = true
                     }
                 }
             } catch {

@@ -173,9 +173,10 @@ struct PersonaChatView: View {
         .onAppear {
             viewModel.loadMessages(for: persona.id, personaName: persona.nickname)
 
-            // Authenticate user with SendBird Calls if not already authenticated
-            if let userId = SupabaseManager.shared.currentUser?.id {
-                callsManager.authenticate(userId: userId) { result in
+            // Authenticate user with SendBird Calls using FastAPI user_id
+            // NOTE: Must use FastAPI user_id (stored in UserDefaults), not Supabase UUID
+            if let fastapiUserId = UserDefaults.standard.string(forKey: "fastapi_user_id") {
+                callsManager.authenticate(userId: fastapiUserId) { result in
                     switch result {
                     case .success(let user):
                         print("✅ [PersonaChatView] Authenticated with SendBird Calls: \(user.userId)")
@@ -183,6 +184,8 @@ struct PersonaChatView: View {
                         print("❌ [PersonaChatView] SendBird Calls authentication failed: \(error)")
                     }
                 }
+            } else {
+                print("⚠️ [PersonaChatView] FastAPI user_id not found in UserDefaults")
             }
         }
     }

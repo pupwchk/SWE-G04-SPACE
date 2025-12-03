@@ -232,6 +232,15 @@ class SupabaseManager: ObservableObject {
                     } catch {
                         print("⚠️ [Sendbird] Failed to connect: \(error)")
                     }
+
+                    // Authenticate with SendBird Calls using FastAPI user_id
+                    SendbirdManager.shared.authenticateForCalls(userId: fastAPIUserId) { success, error in
+                        if success {
+                            print("✅ [Sendbird] Calls authenticated after login: \(fastAPIUserId)")
+                        } else {
+                            print("⚠️ [Sendbird] Calls authentication failed: \(error?.localizedDescription ?? "unknown")")
+                        }
+                    }
                 } else {
                     print("❌ [FastAPI] Failed to register user, cannot connect to Sendbird")
                 }
