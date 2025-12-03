@@ -548,12 +548,13 @@ async def handle_call_ended(payload: Dict[str, Any]):
 
 async def handle_call_dialing(payload: Dict[str, Any]):
     """
-    전화 발신 처리 (AI 자동 응답)
+    전화 발신 처리
 
-    AI assistant가 전화를 받아야 하는 경우:
-    1. callee가 AI assistant인지 확인
-    2. SendBird Calls API로 전화 수락
-    3. 통화 시작
+    NOTE: Sendbird Calls는 서버에서 통화를 수락하는 API를 제공하지 않습니다.
+    통화 수락은 클라이언트 SDK를 통해서만 가능합니다.
+
+    현재는 통화 이벤트를 로깅하고 메모리에 기록만 합니다.
+    실제 통화 수락은 iOS 앱에서 처리해야 합니다.
     """
     try:
         direct_call = payload.get("direct_call", {})
@@ -567,14 +568,20 @@ async def handle_call_dialing(payload: Dict[str, Any]):
         logger.info(f"   Callee: {callee_id}")
         logger.info(f"   AI User ID: {SendbirdConfig.AI_USER_ID}")
 
-        # AI assistant가 수신자인 경우에만 자동 응답
+        # AI assistant가 수신자인 경우
         if callee_id == SendbirdConfig.AI_USER_ID:
-            logger.info(f"🤖 [CALL-INCOMING] AI assistant receiving call, auto-accepting...")
+            logger.info(f"🤖 [CALL-INCOMING] AI assistant receiving call from {caller_id}")
 
-            # SendBird Calls API로 전화 수락
-            await calls_client.accept_call(call_id)
+            # 통화 이벤트를 메모리에 기록
+            memory_service.add_message(
+                caller_id,
+                "system",
+                f"전화 수신 시작 (Call ID: {call_id})"
+            )
 
-            logger.info(f"✅ [CALL-INCOMING] AI assistant accepted call: {call_id}")
+            # TODO: 실제 AI 통화 수락 로직은 별도의 WebRTC 클라이언트가 필요
+            # 현재는 iOS 앱에서 AI가 자동으로 응답하도록 구현 필요
+            logger.info(f"ℹ️ [CALL-INCOMING] Call must be accepted by iOS client, not server")
         else:
             logger.info(f"ℹ️ [CALL-INCOMING] Not for AI assistant, ignoring")
 
