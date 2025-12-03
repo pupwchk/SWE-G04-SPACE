@@ -451,6 +451,9 @@ async def sendbird_calls_webhook(request: Request):
             logger.warning("⚠️ Empty payload received in calls webhook")
             return {"status": "ignored", "reason": "empty_payload"}
 
+        # 🔍 전체 페이로드 로깅 (디버깅용)
+        logger.info(f"📦 [CALLS-WEBHOOK] Full payload: {payload}")
+
         event_type = payload.get("type")
         call_id = payload.get("call_id")
 
