@@ -178,17 +178,20 @@ class SendbirdCallsClient:
         assistant_id: str = None
     ) -> Dict[str, Any]:
         """
-        AI assistant를 SendBird Chat & Calls에 자동 등록
+        AI assistant를 SendBird Chat에 등록 및 Calls용 access_token 발급
 
-        2단계 프로세스:
+        프로세스:
         1. Chat Platform API로 사용자 생성 및 access_token 발급
-        2. Calls API로 인증 (/v1/authenticate)
+        2. access_token은 SendBird Calls SDK에서 클라이언트 인증에 사용됨
+
+        Note: SendBird Calls는 서버-투-서버 인증이 필요 없음.
+        클라이언트(iOS)에서 access_token으로 직접 인증.
 
         Args:
             assistant_id: AI assistant의 사용자 ID (기본값: SendbirdConfig.AI_USER_ID)
 
         Returns:
-            등록 결과 딕셔너리
+            등록 결과 딕셔너리 (access_token 포함)
         """
         if assistant_id is None:
             assistant_id = SendbirdConfig.AI_USER_ID
@@ -244,15 +247,17 @@ class SendbirdCallsClient:
                             # access_token이 없으면 새로 발급
                             if not access_token:
                                 logger.info(f"🔑 Issuing new access token for '{assistant_id}'")
+                                # PUT 요청으로 사용자 정보 업데이트 + 토큰 발급
                                 async with httpx.AsyncClient() as token_client:
-                                    token_response = await token_client.post(
-                                        f"{chat_user_url}/{assistant_id}/token",
+                                    token_response = await token_client.put(
+                                        f"{chat_user_url}/{assistant_id}",
                                         headers=SendbirdConfig.get_chat_headers(),
+                                        json={"issue_access_token": True},
                                         timeout=10.0
                                     )
                                     token_response.raise_for_status()
                                     token_data = token_response.json()
-                                    access_token = token_data.get("token")
+                                    access_token = token_data.get("access_token")
                     except Exception as token_error:
                         logger.warning(f"⚠️ Failed to get access token: {token_error}")
                 else:
@@ -265,57 +270,18 @@ class SendbirdCallsClient:
             logger.error(f"❌ Error registering AI assistant in Chat Platform: {str(e)}")
             raise
 
-        # Step 2: Calls API로 인증
-        calls_auth_url = f"{self.base_url}/authenticate"
-        calls_payload = {
-            "user_id": assistant_id
+        # SendBird Calls는 서버 인증이 필요 없음
+        # iOS 클라이언트에서 access_token으로 직접 인증
+        logger.info(f"✅ AI assistant '{assistant_id}' registered with access_token for Calls")
+
+        return {
+            "status": "success",
+            "user_id": assistant_id,
+            "access_token": access_token,
+            "chat_registered": True,
+            "calls_ready": True,
+            "user_already_exists": user_already_exists
         }
-
-        # access_token이 있으면 추가
-        if access_token:
-            calls_payload["access_token"] = access_token
-
-        try:
-            async with httpx.AsyncClient() as client:
-                calls_response = await client.post(
-                    calls_auth_url,
-                    headers=self.headers,
-                    json=calls_payload,
-                    timeout=10.0
-                )
-                calls_response.raise_for_status()
-
-                calls_result = calls_response.json()
-                logger.info(f"✅ AI assistant '{assistant_id}' authenticated with SendBird Calls")
-
-                return {
-                    "status": "success",
-                    "user_id": assistant_id,
-                    "chat_registered": True,
-                    "calls_authenticated": True,
-                    "user_already_exists": user_already_exists,
-                    "calls_result": calls_result
-                }
-
-        except httpx.HTTPStatusError as e:
-            logger.error(f"❌ Failed to authenticate with Calls API: {e.response.status_code} - {e.response.text}")
-            # Calls 인증 실패해도 Chat 등록은 성공했으므로 부분 성공 반환
-            return {
-                "status": "partial_success",
-                "user_id": assistant_id,
-                "chat_registered": True,
-                "calls_authenticated": False,
-                "error": f"Calls auth failed: {e.response.text}"
-            }
-        except Exception as e:
-            logger.error(f"❌ Error authenticating with Calls API: {str(e)}")
-            return {
-                "status": "partial_success",
-                "user_id": assistant_id,
-                "chat_registered": True,
-                "calls_authenticated": False,
-                "error": str(e)
-            }
 
     async def authenticate_user(
         self,
@@ -324,8 +290,11 @@ class SendbirdCallsClient:
         profile_url: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        일반 사용자를 SendBird Chat & Calls에 인증
-        iOS 앱에서 로그인 후 호출하여 SendBird Calls SDK 초기화용 토큰 발급
+        일반 사용자를 SendBird Chat에 인증 및 Calls용 access_token 발급
+        iOS 앱에서 로그인 후 호출하여 SendBird Calls SDK 초기화용 토큰 획득
+
+        Note: SendBird Calls는 서버-투-서버 인증이 필요 없음.
+        반환된 access_token을 iOS에서 SendBirdCall.authenticate()에 사용.
 
         Args:
             user_id: 사용자 ID (이메일 또는 UUID)
@@ -335,7 +304,7 @@ class SendbirdCallsClient:
         Returns:
             {
                 "user_id": str,
-                "access_token": str,
+                "access_token": str,  # iOS에서 Calls SDK 인증에 사용
                 "calls_authenticated": bool
             }
         """
@@ -387,15 +356,17 @@ class SendbirdCallsClient:
                             # access_token이 없으면 새로 발급
                             if not access_token:
                                 logger.info(f"🔑 Issuing new access token for '{user_id}'")
+                                # PUT 요청으로 사용자 정보 업데이트 + 토큰 발급
                                 async with httpx.AsyncClient() as token_client:
-                                    token_response = await token_client.post(
-                                        f"{chat_user_url}/{user_id}/token",
+                                    token_response = await token_client.put(
+                                        f"{chat_user_url}/{user_id}",
                                         headers=SendbirdConfig.get_chat_headers(),
+                                        json={"issue_access_token": True},
                                         timeout=10.0
                                     )
                                     token_response.raise_for_status()
                                     token_data = token_response.json()
-                                    access_token = token_data.get("token")
+                                    access_token = token_data.get("access_token")
                     except Exception as token_error:
                         logger.error(f"❌ Failed to get access token: {token_error}")
                         raise
@@ -411,48 +382,15 @@ class SendbirdCallsClient:
         if not access_token:
             raise Exception("Failed to obtain access_token from Chat Platform")
 
-        # Step 2: Calls API로 인증
-        calls_auth_url = f"{self.base_url}/authenticate"
-        calls_payload = {
+        # SendBird Calls는 서버 인증이 필요 없음
+        # iOS 클라이언트에서 access_token으로 직접 인증
+        logger.info(f"✅ User '{user_id}' ready for SendBird Calls with access_token")
+
+        return {
             "user_id": user_id,
-            "access_token": access_token
+            "access_token": access_token,
+            "calls_authenticated": True
         }
-
-        try:
-            async with httpx.AsyncClient() as client:
-                calls_response = await client.post(
-                    calls_auth_url,
-                    headers=self.headers,
-                    json=calls_payload,
-                    timeout=10.0
-                )
-                calls_response.raise_for_status()
-
-                logger.info(f"✅ User '{user_id}' authenticated with SendBird Calls")
-
-                return {
-                    "user_id": user_id,
-                    "access_token": access_token,
-                    "calls_authenticated": True
-                }
-
-        except httpx.HTTPStatusError as e:
-            logger.error(f"❌ Failed to authenticate with Calls API: {e.response.status_code} - {e.response.text}")
-            # Calls 인증 실패해도 access_token은 반환
-            return {
-                "user_id": user_id,
-                "access_token": access_token,
-                "calls_authenticated": False,
-                "error": f"Calls auth failed: {e.response.text}"
-            }
-        except Exception as e:
-            logger.error(f"❌ Error authenticating with Calls API: {str(e)}")
-            return {
-                "user_id": user_id,
-                "access_token": access_token,
-                "calls_authenticated": False,
-                "error": str(e)
-            }
 
     async def make_call(
         self,
