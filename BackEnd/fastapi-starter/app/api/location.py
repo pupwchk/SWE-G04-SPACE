@@ -103,11 +103,10 @@ async def trigger_auto_call(user_id: str, distance: float, event_type: str):
 
     흐름:
     1. HRV 피로도 조회
-    2. 날씨 데이터 조회
+    2. 날씨 데이터 조회 (서울 기본값)
     3. Rule Engine으로 가전 제어 결정
     4. 가전 제어 실행
     5. Sendbird 채팅 메시지
-    6. Sendbird 음성 통화
 
     Args:
         user_id: 사용자 ID
@@ -120,7 +119,6 @@ async def trigger_auto_call(user_id: str, distance: float, event_type: str):
         from app.services.weather_service import weather_service
         from app.services.appliance_rule_engine import appliance_rule_engine
         from app.services.appliance_control_service import appliance_control_service
-        from app.models.location import UserLocation
 
         logger.info(f"📞 [Scenario 1] Triggering for {user_id} (event: {event_type}, distance: {distance:.1f}m)")
 
@@ -135,26 +133,17 @@ async def trigger_auto_call(user_id: str, distance: float, event_type: str):
 
             logger.info(f"💓 Fatigue level: {fatigue_level}")
 
-            # 2. 사용자 집 위치 조회
-            user_location = db.query(UserLocation)\
-                .filter(UserLocation.user_id == user_id)\
-                .first()
-
-            if not user_location or not user_location.home_latitude:
-                logger.error(f"❌ No home location for {user_id}")
-                return
-
-            # 3. 날씨 데이터 조회
+            # 2. 날씨 데이터 조회 (서울 기본값 사용)
             weather_data = await weather_service.get_combined_weather(
                 db=db,
-                latitude=user_location.home_latitude,
-                longitude=user_location.home_longitude,
+                latitude=37.5665,  # 서울 시청 좌표
+                longitude=126.9780,
                 sido_name=os.getenv("DEFAULT_SIDO_NAME", "서울")
             )
 
             logger.info(f"🌤️ Weather: {weather_data.get('temperature')}°C, {weather_data.get('humidity')}%")
 
-            # 4. Rule Engine으로 가전 제어 결정
+            # 3. Rule Engine으로 가전 제어 결정
             appliances_to_control = appliance_rule_engine.get_appliances_to_control(
                 db=db,
                 user_id=user_id,
@@ -164,7 +153,7 @@ async def trigger_auto_call(user_id: str, distance: float, event_type: str):
 
             logger.info(f"🎛️ Appliances to control: {len(appliances_to_control)}")
 
-            # 5. 가전 제어 실행
+            # 4. 가전 제어 실행
             if appliances_to_control:
                 control_results = appliance_control_service.execute_multiple_commands(
                     db=db,
@@ -176,7 +165,7 @@ async def trigger_auto_call(user_id: str, distance: float, event_type: str):
                 success_count = sum(1 for r in control_results if r.get("success"))
                 logger.info(f"✅ Controlled {success_count}/{len(appliances_to_control)} appliances")
 
-            # 6. Sendbird 채팅 메시지
+            # 5. Sendbird 채팅 메시지
             # distinct 채널 생성 또는 가져오기
             try:
                 channel_data = await chat_client.create_channel(
@@ -188,9 +177,9 @@ async def trigger_auto_call(user_id: str, distance: float, event_type: str):
                 # 메시지 생성
                 appliance_names = [a["appliance_type"] for a in appliances_to_control]
                 if appliances_to_control:
-                    message = f"집에 거의 도착하셨네요! 피로도를 고려해서 {', '.join(appliance_names)}을(를) 켜드렸어요. 잠시 후 전화로 자세히 안내해드릴게요."
+                    message = f"집에 거의 도착하셨네요! 피로도를 고려해서 {', '.join(appliance_names)}을(를) 켜드렸어요."
                 else:
-                    message = "집에 거의 도착하셨네요! 현재 날씨와 피로도 상태가 괜찮아서 따로 켤 가전은 없어요. 잠시 후 전화드릴게요."
+                    message = "집에 거의 도착하셨네요! 현재 날씨와 피로도 상태가 괜찮아서 따로 켤 가전은 없어요."
 
                 await chat_client.send_message(
                     channel_url=channel_url,
@@ -200,17 +189,6 @@ async def trigger_auto_call(user_id: str, distance: float, event_type: str):
                 logger.info(f"💬 Chat message sent to {channel_url}")
             except Exception as e:
                 logger.warning(f"⚠️ Failed to send chat: {str(e)}")
-
-            # 7. Sendbird 음성 통화
-            try:
-                await calls_client.make_call(
-                    caller_id=SendbirdConfig.AI_USER_ID,
-                    callee_id=user_id,
-                    call_type="voice"
-                )
-                logger.info(f"📞 Call initiated")
-            except Exception as e:
-                logger.warning(f"⚠️ Failed to make call: {str(e)}")
 
             logger.info(f"✅ [Scenario 1] Completed for {user_id}")
 
