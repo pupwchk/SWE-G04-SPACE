@@ -53,11 +53,6 @@ async def main():
         logger.info("\n✅ 등록 완료!")
         logger.info(f"   결과: {result}")
 
-        # 인증 테스트 (재인증)
-        logger.info("\n🧪 인증 테스트 (재인증 시도)...")
-        test_result = await calls_client.authenticate_user(SendbirdConfig.AI_USER_ID)
-        logger.info(f"   테스트 결과: {test_result}")
-
         logger.info("\n" + "=" * 80)
         logger.info("🎉 모든 작업이 성공적으로 완료되었습니다!")
         logger.info("=" * 80)
