@@ -342,3 +342,41 @@ async def get_geofence_config(user_identifier: str, db: Session = Depends(get_db
     except Exception as e:
         logger.error(f"❌ Get geofence config error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/trigger/demo/{user_identifier}")
+async def trigger_demo_call(
+    user_identifier: str,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    """
+    시연용 API - 수동으로 Geofence 이벤트 트리거
+
+    user_identifier: 사용자 email 또는 UUID
+
+    실제 위치 이동 없이 AI 자동 전화를 테스트할 수 있습니다.
+    """
+    try:
+        logger.info(f"🎬 [DEMO] Manual trigger for {user_identifier}")
+
+        # user_identifier를 UUID로 변환
+        user_uuid = get_user_uuid_by_identifier(db, user_identifier)
+
+        # 백그라운드에서 자동 전화 트리거 (거리 50m, ENTER 이벤트로 시뮬레이션)
+        background_tasks.add_task(
+            trigger_auto_call,
+            str(user_uuid),
+            50.0,  # 집에서 50m 거리로 가정
+            "ENTER"
+        )
+
+        return {
+            "status": "ok",
+            "message": "시연용 자동 전화가 트리거되었습니다. 잠시 후 전화가 올 것입니다.",
+            "user_id": user_identifier
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Demo trigger error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
