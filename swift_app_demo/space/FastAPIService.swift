@@ -1013,6 +1013,102 @@ class FastAPIService {
         }
     }
 
+    // MARK: - Sendbird Auth API
+
+    /// Get Sendbird authentication token for user
+    /// - Parameter userId: User ID (email or UUID)
+    /// - Returns: Sendbird auth response with user_id and access_token
+    func getSendbirdUserToken(userId: String, nickname: String? = nil) async -> (userId: String, accessToken: String)? {
+        guard let url = URL(string: "\(baseURL)/api/sendbird/auth/token") else {
+            print("❌ [FastAPI] Invalid URL for Sendbird user token")
+            return nil
+        }
+
+        var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        var body: [String: Any] = ["user_id": userId]
+        if let nickname = nickname {
+            body["nickname"] = nickname
+        }
+
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+            let (data, response) = try await apiSession.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                print("❌ [FastAPI] Invalid response for Sendbird user token")
+                return nil
+            }
+
+            if httpResponse.statusCode == 200 {
+                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let userId = json["user_id"] as? String,
+                   let accessToken = json["access_token"] as? String {
+                    print("✅ [FastAPI] Sendbird user token retrieved for: \(userId)")
+                    return (userId, accessToken)
+                }
+            } else {
+                if let errorString = String(data: data, encoding: .utf8) {
+                    print("❌ [FastAPI] Get Sendbird user token failed (\(httpResponse.statusCode)): \(errorString)")
+                }
+                return nil
+            }
+
+            return nil
+
+        } catch {
+            print("❌ [FastAPI] Network error getting Sendbird user token: \(error.localizedDescription)")
+            return nil
+        }
+    }
+
+    /// Get Sendbird AI assistant token
+    /// - Returns: AI assistant user_id and access_token
+    func getSendbirdAIToken() async -> (userId: String, accessToken: String)? {
+        guard let url = URL(string: "\(baseURL)/api/sendbird/auth/ai-token") else {
+            print("❌ [FastAPI] Invalid URL for Sendbird AI token")
+            return nil
+        }
+
+        var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        do {
+            let (data, response) = try await apiSession.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                print("❌ [FastAPI] Invalid response for Sendbird AI token")
+                return nil
+            }
+
+            if httpResponse.statusCode == 200 {
+                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let userId = json["user_id"] as? String,
+                   let accessToken = json["access_token"] as? String {
+                    print("✅ [FastAPI] Sendbird AI token retrieved: \(userId)")
+                    return (userId, accessToken)
+                }
+            } else {
+                if let errorString = String(data: data, encoding: .utf8) {
+                    print("❌ [FastAPI] Get Sendbird AI token failed (\(httpResponse.statusCode)): \(errorString)")
+                }
+                return nil
+            }
+
+            return nil
+
+        } catch {
+            print("❌ [FastAPI] Network error getting Sendbird AI token: \(error.localizedDescription)")
+            return nil
+        }
+    }
+
     // MARK: - Calls API
 
     /// Trigger auto-call when user approaches home (GPS-based)

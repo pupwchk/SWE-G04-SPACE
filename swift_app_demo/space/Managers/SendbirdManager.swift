@@ -136,6 +136,85 @@ class SendbirdManager: ObservableObject {
         print("✅ [Sendbird] Simulated calls authentication successful")
     }
 
+    /// Authenticate both user and AI assistant for Sendbird Calls (free plan workaround)
+    /// Since free plan doesn't support Direct Call API, iOS must authenticate as both parties
+    /// - Parameters:
+    ///   - userEmail: User email (used as user_id)
+    ///   - completion: Completion handler with success status
+    func authenticateForCalls(userEmail: String, completion: @escaping (Bool, Error?) -> Void) {
+        Task {
+            do {
+                // Step 1: Get user token from backend
+                guard let userAuth = await FastAPIService.shared.getSendbirdUserToken(userId: userEmail) else {
+                    print("❌ [Sendbird] Failed to get user token from backend")
+                    await MainActor.run {
+                        completion(false, SendbirdError.authenticationFailed)
+                    }
+                    return
+                }
+
+                print("🔑 [Sendbird] Got user token for: \(userAuth.userId)")
+
+                // Step 2: Get AI assistant token from backend
+                guard let aiAuth = await FastAPIService.shared.getSendbirdAIToken() else {
+                    print("❌ [Sendbird] Failed to get AI assistant token from backend")
+                    await MainActor.run {
+                        completion(false, SendbirdError.authenticationFailed)
+                    }
+                    return
+                }
+
+                print("🔑 [Sendbird] Got AI assistant token for: \(aiAuth.userId)")
+
+                // Step 3: Authenticate user with SendBird Calls
+                SendbirdCallsManager.shared.authenticate(userId: userAuth.userId, accessToken: userAuth.accessToken) { result in
+                    switch result {
+                    case .success(let user):
+                        print("✅ [Sendbird] User authenticated with Calls: \(user.userId)")
+
+                        // Step 4: Now authenticate as AI assistant (this registers AI in the SDK)
+                        // Note: SendBird Calls SDK can only be authenticated as one user at a time
+                        // But registering AI here ensures AI is known to SendBird
+                        SendbirdCallsManager.shared.authenticate(userId: aiAuth.userId, accessToken: aiAuth.accessToken) { aiResult in
+                            switch aiResult {
+                            case .success(let aiUser):
+                                print("✅ [Sendbird] AI assistant authenticated with Calls: \(aiUser.userId)")
+
+                                // Step 5: Switch back to user authentication so user can make calls
+                                SendbirdCallsManager.shared.authenticate(userId: userAuth.userId, accessToken: userAuth.accessToken) { finalResult in
+                                    switch finalResult {
+                                    case .success(let finalUser):
+                                        print("✅ [Sendbird] Final user authentication complete: \(finalUser.userId)")
+                                        print("📞 [Sendbird] Ready to make calls to AI assistant")
+                                        completion(true, nil)
+
+                                    case .failure(let error):
+                                        print("❌ [Sendbird] Final user authentication failed: \(error)")
+                                        completion(false, error)
+                                    }
+                                }
+
+                            case .failure(let error):
+                                print("❌ [Sendbird] AI authentication failed: \(error)")
+                                completion(false, error)
+                            }
+                        }
+
+                    case .failure(let error):
+                        print("❌ [Sendbird] User authentication failed: \(error)")
+                        completion(false, error)
+                    }
+                }
+
+            } catch {
+                print("❌ [Sendbird] Authentication process error: \(error)")
+                await MainActor.run {
+                    completion(false, error)
+                }
+            }
+        }
+    }
+
     // MARK: - Helper Methods
 
     /// Check if Sendbird is properly initialized

@@ -25,13 +25,13 @@ struct HaruApp: App {
                     // Wait a bit for Supabase to be ready
                     try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
 
-                    if let userId = await SupabaseManager.shared.currentUser?.id {
-                        SendbirdCallsManager.shared.authenticate(userId: userId) { result in
-                            switch result {
-                            case .success(let user):
-                                print("✅ [App] User authenticated with SendBird Calls: \(user.userId)")
-                            case .failure(let error):
-                                print("❌ [App] SendBird Calls authentication failed: \(error)")
+                    if let userEmail = await SupabaseManager.shared.currentUser?.email {
+                        // Use dual authentication method to register both user and AI assistant
+                        SendbirdManager.shared.authenticateForCalls(userEmail: userEmail) { success, error in
+                            if success {
+                                print("✅ [App] Dual authentication complete - ready for calls")
+                            } else {
+                                print("❌ [App] Dual authentication failed: \(error?.localizedDescription ?? "unknown error")")
                             }
                         }
                     } else {
