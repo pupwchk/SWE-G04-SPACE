@@ -12,7 +12,11 @@ struct PersonaChatView: View {
     let persona: Persona
 
     @StateObject private var viewModel = PersonaChatViewModel()
+    @StateObject private var callsManager = SendbirdCallsManager.shared
     @State private var messageText = ""
+    @State private var showPhoneCall = false
+    @State private var showCallError = false
+    @State private var callErrorMessage = ""
     @FocusState private var isInputFocused: Bool
 
     var body: some View {
@@ -148,8 +152,53 @@ struct PersonaChatView: View {
         .background(Color(hex: "F9F9F9"))
         .navigationTitle(persona.nickname)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: {
+                    startVoiceCall()
+                }) {
+                    Image(systemName: "phone.fill")
+                        .foregroundColor(Color(hex: "A50034"))
+                }
+            }
+        }
+        .sheet(isPresented: $showPhoneCall) {
+            PhoneCallView(contactName: persona.nickname, callId: callsManager.currentCallId)
+        }
+        .alert("통화 오류", isPresented: $showCallError) {
+            Button("확인", role: .cancel) { }
+        } message: {
+            Text(callErrorMessage)
+        }
         .onAppear {
             viewModel.loadMessages(for: persona.id, personaName: persona.nickname)
+
+            // Authenticate user with SendBird Calls if not already authenticated
+            if let userId = SupabaseManager.shared.currentUser?.id {
+                callsManager.authenticate(userId: userId) { result in
+                    switch result {
+                    case .success(let user):
+                        print("✅ [PersonaChatView] Authenticated with SendBird Calls: \(user.userId)")
+                    case .failure(let error):
+                        print("❌ [PersonaChatView] SendBird Calls authentication failed: \(error)")
+                    }
+                }
+            }
+        }
+    }
+
+    private func startVoiceCall() {
+        // Make a call to the AI assistant
+        callsManager.makeCall(to: Config.aiUserId) { result in
+            switch result {
+            case .success(_):
+                print("✅ [PersonaChatView] Call initiated successfully")
+                showPhoneCall = true
+            case .failure(let error):
+                print("❌ [PersonaChatView] Call failed: \(error)")
+                callErrorMessage = error.localizedDescription
+                showCallError = true
+            }
         }
     }
 

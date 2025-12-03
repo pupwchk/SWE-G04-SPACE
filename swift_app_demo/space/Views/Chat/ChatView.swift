@@ -32,29 +32,34 @@ struct ChatView: View {
             }
             .navigationTitle("채팅")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                if selectedMode != nil {
-                    ToolbarItem(placement: .navigationBarLeading) {
-                        Button(action: {
-                            selectedMode = nil
-                        }) {
-                            Image(systemName: "chevron.left")
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundColor(.black)
-                        }
-                    }
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: {}) {
-                        Image(systemName: "square.dashed")
-                            .font(.system(size: 18))
-                            .foregroundColor(.black)
-                    }
+            .toolbar(content: chatToolbar)   // 🔹 명시적으로 content 지정
+        }
+        .fullScreenCover(isPresented: $showPhoneCall) {
+            PhoneCallView(contactName: "My home", callId: nil)
+        }
+    }
+
+    // 🔹 Toolbar 내용을 따로 분리해서 Ambiguous 에러 방지
+    @ToolbarContentBuilder
+    private func chatToolbar() -> some ToolbarContent {
+        ToolbarItem(placement: .navigationBarLeading) {
+            if selectedMode != nil {
+                Button(action: {
+                    selectedMode = nil
+                }) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(.black)
                 }
             }
         }
-        .fullScreenCover(isPresented: $showPhoneCall) {
-            PhoneCallView(contactName: "My home")
+
+        ToolbarItem(placement: .navigationBarTrailing) {
+            Button(action: {}) {
+                Image(systemName: "square.dashed")
+                    .font(.system(size: 18))
+                    .foregroundColor(.black)
+            }
         }
     }
 }

@@ -8,6 +8,7 @@
 import Foundation
 import AVFoundation
 import Combine
+import SendBirdCalls
 
 // MARK: - Call State Enum
 
@@ -61,7 +62,7 @@ class SendbirdCallsManager: NSObject, ObservableObject {
 
     weak var delegate: SendbirdCallsDelegate?
 
-    private var currentCall: Any? // Will be DirectCall when SDK is installed
+    private var currentCall: DirectCall?
     private var audioSession: AVAudioSession = .sharedInstance()
     private var durationTimer: Timer?
     private var cancellables = Set<AnyCancellable>()
@@ -87,13 +88,51 @@ class SendbirdCallsManager: NSObject, ObservableObject {
 
     /// Setup Sendbird call delegates
     private func setupCallDelegates() {
-        // NOTE: Will be implemented once SDK is installed
-        /*
-        // Example delegate setup (uncomment when SDK is installed):
-        SendbirdCall.addDelegate(self, identifier: "CallsManager")
-        */
+        SendBirdCall.addDelegate(self, identifier: "CallsManager")
+        print("✅ [SendbirdCallsManager] Call delegates registered")
+    }
 
-        print("ℹ️ [SendbirdCallsManager] Call delegates pending - waiting for SDK")
+    /// Initialize SendBird Calls SDK
+    /// - Parameters:
+    ///   - appId: SendBird Application ID
+    ///   - completion: Completion handler with success status
+    func initializeSDK(appId: String, completion: @escaping (Bool) -> Void) {
+        SendBirdCall.configure(appId: appId)
+        print("✅ [SendbirdCallsManager] SDK initialized with App ID: \(appId)")
+        completion(true)
+    }
+
+    /// Authenticate user with SendBird Calls
+    /// - Parameters:
+    ///   - userId: User ID to authenticate
+    ///   - accessToken: Optional access token
+    ///   - completion: Completion handler with authentication result
+    func authenticate(userId: String, accessToken: String? = nil, completion: @escaping (Result<SendBirdCalls.User, Error>) -> Void) {
+        let authParams = AuthenticateParams(userId: userId, accessToken: accessToken)
+
+        SendBirdCall.authenticate(with: authParams) { user, error in
+            if let error = error {
+                print("❌ [SendbirdCallsManager] Authentication failed: \(error)")
+                completion(.failure(error))
+            } else if let user = user {
+                print("✅ [SendbirdCallsManager] Authenticated as: \(user.userId)")
+                completion(.success(user))
+            }
+        }
+    }
+
+    /// Register push token for incoming call notifications
+    /// - Parameters:
+    ///   - token: APNS device token
+    ///   - isProduction: Whether to use production APNS environment
+    func registerPushToken(_ token: Data, isProduction: Bool = false) {
+        SendBirdCall.registerVoIPPush(token: token, unique: true) { error in
+            if let error = error {
+                print("❌ [SendbirdCallsManager] Push token registration failed: \(error)")
+            } else {
+                print("✅ [SendbirdCallsManager] Push token registered successfully")
+            }
+        }
     }
 
     // MARK: - Call Management
@@ -122,89 +161,60 @@ class SendbirdCallsManager: NSObject, ObservableObject {
             throw CallError.invalidCallId
         }
 
-        // NOTE: Actual call acceptance will be implemented once SDK is installed
-        /*
-        guard let call = currentCall as? DirectCall else {
+        guard let call = currentCall else {
             throw CallError.callNotFound
         }
 
-        let acceptParams = AcceptParams()
-        acceptParams.callOptions = CallOptions()
+        let acceptParams = AcceptParams(callOptions: CallOptions())
 
-        return try await withCheckedThrowingContinuation { continuation in
-            call.accept(with: acceptParams) { error in
-                if let error = error {
-                    print("❌ [SendbirdCallsManager] Call accept failed: \(error)")
-                    self.handleCallError(error)
-                    continuation.resume(throwing: error)
-                } else {
-                    print("✅ [SendbirdCallsManager] Call accepted")
-                    self.startCallDurationTimer()
-                    continuation.resume()
-                }
-            }
-        }
-        */
-
-        // Temporary simulation
-        print("ℹ️ [SendbirdCallsManager] Simulating call acceptance: \(callId)")
-        try await Task.sleep(nanoseconds: 500_000_000)
-
-        await MainActor.run {
-            self.callState = .connecting
-        }
-
-        try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
-
-        await MainActor.run {
-            self.callState = .connected
-            self.delegate?.didCallConnect(callId: callId)
-        }
-
-        startCallDurationTimer()
-        print("✅ [SendbirdCallsManager] Simulated call connected")
+        call.accept(with: acceptParams)
+        print("✅ [SendbirdCallsManager] Call accept requested")
     }
 
     /// Decline incoming call
     /// - Parameter callId: Call ID to decline
     func declineCall(callId: String) async {
         guard callId == currentCallId else { return }
-
-        // NOTE: Will be implemented once SDK is installed
-        /*
-        guard let call = currentCall as? DirectCall else { return }
+        guard let call = currentCall else { return }
 
         call.end()
-        */
-
-        // Temporary simulation
-        print("ℹ️ [SendbirdCallsManager] Simulating call decline: \(callId)")
-
-        await MainActor.run {
-            self.callState = .ended
-            self.delegate?.didCallEnd(callId: callId, reason: .declined)
-            self.cleanup()
-        }
+        print("✅ [SendbirdCallsManager] Call declined: \(callId)")
     }
 
     /// End current call
     func endCall() async {
         guard let callId = currentCallId else { return }
-
-        // NOTE: Will be implemented once SDK is installed
-        /*
-        guard let call = currentCall as? DirectCall else { return }
+        guard let call = currentCall else { return }
 
         call.end()
-        */
+        print("✅ [SendbirdCallsManager] Call ended: \(callId)")
+    }
 
-        // Temporary simulation
-        print("ℹ️ [SendbirdCallsManager] Simulating call end: \(callId)")
+    /// Make an outgoing call to a user
+    /// - Parameters:
+    ///   - calleeId: User ID to call
+    ///   - completion: Completion handler with call result
+    func makeCall(to calleeId: String, completion: @escaping (Result<DirectCall, Error>) -> Void) {
+        let callParams = DialParams(calleeId: calleeId, isVideoCall: false, callOptions: CallOptions(), customItems: [:])
 
-        await MainActor.run {
-            self.callState = .ended
-            self.delegate?.didCallEnd(callId: callId, reason: .completed)
-            self.cleanup()
+        SendBirdCall.dial(with: callParams) { call, error in
+            if let error = error {
+                print("❌ [SendbirdCallsManager] Call dial failed: \(error)")
+                completion(.failure(error))
+            } else if let call = call {
+                print("✅ [SendbirdCallsManager] Call initiated: \(call.callId)")
+
+                DispatchQueue.main.async {
+                    self.currentCall = call
+                    self.currentCallId = call.callId
+                    self.callState = .dialing
+                }
+
+                // Set delegate for this call
+                call.delegate = self
+
+                completion(.success(call))
+            }
         }
     }
 
@@ -213,14 +223,14 @@ class SendbirdCallsManager: NSObject, ObservableObject {
     /// Toggle mute state
     /// - Parameter muted: Whether to mute the microphone
     func setMute(_ muted: Bool) {
-        // NOTE: Will be implemented once SDK is installed
-        /*
-        guard let call = currentCall as? DirectCall else { return }
+        guard let call = currentCall else { return }
 
-        call.muteMicrophone(muted)
-        */
+        if muted {
+            call.muteMicrophone()
+        } else {
+            call.unmuteMicrophone()
+        }
 
-        // Temporary simulation
         DispatchQueue.main.async {
             self.isMuted = muted
             print("🎤 [SendbirdCallsManager] Microphone \(muted ? "muted" : "unmuted")")
@@ -324,13 +334,11 @@ class SendbirdCallsManager: NSObject, ObservableObject {
     }
 }
 
-// MARK: - Sendbird Call Delegate (Commented for now)
+// MARK: - SendBird Call Delegate
 
-/*
-// Uncomment when SDK is installed
 extension SendbirdCallsManager: SendBirdCallDelegate {
     func didStartRinging(_ call: DirectCall) {
-        print("📞 [SendbirdCallsManager] Call ringing: \(call.callId)")
+        print("📞 [SendbirdCallsManager] Incoming call ringing: \(call.callId)")
 
         DispatchQueue.main.async {
             self.currentCall = call
@@ -342,9 +350,16 @@ extension SendbirdCallsManager: SendBirdCallDelegate {
             )
         }
 
+        // Set call delegate
+        call.delegate = self
+
         activateAudioSession()
     }
+}
 
+// MARK: - DirectCall Delegate
+
+extension SendbirdCallsManager: DirectCallDelegate {
     func didEstablish(_ call: DirectCall) {
         print("✅ [SendbirdCallsManager] Call established: \(call.callId)")
 
@@ -361,7 +376,6 @@ extension SendbirdCallsManager: SendBirdCallDelegate {
 
         DispatchQueue.main.async {
             self.callState = .connected
-            self.delegate?.didCallConnect(callId: call.callId)
         }
     }
 
@@ -377,11 +391,13 @@ extension SendbirdCallsManager: SendBirdCallDelegate {
             reason = .canceled
         case .declined:
             reason = .declined
-        case .timedOut:
+        case .timedOut, .noAnswer:
             reason = .timeout
-        case .connectionFailed:
+        case .connectionLost, .dialFailed, .acceptFailed, .otherDeviceAccepted, .notConnected, .none:
             reason = .connectionFailed
-        default:
+        case .unknown:
+            reason = .unknown
+        @unknown default:
             reason = .unknown
         }
 
@@ -392,10 +408,13 @@ extension SendbirdCallsManager: SendBirdCallDelegate {
     }
 
     func didRemoteAudioSettingsChange(_ call: DirectCall) {
-        print("ℹ️ [SendbirdCallsManager] Remote audio settings changed")
+        print("ℹ️ [SendbirdCallsManager] Remote audio settings changed - muted: \(call.isRemoteAudioEnabled)")
+    }
+
+    func didAudioDeviceChange(_ call: DirectCall, session: AVAudioSession, previousRoute: AVAudioSessionRouteDescription, reason: AVAudioSession.RouteChangeReason) {
+        print("ℹ️ [SendbirdCallsManager] Audio device changed: \(reason.rawValue)")
     }
 }
-*/
 
 // MARK: - Error Types
 

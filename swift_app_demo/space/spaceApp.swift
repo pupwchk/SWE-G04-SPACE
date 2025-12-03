@@ -15,6 +15,34 @@ struct HaruApp: App {
         SendbirdManager.shared.initializeChat()
         print("📱 Sendbird Chat SDK initialized")
 
+        // Initialize Sendbird Calls SDK
+        SendbirdCallsManager.shared.initializeSDK(appId: Config.sendbirdAppId) { success in
+            if success {
+                print("📱 Sendbird Calls SDK initialized")
+
+                // Authenticate user with SendBird Calls after SDK initialization
+                Task {
+                    // Wait a bit for Supabase to be ready
+                    try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+
+                    if let userId = await SupabaseManager.shared.currentUser?.id {
+                        SendbirdCallsManager.shared.authenticate(userId: userId) { result in
+                            switch result {
+                            case .success(let user):
+                                print("✅ [App] User authenticated with SendBird Calls: \(user.userId)")
+                            case .failure(let error):
+                                print("❌ [App] SendBird Calls authentication failed: \(error)")
+                            }
+                        }
+                    } else {
+                        print("⚠️ [App] No user session found, skipping SendBird Calls authentication")
+                    }
+                }
+            } else {
+                print("❌ Sendbird Calls SDK initialization failed")
+            }
+        }
+
         // Initialize WatchConnectivityManager singleton
         _ = WatchConnectivityManager.shared
         print("📱 iOS App initialized with WatchConnectivity")

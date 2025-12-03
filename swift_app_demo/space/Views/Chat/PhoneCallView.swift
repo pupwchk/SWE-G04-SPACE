@@ -10,14 +10,10 @@ import SwiftUI
 struct PhoneCallView: View {
     @Environment(\.dismiss) var dismiss
     @StateObject private var callHistoryManager = CallHistoryManager.shared
-
-    @State private var callDuration: TimeInterval = 0
-    @State private var timer: Timer?
-    @State private var isMuted = false
-    @State private var isSpeakerOn = false
-    @State private var showEndCallConfirmation = false
+    @StateObject private var callsManager = SendbirdCallsManager.shared
 
     let contactName: String
+    let callId: String?
 
     var body: some View {
         ZStack {
@@ -53,8 +49,8 @@ struct PhoneCallView: View {
                         .font(.system(size: 32, weight: .semibold))
                         .foregroundColor(.white)
 
-                    // Call duration
-                    Text(formattedDuration)
+                    // Call duration or status
+                    Text(callStatusText)
                         .font(.system(size: 18))
                         .foregroundColor(.white.opacity(0.9))
                         .monospacedDigit()
@@ -69,15 +65,15 @@ struct PhoneCallView: View {
                         // Mute button
                         VStack(spacing: 12) {
                             Button(action: {
-                                isMuted.toggle()
+                                callsManager.setMute(!callsManager.isMuted)
                             }) {
                                 Circle()
-                                    .fill(isMuted ? Color.white : Color.white.opacity(0.3))
+                                    .fill(callsManager.isMuted ? Color.white : Color.white.opacity(0.3))
                                     .frame(width: 70, height: 70)
                                     .overlay(
-                                        Image(systemName: isMuted ? "mic.slash.fill" : "mic.fill")
+                                        Image(systemName: callsManager.isMuted ? "mic.slash.fill" : "mic.fill")
                                             .font(.system(size: 28))
-                                            .foregroundColor(isMuted ? Color(hex: "A50034") : .white)
+                                            .foregroundColor(callsManager.isMuted ? Color(hex: "A50034") : .white)
                                     )
                             }
 
@@ -89,15 +85,15 @@ struct PhoneCallView: View {
                         // Speaker button
                         VStack(spacing: 12) {
                             Button(action: {
-                                isSpeakerOn.toggle()
+                                callsManager.setSpeaker(!callsManager.isSpeakerOn)
                             }) {
                                 Circle()
-                                    .fill(isSpeakerOn ? Color.white : Color.white.opacity(0.3))
+                                    .fill(callsManager.isSpeakerOn ? Color.white : Color.white.opacity(0.3))
                                     .frame(width: 70, height: 70)
                                     .overlay(
-                                        Image(systemName: isSpeakerOn ? "speaker.wave.3.fill" : "speaker.fill")
+                                        Image(systemName: callsManager.isSpeakerOn ? "speaker.wave.3.fill" : "speaker.fill")
                                             .font(.system(size: 28))
-                                            .foregroundColor(isSpeakerOn ? Color(hex: "A50034") : .white)
+                                            .foregroundColor(callsManager.isSpeakerOn ? Color(hex: "A50034") : .white)
                                     )
                             }
 
@@ -124,45 +120,49 @@ struct PhoneCallView: View {
                 .padding(.bottom, 80)
             }
         }
-        .onAppear {
-            startTimer()
-        }
-        .onDisappear {
-            stopTimer()
-        }
-    }
-
-    private var formattedDuration: String {
-        let minutes = Int(callDuration) / 60
-        let seconds = Int(callDuration) % 60
-        return String(format: "%02d:%02d", minutes, seconds)
-    }
-
-    private func startTimer() {
-        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
-            callDuration += 1
+        .onChange(of: callsManager.callState) { oldState, newState in
+            if newState == .ended {
+                dismiss()
+            }
         }
     }
 
-    private func stopTimer() {
-        timer?.invalidate()
-        timer = nil
+    private var callStatusText: String {
+        switch callsManager.callState {
+        case .idle:
+            return "준비 중..."
+        case .dialing:
+            return "전화 거는 중..."
+        case .ringing:
+            return "벨이 울리는 중..."
+        case .connecting:
+            return "연결 중..."
+        case .connected:
+            let minutes = Int(callsManager.callDuration) / 60
+            let seconds = Int(callsManager.callDuration) % 60
+            return String(format: "%02d:%02d", minutes, seconds)
+        case .ended:
+            return "통화 종료"
+        case .error:
+            return "오류 발생"
+        }
     }
 
     private func endCall() {
-        stopTimer()
+        Task {
+            // Save call record
+            let callRecord = CallRecord(
+                contactName: contactName,
+                callType: .voice,
+                timestamp: Date(),
+                duration: callsManager.callDuration,
+                summary: generateCallSummary()
+            )
+            callHistoryManager.addCallRecord(callRecord)
 
-        // Save call record
-        let callRecord = CallRecord(
-            contactName: contactName,
-            callType: .voice,
-            timestamp: Date(),
-            duration: callDuration,
-            summary: generateCallSummary()
-        )
-        callHistoryManager.addCallRecord(callRecord)
-
-        dismiss()
+            // End the call
+            await callsManager.endCall()
+        }
     }
 
     private func generateCallSummary() -> String {
@@ -178,5 +178,5 @@ struct PhoneCallView: View {
 }
 
 #Preview {
-    PhoneCallView(contactName: "My home")
+    PhoneCallView(contactName: "My home", callId: nil)
 }
