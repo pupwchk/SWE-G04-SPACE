@@ -486,6 +486,40 @@ class SendbirdCallsClient:
             logger.error(f"❌ Error getting call info: {str(e)}")
             raise
 
+    async def accept_call(self, call_id: str) -> Dict[str, Any]:
+        """
+        통화 수락 (AI 자동 응답용)
+
+        SendBird Calls API를 사용하여 서버에서 통화를 수락합니다.
+
+        Args:
+            call_id: 수락할 통화 ID
+
+        Returns:
+            수락 결과
+        """
+        url = f"{self.base_url}/calls/{call_id}/accept"
+
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    url,
+                    headers=self.headers,
+                    json={},
+                    timeout=10.0
+                )
+                response.raise_for_status()
+
+                logger.info(f"✅ Call accepted: {call_id}")
+                return response.json()
+
+        except httpx.HTTPStatusError as e:
+            logger.error(f"❌ Failed to accept call: {e.response.status_code} - {e.response.text}")
+            raise
+        except Exception as e:
+            logger.error(f"❌ Error accepting call: {str(e)}")
+            raise
+
     async def end_call(self, call_id: str) -> Dict[str, Any]:
         """통화 종료"""
         url = f"{self.base_url}/calls/{call_id}"

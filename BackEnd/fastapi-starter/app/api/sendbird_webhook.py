@@ -535,3 +535,74 @@ async def handle_call_ended(payload: Dict[str, Any]):
         db.close()
 
 
+async def handle_incoming_call(payload: Dict[str, Any]):
+    """
+    수신 통화 처리 (AI 자동 응답)
+
+    AI assistant가 전화를 받아야 하는 경우:
+    1. callee가 AI assistant인지 확인
+    2. SendBird Calls API로 전화 수락
+    3. 통화 시작
+    """
+    try:
+        call_id = payload.get("call_id")
+        caller = payload.get("caller", {})
+        callee = payload.get("callee", {})
+
+        caller_id = caller.get("user_id") if isinstance(caller, dict) else None
+        callee_id = callee.get("user_id") if isinstance(callee, dict) else None
+
+        logger.info(f"📞 [CALL-INCOMING] Call received!")
+        logger.info(f"   Call ID: {call_id}")
+        logger.info(f"   Caller: {caller_id}")
+        logger.info(f"   Callee: {callee_id}")
+        logger.info(f"   AI User ID: {SendbirdConfig.AI_USER_ID}")
+
+        # AI assistant가 수신자인 경우에만 자동 응답
+        if callee_id == SendbirdConfig.AI_USER_ID:
+            logger.info(f"🤖 [CALL-INCOMING] AI assistant receiving call, auto-accepting...")
+
+            # SendBird Calls API로 전화 수락
+            await calls_client.accept_call(call_id)
+
+            logger.info(f"✅ [CALL-INCOMING] AI assistant accepted call: {call_id}")
+        else:
+            logger.info(f"ℹ️ [CALL-INCOMING] Not for AI assistant, ignoring")
+
+    except Exception as e:
+        logger.error(f"❌ Incoming call handling error: {str(e)}")
+        logger.error(f"   Payload: {payload}")
+
+
+async def handle_call_established(payload: Dict[str, Any]):
+    """
+    통화 연결됨 처리
+
+    통화가 정상적으로 연결되었을 때:
+    1. 로깅
+    2. 통화 시작 시간 기록
+    3. TTS로 인사말 재생 (향후 구현)
+    """
+    try:
+        call_id = payload.get("call_id")
+        caller = payload.get("caller", {})
+        callee = payload.get("callee", {})
+
+        caller_id = caller.get("user_id") if isinstance(caller, dict) else None
+        callee_id = callee.get("user_id") if isinstance(callee, dict) else None
+
+        logger.info(f"✅ [CALL-ESTABLISHED] Call connected!")
+        logger.info(f"   Call ID: {call_id}")
+        logger.info(f"   Caller: {caller_id}")
+        logger.info(f"   Callee: {callee_id}")
+
+        # TODO: 향후 구현
+        # 1. TTS로 AI 인사말 재생
+        # 2. STT 활성화하여 사용자 음성 인식 시작
+        # 3. 실시간 대화 처리
+
+    except Exception as e:
+        logger.error(f"❌ Call established handling error: {str(e)}")
+        logger.error(f"   Payload: {payload}")
+
+

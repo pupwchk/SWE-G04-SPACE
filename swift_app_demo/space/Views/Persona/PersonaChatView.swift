@@ -616,19 +616,25 @@ struct ApplianceChangeRow: View {
                 .frame(width: 24)
 
             // 텍스트
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
-                    Text("\(change.applianceName) \(change.action)")
-                        .font(.system(size: 14, weight: .medium))
+                    Text(change.applianceName)
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(.black)
 
                     if change.isModified {
                         Image(systemName: "pencil.circle.fill")
-                            .font(.system(size: 14))
+                            .font(.system(size: 12))
                             .foregroundColor(Color(hex: "A50034").opacity(0.7))
                     }
                 }
 
+                // 동작 상태 (on/off 등)
+                Text(change.action)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(change.action.lowercased().contains("on") || change.action.lowercased().contains("켜") ? Color(hex: "A50034") : .gray)
+
+                // 세부 정보 (온도, 모드 등)
                 if let detail = change.detail {
                     Text(detail)
                         .font(.system(size: 12))
@@ -638,6 +644,7 @@ struct ApplianceChangeRow: View {
 
             Spacer()
         }
+        .padding(.vertical, 4)
     }
 }
 

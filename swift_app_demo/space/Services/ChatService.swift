@@ -308,19 +308,51 @@ class ChatService: ObservableObject {
 
         var details: [String] = []
 
+        // 모드 정보 (난방, 냉방, 송풍 등)
+        if let mode = settings["mode"] as? String {
+            let modeText: String
+            switch mode.lowercased() {
+            case "heat", "heating":
+                modeText = "난방"
+            case "cool", "cooling":
+                modeText = "냉방"
+            case "fan":
+                modeText = "송풍"
+            case "dry":
+                modeText = "제습"
+            default:
+                modeText = mode
+            }
+            details.append("\(modeText) 모드")
+        }
+
+        // 온도
         if let temp = settings["temperature"] as? Int {
             details.append("\(temp)°C")
         }
 
+        // 밝기
         if let brightness = settings["brightness"] as? Int {
-            details.append("\(brightness)% 밝기")
+            details.append("밝기 \(brightness)%")
         }
 
+        // 팬 속도
         if let fanSpeed = settings["fan_speed"] as? Int {
-            details.append("바람 세기 \(fanSpeed)")
+            let speedText: String
+            switch fanSpeed {
+            case 1:
+                speedText = "약"
+            case 2:
+                speedText = "중"
+            case 3:
+                speedText = "강"
+            default:
+                speedText = "\(fanSpeed)단"
+            }
+            details.append("바람 \(speedText)")
         }
 
-        return details.isEmpty ? nil : details.joined(separator: ", ")
+        return details.isEmpty ? nil : details.joined(separator: " · ")
     }
 }
 
