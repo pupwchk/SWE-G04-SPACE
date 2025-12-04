@@ -209,6 +209,33 @@ class SendbirdManager: ObservableObject {
         }
     }
 
+    // MARK: - Push Notifications
+
+    /// Register device token for push notifications
+    /// - Parameter deviceToken: Device token from APNs
+    func registerPushToken(_ deviceToken: Data) {
+        SendbirdChat.registerDevicePushToken(deviceToken, unique: true) { status, error in
+            if let error = error {
+                print("❌ [Sendbird] Failed to register push token: \(error)")
+            } else {
+                print("✅ [Sendbird] Push token registered successfully")
+                print("   Status: \(status)")
+            }
+        }
+    }
+
+    /// Unregister device token for push notifications
+    /// - Parameter deviceToken: Device token to unregister
+    func unregisterPushToken(_ deviceToken: Data) {
+        SendbirdChat.unregisterPushToken(deviceToken) { error in
+            if let error = error {
+                print("❌ [Sendbird] Failed to unregister push token: \(error)")
+            } else {
+                print("✅ [Sendbird] Push token unregistered successfully")
+            }
+        }
+    }
+
     // MARK: - Helper Methods
 
     /// Check if Sendbird is properly initialized

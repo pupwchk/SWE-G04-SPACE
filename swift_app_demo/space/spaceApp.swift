@@ -6,9 +6,12 @@
 //
 
 import SwiftUI
+import UserNotifications
 
 @main
 struct HaruApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+
     // Initialize managers on app launch
     init() {
         // Request notification permission for chat messages
