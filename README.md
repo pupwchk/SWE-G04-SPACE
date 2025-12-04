@@ -26,7 +26,9 @@ HARU is an intelligent smart-home automation platform that integrates wearable h
 8. Sendbird chatbot allows conversation-based control and feedback.
 
 ---
+## 🎥 Video
 
+---
 ## Key Features
 
 ### 1) Wellness State Analysis from Wearable HRV
@@ -67,9 +69,6 @@ This enables a highly adaptive environment that goes beyond simple “if tired �
 | **DevOps / Tools** |Postman / Bruno (API testing), VSCode Remote SSH |
 
 ---
-## 🎥 Video
-
----
 
 ## 🧑🏻‍💻👩🏻‍💻 Group Members
 
@@ -85,5 +84,6 @@ This enables a highly adaptive environment that goes beyond simple “if tired �
 
 Copyright (c) 2025 HARU
 This project is licensed under the MIT License — see the [LICENSE](./LICENSE) file for details.
+
 
 
