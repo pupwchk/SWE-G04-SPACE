@@ -357,15 +357,34 @@ extension SendbirdChatManager: GroupChannelDelegate {
         print("✅ [SendbirdChatManager] Received message: \(chatMessage.text)")
         print("   Is from user: \(chatMessage.isFromUser)")
 
-        // AI로부터 온 메시지인 경우에만 알림 전송
+        // AI로부터 온 메시지인 경우 알림 전송
         if !chatMessage.isFromUser {
-            print("🔔 [SendbirdChatManager] AI message detected, sending notification...")
+            print("🔔 [SendbirdChatManager] AI message detected, preparing notification...")
 
-            // 채널 이름에서 페르소나 이름 추출 (또는 기본값 사용)
-            let personaName = (channel as? GroupChannel)?.name ?? "페르소나"
-            print("   Persona name: \(personaName)")
+            // 채널 이름 또는 sender의 닉네임에서 페르소나 이름 추출
+            let personaName: String
+            if let groupChannel = channel as? GroupChannel {
+                // 채널 이름이 "AI Chat with Persona ..."인 경우 sender의 닉네임 사용
+                if let senderNickname = userMessage.sender?.nickname, !senderNickname.isEmpty {
+                    personaName = senderNickname
+                    print("   Using sender nickname: \(personaName)")
+                } else {
+                    let channelName = groupChannel.name
+                    if !channelName.isEmpty && !channelName.contains("AI Chat") {
+                        personaName = channelName
+                        print("   Using channel name: \(personaName)")
+                    } else {
+                        personaName = "페르소나"
+                        print("   Using default name: \(personaName)")
+                    }
+                }
+            } else {
+                personaName = "페르소나"
+                print("   Using default name (not GroupChannel): \(personaName)")
+            }
 
             // 로컬 알림 전송
+            print("📤 [SendbirdChatManager] Sending notification with persona name: \(personaName)")
             NotificationManager.shared.sendChatMessageNotification(
                 personaName: personaName,
                 messageText: chatMessage.text,

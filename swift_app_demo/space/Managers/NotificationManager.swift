@@ -64,15 +64,15 @@ class NotificationManager: NSObject, ObservableObject {
     ///   - messageText: 메시지 내용
     ///   - channelUrl: 채널 URL (탭 시 해당 채팅방으로 이동하기 위한 데이터)
     func sendChatMessageNotification(personaName: String, messageText: String, channelUrl: String) {
+        print("📲 [NotificationManager] sendChatMessageNotification called")
+        print("   Persona: \(personaName)")
+        print("   Message: \(messageText)")
+        print("   Channel: \(channelUrl)")
+        print("   Is authorized: \(isAuthorized)")
+
         // 권한이 없으면 알림을 보내지 않음
         guard isAuthorized else {
             print("⚠️ [NotificationManager] Notification not authorized")
-            return
-        }
-
-        // 앱이 활성화 상태일 때는 알림을 보내지 않음 (이미 화면에 표시되므로)
-        if UIApplication.shared.applicationState == .active {
-            print("ℹ️ [NotificationManager] App is active, skipping notification")
             return
         }
 
@@ -80,7 +80,13 @@ class NotificationManager: NSObject, ObservableObject {
         content.title = personaName
         content.body = messageText
         content.sound = .default
-        content.badge = NSNumber(value: UIApplication.shared.applicationIconBadgeNumber + 1)
+
+        // iOS 17+ uses UNUserNotificationCenter for badge count
+        if #available(iOS 17.0, *) {
+            content.badge = 1
+        } else {
+            content.badge = NSNumber(value: UIApplication.shared.applicationIconBadgeNumber + 1)
+        }
 
         // 채널 URL을 userInfo에 저장 (나중에 알림 탭 시 사용 가능)
         content.userInfo = [
@@ -97,6 +103,7 @@ class NotificationManager: NSObject, ObservableObject {
 
         let request = UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
 
+        print("📤 [NotificationManager] Adding notification request...")
         notificationCenter.add(request) { error in
             if let error = error {
                 print("❌ [NotificationManager] Failed to send notification: \(error)")
@@ -108,9 +115,19 @@ class NotificationManager: NSObject, ObservableObject {
 
     /// 배지 카운트 초기화
     func clearBadgeCount() {
-        DispatchQueue.main.async {
-            UIApplication.shared.applicationIconBadgeNumber = 0
-            print("✅ [NotificationManager] Badge count cleared")
+        if #available(iOS 17.0, *) {
+            notificationCenter.setBadgeCount(0) { error in
+                if let error = error {
+                    print("❌ [NotificationManager] Failed to clear badge count: \(error)")
+                } else {
+                    print("✅ [NotificationManager] Badge count cleared")
+                }
+            }
+        } else {
+            DispatchQueue.main.async {
+                UIApplication.shared.applicationIconBadgeNumber = 0
+                print("✅ [NotificationManager] Badge count cleared")
+            }
         }
     }
 
@@ -149,9 +166,15 @@ extension NotificationManager: UNUserNotificationCenterDelegate {
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
-        // 앱이 활성화 상태일 때도 배너와 사운드 표시 (선택사항)
-        // 원하지 않으면 빈 배열 [] 반환
-        completionHandler([.banner, .sound, .badge])
+        print("📱 [NotificationManager] willPresent notification called")
+        print("   Notification: \(notification.request.content.title) - \(notification.request.content.body)")
+
+        // iOS 14+: 배너, 사운드, 배지, 알림 센터 리스트 모두 표시
+        if #available(iOS 14.0, *) {
+            completionHandler([.banner, .sound, .badge, .list])
+        } else {
+            completionHandler([.alert, .sound, .badge])
+        }
     }
 
     /// 사용자가 알림을 탭했을 때 처리

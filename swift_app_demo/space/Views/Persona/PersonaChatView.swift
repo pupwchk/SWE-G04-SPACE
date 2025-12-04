@@ -353,6 +353,7 @@ class PersonaChatViewModel: ObservableObject {
 
     // Current persona context
     private var currentPersonaId: String?
+    private var currentPersonaName: String?
     private var currentPersonaContext: String?
 
     // Store metadata for approval
@@ -367,6 +368,7 @@ class PersonaChatViewModel: ObservableObject {
 
     func loadMessages(for personaId: String, personaName: String) {
         self.currentPersonaId = personaId
+        self.currentPersonaName = personaName
 
         // Load persona context (final prompt)
         Task {
