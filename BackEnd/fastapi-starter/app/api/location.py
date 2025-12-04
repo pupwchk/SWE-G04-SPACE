@@ -187,14 +187,24 @@ async def trigger_auto_notification(user_id: str, distance: float, event_type: s
 
             # 5. Sendbird 채팅으로 승인 요청 메시지 전송
             try:
-                # Sendbird의 is_distinct=True로 채널 조회/생성
-                # 같은 멤버 조합이 있으면 기존 채널 반환, 없으면 새로 생성
-                channel_data = await chat_client.create_channel(
-                    channel_url=None,  # 자동 생성
-                    user_ids=[user_id, SendbirdConfig.AI_USER_ID],
-                    name=f"Chat with {persona_name}"
-                )
-                channel_url = channel_data.get("channel_url")
+                # 5-1. Supabase persona_channels에서 기존 채널 URL 조회
+                channel_url = None
+                if persona_id and user_email:
+                    channel_url = supabase_persona_service.get_channel_url_by_email_and_persona(
+                        email=user_email,
+                        persona_id=persona_id
+                    )
+
+                # 5-2. 채널 URL이 없으면 새로 생성 (fallback)
+                if not channel_url:
+                    logger.warning(f"⚠️ No existing channel found, creating new one")
+                    channel_data = await chat_client.create_channel(
+                        channel_url=None,  # 자동 생성
+                        user_ids=[user_id, SendbirdConfig.AI_USER_ID],
+                        name=f"Chat with {persona_name}"
+                    )
+                    channel_url = channel_data.get("channel_url")
+
                 logger.info(f"📱 Using channel: {channel_url} (persona: {persona_name})")
 
                 # ChatSession에 기록 저장 (선택적, 추후 분석용)

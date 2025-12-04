@@ -431,6 +431,66 @@ class SupabasePersonaService:
             logger.error(f"❌ Error fetching latest persona for email {email}: {str(e)}")
             return None
 
+    def get_channel_url_by_email_and_persona(self, email: str, persona_id: str) -> Optional[str]:
+        """
+        email과 persona_id를 통해 persona_channels 테이블에서 채널 URL 조회
+
+        Args:
+            email: 사용자 이메일 (Supabase와 PostgreSQL 공통 키)
+            persona_id: 페르소나 ID (UUID)
+
+        Returns:
+            Sendbird channel_url 또는 None
+        """
+        if not self.is_available():
+            logger.warning("⚠️ Supabase not available, returning None")
+            return None
+
+        try:
+            # 1. email로 Supabase user_id 찾기
+            supabase_user_id = None
+
+            # user_profiles 테이블에서 email로 조회 (우선순위 1)
+            try:
+                user_result = self.client.table("user_profiles")\
+                    .select("id, email")\
+                    .eq("email", email)\
+                    .execute()
+
+                if user_result.data:
+                    if isinstance(user_result.data, list) and len(user_result.data) > 0:
+                        supabase_user_id = user_result.data[0].get("id")
+                    elif isinstance(user_result.data, dict):
+                        supabase_user_id = user_result.data.get("id")
+
+                    if supabase_user_id:
+                        logger.debug(f"✅ [SUPABASE-CHANNEL] Found user_id via user_profiles: {supabase_user_id}")
+            except Exception as e:
+                logger.debug(f"ℹ️ [SUPABASE-CHANNEL] user_profiles query failed: {str(e)}")
+
+            if not supabase_user_id:
+                logger.warning(f"⚠️ [SUPABASE-CHANNEL] Could not find Supabase user_id for email: {email}")
+                return None
+
+            # 2. persona_channels 테이블에서 channel_url 조회
+            result = self.client.table("persona_channels")\
+                .select("channel_url")\
+                .eq("user_id", supabase_user_id)\
+                .eq("persona_id", persona_id)\
+                .execute()
+
+            if result.data and len(result.data) > 0:
+                channel_url = result.data[0].get("channel_url")
+                logger.info(f"✅ [SUPABASE-CHANNEL] Found channel_url for persona {persona_id}: {channel_url}")
+                return channel_url
+            else:
+                logger.warning(f"⚠️ [SUPABASE-CHANNEL] No channel_url found for email {email}, persona {persona_id}")
+                return None
+
+        except Exception as e:
+            logger.error(f"❌ [SUPABASE-CHANNEL] Error fetching channel_url: {str(e)}")
+            return None
+
 
 # 싱글톤 인스턴스
 supabase_persona_service = SupabasePersonaService()
