@@ -207,6 +207,173 @@ async def process_and_respond(
         else:
             logger.warning("⚠️ [RESPONSE-DEBUG] No persona context and Supabase not available")
 
+        # 현재 가전 상태 조회 (실제 DB user_id 사용)
+        appliance_states = appliance_control_service.get_appliance_status(
+            db=db,
+            user_id=actual_user_id
+        )
+
+        # 0. 대기 중인 가전 제안 확인 (시나리오 1에서 생성된 제안)
+        pending_suggestion = long_term.get("pending_appliance_suggestion")
+
+        if pending_suggestion:
+            logger.info("🔔 [APPROVAL-CHECK] Found pending appliance suggestion!")
+            logger.info(f"   Appliances: {[a['appliance_type'] for a in pending_suggestion.get('appliances', [])]}")
+
+            # LLM으로 승인/거절 판단
+            logger.info("🧠 [APPROVAL-CHECK] Checking if message is approval...")
+            approval_result = await llm_service.detect_modification(
+                original_plan={"recommendations": pending_suggestion.get("appliances", [])},
+                user_response=message
+            )
+
+            approved = approval_result.get("approved", False)
+            has_modification = approval_result.get("has_modification", False)
+            modifications = approval_result.get("modifications", {})
+
+            logger.info(f"📝 [APPROVAL-CHECK] Approved: {approved}, Has modification: {has_modification}")
+
+            if approved:
+                # 승인됨 - 가전 제어 실행
+                logger.info("✅ [APPLIANCE-CONTROL] User approved! Executing appliance controls...")
+
+                execution_results = []
+                recommendations = pending_suggestion.get("appliances", [])
+                fatigue_level = pending_suggestion.get("fatigue_level", 2)
+
+                for rec in recommendations:
+                    appliance_type = rec["appliance_type"]
+                    action = rec.get("action", "on")
+                    settings = rec.get("settings", {})
+
+                    # 수정 사항 적용
+                    if has_modification and appliance_type in modifications:
+                        settings.update(modifications[appliance_type])
+                        logger.info(f"🔧 [APPLIANCE-CONTROL] Modified {appliance_type}: {settings}")
+
+                    # 가전 제어 실행
+                    try:
+                        result = appliance_control_service.execute_command(
+                            db=db,
+                            user_id=actual_user_id,
+                            appliance_type=appliance_type,
+                            action=action,
+                            settings=settings,
+                            triggered_by="scenario1_approved"
+                        )
+
+                        execution_results.append({
+                            "appliance": appliance_type,
+                            "action": action,
+                            "settings": settings,
+                            "status": "success"
+                        })
+                        logger.info(f"✅ [APPLIANCE-CONTROL] {appliance_type} {action} success")
+
+                        # 선호 세팅 학습
+                        try:
+                            from app.models.appliance import UserAppliancePreference
+                            from uuid import UUID
+
+                            preference = db.query(UserAppliancePreference).filter(
+                                UserAppliancePreference.user_id == UUID(actual_user_id),
+                                UserAppliancePreference.fatigue_level == fatigue_level,
+                                UserAppliancePreference.appliance_type == appliance_type
+                            ).first()
+
+                            if action == "on" and settings:
+                                if preference:
+                                    preference.settings_json = settings
+                                    logger.info(f"📝 [LEARNING] Updated preference for {appliance_type}")
+                                else:
+                                    new_preference = UserAppliancePreference(
+                                        user_id=UUID(actual_user_id),
+                                        fatigue_level=fatigue_level,
+                                        appliance_type=appliance_type,
+                                        settings_json=settings
+                                    )
+                                    db.add(new_preference)
+                                    logger.info(f"✨ [LEARNING] Created preference for {appliance_type}")
+                                db.commit()
+                        except Exception as pref_error:
+                            logger.error(f"⚠️ [LEARNING] Failed to save preference: {str(pref_error)}")
+                            db.rollback()
+
+                    except Exception as e:
+                        execution_results.append({
+                            "appliance": appliance_type,
+                            "action": action,
+                            "status": "error",
+                            "error": str(e)
+                        })
+                        logger.error(f"❌ [APPLIANCE-CONTROL] {appliance_type} error: {str(e)}")
+
+                # 실행 결과 메시지 생성
+                success_count = sum(1 for r in execution_results if r["status"] == "success")
+                success_details = []
+
+                for r in execution_results:
+                    if r["status"] == "success":
+                        appliance_name = r["appliance"]
+                        action = r["action"]
+                        settings = r.get("settings", {})
+
+                        if action == "on" and settings:
+                            details = []
+                            if "target_temp_c" in settings:
+                                details.append(f"{settings['target_temp_c']}도")
+                            if "target_humidity_pct" in settings:
+                                details.append(f"습도 {settings['target_humidity_pct']}%")
+                            if "mode" in settings:
+                                details.append(f"{settings['mode']} 모드")
+                            if "brightness_pct" in settings:
+                                details.append(f"밝기 {settings['brightness_pct']}%")
+
+                            if details:
+                                success_details.append(f"{appliance_name}을(를) {', '.join(details)}로 켰습니다")
+                            else:
+                                success_details.append(f"{appliance_name}을(를) 켰습니다")
+                        elif action == "off":
+                            success_details.append(f"{appliance_name}을(를) 껐습니다")
+
+                if success_count > 0:
+                    if has_modification:
+                        response_text = f"수정하신 내용으로 제어했습니다. {', '.join(success_details)}."
+                    else:
+                        response_text = f"{', '.join(success_details)}."
+                else:
+                    response_text = "가전 제어에 실패했습니다. 다시 시도해주세요."
+
+                # 메모리 업데이트
+                memory_service.add_message(user_id, "assistant", response_text)
+                memory_service.update_long_term_memory(user_id, "pending_appliance_suggestion", None)
+                logger.info("💾 [APPLIANCE-CONTROL] Cleared pending suggestion from memory")
+
+                # 응답 전송
+                await chat_client.send_message(
+                    channel_url=channel_url,
+                    message=response_text,
+                    user_id=user_id
+                )
+                logger.info(f"✅ [APPLIANCE-CONTROL] Execution result sent to {user_id}")
+                logger.info("=" * 80)
+                return
+
+            elif not approved:
+                # 거절됨
+                logger.info("❌ [APPROVAL-CHECK] User declined appliance control")
+                response_text = "알겠습니다. 필요하시면 언제든 말씀해주세요."
+                memory_service.add_message(user_id, "assistant", response_text)
+                memory_service.update_long_term_memory(user_id, "pending_appliance_suggestion", None)
+
+                await chat_client.send_message(
+                    channel_url=channel_url,
+                    message=response_text,
+                    user_id=user_id
+                )
+                logger.info("=" * 80)
+                return
+
         # 1. 의도 파싱
         logger.info("🧠 [RESPONSE-DEBUG] Parsing user intent...")
         intent_result = await llm_service.parse_user_intent(
@@ -221,12 +388,6 @@ async def process_and_respond(
         # environment_complaint나 appliance_request는 무조건 제어 필요
         if intent_type in ["environment_complaint", "appliance_request"]:
             needs_control = True
-
-        # 현재 가전 상태 조회 (실제 DB user_id 사용)
-        appliance_states = appliance_control_service.get_appliance_status(
-            db=db,
-            user_id=actual_user_id
-        )
 
         # 2. 가전 제어가 필요 없는 경우 (일반 대화)
         if intent_type == "general_chat" or not needs_control:
