@@ -244,44 +244,42 @@ async def trigger_auto_notification(user_id: str, distance: float, event_type: s
                         logger.warning(f"⚠️ Failed to save ChatSession: {str(e)}")
                         db.rollback()
 
-                # 승인 요청 메시지 생성
+                # 승인 요청 메시지 생성 (LLM으로 자연스럽게)
                 if appliances_to_control:
-                    # 가전 목록과 설정값을 상세히 설명
-                    appliance_details = []
-                    for cmd in appliances_to_control:
-                        detail = f"- {cmd['appliance_type']}"
-                        if cmd.get('settings'):
-                            # 주요 설정값만 표시
-                            settings_str = ", ".join([f"{k}: {v}" for k, v in list(cmd['settings'].items())[:3]])
-                            detail += f" ({settings_str})"
-                        appliance_details.append(detail)
+                    # LLM으로 자연스러운 메시지 생성
+                    try:
+                        # 페르소나 정보 준비
+                        persona_info = None
+                        if persona_name != "AI 어시스턴트":
+                            persona_info = {"nickname": persona_name}
 
-                    appliance_list = "\n".join(appliance_details)
-
-                    message = f"""[{persona_name}]
-
-집에 거의 도착하셨네요!
-
-현재 상황:
-- 피로도 레벨: {fatigue_level}
-- 온도: {weather_data.get('temperature', 'N/A')}°C
-- 습도: {weather_data.get('humidity', 'N/A')}%
-
-추천 가전:
-{appliance_list}
-
-위 가전을 작동시킬까요?"""
+                        # LLM 서비스로 자연스러운 메시지 생성
+                        message = await llm_service.generate_proactive_appliance_message(
+                            appliances=appliances_to_control,
+                            weather=weather_data,
+                            fatigue_level=fatigue_level,
+                            persona=persona_info
+                        )
+                    except Exception as e:
+                        logger.warning(f"⚠️ Failed to generate LLM message, using fallback: {str(e)}")
+                        # Fallback: 간단한 형식
+                        appliance_names = [a["appliance_type"] for a in appliances_to_control]
+                        message = f"집에 거의 도착하셨네요! 현재 날씨와 피로도를 고려해서 {', '.join(appliance_names)}을(를) 켜드릴까요?"
                 else:
-                    message = f"""[{persona_name}]
+                    # 가전이 없을 때도 LLM으로 자연스러운 메시지 생성
+                    try:
+                        persona_info = None
+                        if persona_name != "AI 어시스턴트":
+                            persona_info = {"nickname": persona_name}
 
-집에 거의 도착하셨네요!
-
-현재 상황:
-- 피로도 레벨: {fatigue_level}
-- 온도: {weather_data.get('temperature', 'N/A')}°C
-- 습도: {weather_data.get('humidity', 'N/A')}%
-
-현재 날씨와 피로도 상태가 괜찮아서 따로 켤 가전은 없어요."""
+                        message = await llm_service.generate_proactive_no_appliance_message(
+                            weather=weather_data,
+                            fatigue_level=fatigue_level,
+                            persona=persona_info
+                        )
+                    except Exception as e:
+                        logger.warning(f"⚠️ Failed to generate LLM message, using fallback: {str(e)}")
+                        message = "집에 거의 도착하셨네요! 현재 날씨와 피로도 상태가 괜찮아 보여요."
 
                 await chat_client.send_message(
                     channel_url=channel_url,

@@ -484,6 +484,165 @@ TV:
                 "appliances": []
             }
 
+    async def generate_proactive_appliance_message(
+        self,
+        appliances: List[Dict[str, Any]],
+        weather: Dict[str, Any],
+        fatigue_level: int,
+        persona: Optional[Dict] = None
+    ) -> str:
+        """
+        집 도착 시 가전 제어 제안 메시지 생성 (Proactive - 시나리오 1용)
+
+        Args:
+            appliances: 제어할 가전 목록
+            weather: 날씨 데이터
+            fatigue_level: 피로도 레벨 (1-4)
+            persona: 페르소나 정보 (nickname)
+
+        Returns:
+            자연스러운 제안 메시지
+        """
+        try:
+            appliance_info = []
+            for app in appliances:
+                info_parts = [f"- {app['appliance_type']}"]
+                if app.get('settings'):
+                    # 설정값을 자연스럽게 표현
+                    settings = app['settings']
+                    if 'target_temp_c' in settings:
+                        info_parts.append(f"{settings['target_temp_c']}°C")
+                    if 'mode' in settings:
+                        info_parts.append(f"{settings['mode']} 모드")
+                    if 'target_humidity_pct' in settings:
+                        info_parts.append(f"습도 {settings['target_humidity_pct']}%")
+                    if 'fan_speed' in settings:
+                        info_parts.append(f"풍속 {settings['fan_speed']}")
+                    if 'brightness_pct' in settings:
+                        info_parts.append(f"밝기 {settings['brightness_pct']}%")
+
+                appliance_info.append(" ".join(info_parts))
+
+            prompt = f"""사용자가 집에 거의 도착했습니다.
+
+**현재 상황:**
+- 온도: {weather.get('temperature')}°C
+- 습도: {weather.get('humidity')}%
+- 피로도 레벨: {fatigue_level} (1:좋음, 2:보통, 3:나쁨, 4:매우나쁨)
+
+**AI가 분석하여 추천하는 가전 제어:**
+{chr(10).join(appliance_info)}
+
+사용자에게 친근하고 자연스럽게 가전 제어를 제안하는 메시지를 작성하세요.
+
+**반드시 지켜야 할 규칙:**
+1. 현재 상황(온도, 습도, 피로도)을 **간단히** 한 문장으로 언급
+2. 각 가전의 구체적인 설정값을 자연스럽게 포함
+3. "작동시킬까요?", "켜드릴까요?" 같은 승인 요청으로 마무리
+4. 형식적인 나열(예: "- 온도: X°C") 대신 자연스러운 대화체 사용
+5. 200자 이내로 간결하게
+
+**좋은 예시:**
+- "집에 거의 도착하셨네요! 날씨가 춥고 피로해 보이시니 에어컨을 25도 난방 모드로 미리 켜드릴까요?"
+- "곧 도착하시겠어요! 지금 온도가 낮고 건조해서 에어컨을 23도로, 가습기를 습도 50%로 켜드릴까요?"
+
+**나쁜 예시 (절대 하지 마세요):**
+- "집에 거의 도착하셨네요!\n\n현재 상황:\n- 피로도 레벨: 1\n- 온도: -1.2°C\n..." (형식적 나열)
+- "추천 가전:\n- 에어컨 (target_temp_c: 25, fan_speed: 3)..." (기술적 표현)
+
+반드시 일반 텍스트로만 응답하세요 (JSON 아님).
+"""
+
+            # 시스템 프롬프트
+            system_prompt = "당신은 사용자의 스마트홈 AI 어시스턴트입니다. 친근하고 자연스럽게 대화하세요."
+            if persona:
+                system_prompt += f"\n당신의 이름은 {persona.get('nickname')}입니다."
+
+            response = await client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.8,
+                max_tokens=150
+            )
+
+            message = response.choices[0].message.content.strip()
+            logger.info(f"✅ Proactive appliance message generated: {message[:50]}...")
+            return message
+
+        except Exception as e:
+            logger.error(f"❌ Proactive appliance message error: {str(e)}")
+            # Fallback
+            appliance_names = [a["appliance_type"] for a in appliances]
+            return f"집에 거의 도착하셨네요! 현재 날씨와 피로도를 고려해서 {', '.join(appliance_names)}을(를) 켜드릴까요?"
+
+    async def generate_proactive_no_appliance_message(
+        self,
+        weather: Dict[str, Any],
+        fatigue_level: int,
+        persona: Optional[Dict] = None
+    ) -> str:
+        """
+        집 도착 시 가전 추천이 없을 때 메시지 생성 (Proactive - 시나리오 1용)
+
+        Args:
+            weather: 날씨 데이터
+            fatigue_level: 피로도 레벨 (1-4)
+            persona: 페르소나 정보 (nickname)
+
+        Returns:
+            자연스러운 인사 메시지
+        """
+        try:
+            prompt = f"""사용자가 집에 거의 도착했습니다.
+
+**현재 상황:**
+- 온도: {weather.get('temperature')}°C
+- 습도: {weather.get('humidity')}%
+- 피로도 레벨: {fatigue_level} (1:좋음, 2:보통, 3:나쁨, 4:매우나쁨)
+
+AI 분석 결과, 현재 날씨와 피로도 상태가 적정 범위라 따로 켤 가전은 없습니다.
+
+사용자에게 친근하게 집 도착을 환영하는 메시지를 작성하세요.
+
+**반드시 지켜야 할 규칙:**
+1. 현재 상태가 괜찮다는 것을 자연스럽게 전달
+2. 필요하면 언제든 말하라는 안내
+3. 100자 이내로 간결하게
+4. 형식적인 나열 대신 자연스러운 대화체
+
+**좋은 예시:**
+- "집에 거의 도착하셨네요! 현재 날씨와 컨디션이 괜찮아 보여요. 필요한 게 있으면 언제든 말씀해주세요!"
+- "곧 도착하시겠어요! 지금 상태가 좋아 보이네요. 편히 쉬세요~"
+
+반드시 일반 텍스트로만 응답하세요 (JSON 아님).
+"""
+
+            # 시스템 프롬프트
+            system_prompt = "당신은 사용자의 스마트홈 AI 어시스턴트입니다. 친근하고 자연스럽게 대화하세요."
+            if persona:
+                system_prompt += f"\n당신의 이름은 {persona.get('nickname')}입니다."
+
+            response = await client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.8,
+                max_tokens=100
+            )
+
+            message = response.choices[0].message.content.strip()
+            logger.info(f"✅ Proactive no-appliance message generated: {message[:50]}...")
+            return message
+
+        except Exception as e:
+            logger.error(f"❌ Proactive no-appliance message error: {str(e)}")
+            return "집에 거의 도착하셨네요! 현재 날씨와 피로도 상태가 괜찮아 보여요. 편히 쉬세요!"
+
     async def generate_appliance_suggestion(
         self,
         appliances: List[Dict[str, Any]],
