@@ -146,6 +146,53 @@ class SendbirdChatManager: ObservableObject {
         }
     }
 
+    /// Refresh channel to ensure we receive real-time messages
+    /// - Parameter channelUrl: Channel URL to refresh
+    func enterChannel(channelUrl: String) async throws {
+        // Get the channel (which refreshes it in cache)
+        let channel = try await getChannel(channelUrl: channelUrl)
+
+        // Mark the channel as read to sync with server
+        return try await withCheckedThrowingContinuation { continuation in
+            channel.markAsRead { error in
+                if let error = error {
+                    print("⚠️ [SendbirdChatManager] Failed to mark channel as read: \(error)")
+                    // Don't fail the operation, just log the warning
+                    continuation.resume()
+                } else {
+                    print("✅ [SendbirdChatManager] Channel refreshed and marked as read: \(channelUrl)")
+                    continuation.resume()
+                }
+            }
+        }
+    }
+
+    /// Get persona ID from channel
+    /// - Parameter channelUrl: Channel URL
+    /// - Returns: Persona ID extracted from channel data
+    func getPersonaIdFromChannel(channelUrl: String) async throws -> String {
+        let channel = try await getChannel(channelUrl: channelUrl)
+
+        // Try to get persona ID from customType first (format: "persona_{personaId}")
+        if let customType = channel.customType, customType.hasPrefix("persona_") {
+            let personaId = String(customType.dropFirst("persona_".count))
+            print("✅ [SendbirdChatManager] Extracted persona ID from customType: \(personaId)")
+            return personaId
+        }
+
+        // Try to parse from data field
+        if let dataString = channel.data,
+           let data = dataString.data(using: .utf8),
+           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let personaId = json["persona_id"] as? String {
+            print("✅ [SendbirdChatManager] Extracted persona ID from data: \(personaId)")
+            return personaId
+        }
+
+        print("❌ [SendbirdChatManager] Could not extract persona ID from channel")
+        throw SendbirdChatError.channelCreationFailed
+    }
+
     // MARK: - Message Operations
 
     /// Send text message to channel

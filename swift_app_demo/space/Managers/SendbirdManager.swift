@@ -55,13 +55,6 @@ class SendbirdManager: ObservableObject {
         })
     }
 
-    /// Initialize Sendbird Calls SDK
-    /// Call this once in app's initialization
-    func initializeCalls() {
-        // NOTE: Sendbird Calls SDK integration will be added later
-        // For now, focusing on Chat SDK
-        print("ℹ️ [Sendbird] Calls SDK initialization will be implemented in Phase 3")
-    }
 
     // MARK: - User Connection
 
@@ -106,108 +99,6 @@ class SendbirdManager: ObservableObject {
         }
     }
 
-    /// Authenticate Sendbird Calls for voice/video functionality
-    /// - Parameters:
-    ///   - userId: User ID from Supabase authentication
-    ///   - accessToken: Optional access token
-    func authenticateCalls(userId: String, accessToken: String? = nil) async throws {
-        // NOTE: Actual authentication code will be implemented once SDK is installed
-
-        /*
-        // Example authentication code (uncomment when SDK is installed):
-        let authParams = AuthenticateParams(userId: userId, accessToken: accessToken)
-
-        return try await withCheckedThrowingContinuation { continuation in
-            SendbirdCall.authenticate(with: authParams) { user, error in
-                if let error = error {
-                    print("❌ [Sendbird] Calls authentication failed: \(error)")
-                    continuation.resume(throwing: error)
-                } else if let user = user {
-                    print("✅ [Sendbird] Calls authenticated for user: \(user.userId)")
-                    continuation.resume()
-                }
-            }
-        }
-        */
-
-        // Temporary simulation
-        print("ℹ️ [Sendbird] Simulating calls authentication for user: \(userId)")
-        try await Task.sleep(nanoseconds: 500_000_000)
-        print("✅ [Sendbird] Simulated calls authentication successful")
-    }
-
-    /// Authenticate both user and AI assistant for Sendbird Calls (free plan workaround)
-    /// Since free plan doesn't support Direct Call API, iOS must authenticate as both parties
-    /// - Parameters:
-    ///   - userId: FastAPI user ID (UUID from PostgreSQL DB)
-    ///   - completion: Completion handler with success status
-    func authenticateForCalls(userId: String, completion: @escaping (Bool, Error?) -> Void) {
-        Task {
-            do {
-                // Step 1: Get user token from backend using FastAPI user_id
-                guard let userAuth = await FastAPIService.shared.getSendbirdUserToken(userId: userId) else {
-                    print("❌ [Sendbird] Failed to get user token from backend")
-                    await MainActor.run {
-                        completion(false, SendbirdError.authenticationFailed)
-                    }
-                    return
-                }
-
-                print("🔑 [Sendbird] Got user token for: \(userAuth.userId)")
-
-                // Step 2: Get AI assistant token from backend
-                guard let aiAuth = await FastAPIService.shared.getSendbirdAIToken() else {
-                    print("❌ [Sendbird] Failed to get AI assistant token from backend")
-                    await MainActor.run {
-                        completion(false, SendbirdError.authenticationFailed)
-                    }
-                    return
-                }
-
-                print("🔑 [Sendbird] Got AI assistant token for: \(aiAuth.userId)")
-
-                // Step 3: Authenticate user with SendBird Calls
-                SendbirdCallsManager.shared.authenticate(userId: userAuth.userId, accessToken: userAuth.accessToken) { result in
-                    switch result {
-                    case .success(let user):
-                        print("✅ [Sendbird] User authenticated with Calls: \(user.userId)")
-
-                        // Step 4: Now authenticate as AI assistant (this registers AI in the SDK)
-                        // Note: SendBird Calls SDK can only be authenticated as one user at a time
-                        // But registering AI here ensures AI is known to SendBird
-                        SendbirdCallsManager.shared.authenticate(userId: aiAuth.userId, accessToken: aiAuth.accessToken) { aiResult in
-                            switch aiResult {
-                            case .success(let aiUser):
-                                print("✅ [Sendbird] AI assistant authenticated with Calls: \(aiUser.userId)")
-
-                                // Step 5: Switch back to user authentication so user can make calls
-                                SendbirdCallsManager.shared.authenticate(userId: userAuth.userId, accessToken: userAuth.accessToken) { finalResult in
-                                    switch finalResult {
-                                    case .success(let finalUser):
-                                        print("✅ [Sendbird] Final user authentication complete: \(finalUser.userId)")
-                                        print("📞 [Sendbird] Ready to make calls to AI assistant")
-                                        completion(true, nil)
-
-                                    case .failure(let error):
-                                        print("❌ [Sendbird] Final user authentication failed: \(error)")
-                                        completion(false, error)
-                                    }
-                                }
-
-                            case .failure(let error):
-                                print("❌ [Sendbird] AI authentication failed: \(error)")
-                                completion(false, error)
-                            }
-                        }
-
-                    case .failure(let error):
-                        print("❌ [Sendbird] User authentication failed: \(error)")
-                        completion(false, error)
-                    }
-                }
-            }
-        }
-    }
 
     // MARK: - Push Notifications
 

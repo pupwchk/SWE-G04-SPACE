@@ -16,11 +16,31 @@ struct Message: Identifiable {
 
 /// Chat screen - messaging and communication
 struct ChatView: View {
+    @EnvironmentObject var navigationCoordinator: NavigationCoordinator
+
     var body: some View {
         NavigationStack {
             PersonaChatListView()
                 .navigationTitle("채팅")
                 .navigationBarTitleDisplayMode(.inline)
+                .navigationDestination(item: $navigationCoordinator.personaToOpen) { persona in
+                    PersonaChatView(persona: persona)
+                        .onAppear {
+                            print("📱 [ChatView] PersonaChatView appeared for: \(persona.nickname)")
+                        }
+                        .onDisappear {
+                            print("📱 [ChatView] PersonaChatView disappeared for: \(persona.nickname)")
+                            // Clear navigation state when user manually navigates back
+                            navigationCoordinator.clearNavigationState()
+                        }
+                }
+                .onChange(of: navigationCoordinator.personaToOpen) { oldValue, newValue in
+                    if let persona = newValue {
+                        print("📱 [ChatView] personaToOpen changed to: \(persona.nickname)")
+                    } else {
+                        print("📱 [ChatView] personaToOpen cleared")
+                    }
+                }
         }
     }
 }

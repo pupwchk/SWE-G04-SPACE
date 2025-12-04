@@ -12,11 +12,7 @@ struct PersonaChatView: View {
     let persona: Persona
 
     @StateObject private var viewModel = PersonaChatViewModel()
-    @StateObject private var callsManager = SendbirdCallsManager.shared
     @State private var messageText = ""
-    @State private var showPhoneCall = false
-    @State private var showCallError = false
-    @State private var callErrorMessage = ""
     @FocusState private var isInputFocused: Bool
 
     var body: some View {
@@ -152,26 +148,10 @@ struct PersonaChatView: View {
         .background(Color(hex: "F9F9F9"))
         .navigationTitle(persona.nickname)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button(action: {
-                    startVoiceCall()
-                }) {
-                    Image(systemName: "phone.fill")
-                        .foregroundColor(Color(hex: "A50034"))
-                }
-            }
-        }
-        .sheet(isPresented: $showPhoneCall) {
-            PhoneCallView(contactName: persona.nickname, callId: callsManager.currentCallId)
-        }
-        .alert("통화 오류", isPresented: $showCallError) {
-            Button("확인", role: .cancel) { }
-        } message: {
-            Text(callErrorMessage)
-        }
         .onAppear {
-            viewModel.loadMessages(for: persona.id, personaName: persona.nickname)
+            // 채팅방에 들어올 때마다 강제로 메시지 새로고침
+            print("📱 [PersonaChatView] View appeared - Force refreshing messages")
+            viewModel.refreshMessages(for: persona.id, personaName: persona.nickname)
 
             // 해당 채널의 알림 제거 및 배지 카운트 초기화
             Task {
@@ -186,36 +166,6 @@ struct PersonaChatView: View {
                         print("⚠️ [PersonaChatView] Failed to get channel for notification cleanup: \(error)")
                     }
                 }
-            }
-
-            // Authenticate user with SendBird Calls using FastAPI user_id
-            // NOTE: Must use FastAPI user_id (stored in UserDefaults), not Supabase UUID
-            if let fastapiUserId = UserDefaults.standard.string(forKey: "fastapi_user_id") {
-                callsManager.authenticate(userId: fastapiUserId) { result in
-                    switch result {
-                    case .success(let user):
-                        print("✅ [PersonaChatView] Authenticated with SendBird Calls: \(user.userId)")
-                    case .failure(let error):
-                        print("❌ [PersonaChatView] SendBird Calls authentication failed: \(error)")
-                    }
-                }
-            } else {
-                print("⚠️ [PersonaChatView] FastAPI user_id not found in UserDefaults")
-            }
-        }
-    }
-
-    private func startVoiceCall() {
-        // Make a call to the AI assistant
-        callsManager.makeCall(to: Config.aiUserId) { result in
-            switch result {
-            case .success(_):
-                print("✅ [PersonaChatView] Call initiated successfully")
-                showPhoneCall = true
-            case .failure(let error):
-                print("❌ [PersonaChatView] Call failed: \(error)")
-                callErrorMessage = error.localizedDescription
-                showCallError = true
             }
         }
     }
@@ -377,6 +327,46 @@ class PersonaChatViewModel: ObservableObject {
         }
     }
 
+    /// Force refresh messages - used when entering chat from notification
+    func refreshMessages(for personaId: String, personaName: String) {
+        print("🔄 [PersonaChatViewModel] Force refreshing messages for persona: \(personaName)")
+
+        self.currentPersonaId = personaId
+        self.currentPersonaName = personaName
+
+        // Force reload everything and rejoin channel
+        Task {
+            await loadPersonaContext(personaId: personaId)
+            await rejoinChannel(personaId: personaId)
+            await loadChatHistory(personaId: personaId, forceRefresh: true)
+        }
+    }
+
+    /// Rejoin channel to ensure we receive real-time messages
+    private func rejoinChannel(personaId: String) async {
+        guard let userId = supabaseManager.currentUser?.id else {
+            print("⚠️ [PersonaChatViewModel] Cannot rejoin channel - user not authenticated")
+            return
+        }
+
+        do {
+            // Get channel URL
+            let channelUrl = try await chatManager.getOrCreateChannel(
+                userId: userId,
+                personaId: personaId
+            )
+
+            print("🚪 [PersonaChatViewModel] Rejoining channel: \(channelUrl)")
+
+            // Enter channel to start receiving real-time messages
+            try await chatManager.enterChannel(channelUrl: channelUrl)
+
+            print("✅ [PersonaChatViewModel] Successfully rejoined channel")
+        } catch {
+            print("❌ [PersonaChatViewModel] Failed to rejoin channel: \(error)")
+        }
+    }
+
     private func loadPersonaContext(personaId: String) async {
         // Get persona details from Supabase to retrieve final_prompt
         do {
@@ -393,16 +383,20 @@ class PersonaChatViewModel: ObservableObject {
         }
     }
 
-    private func loadChatHistory(personaId: String) async {
+    private func loadChatHistory(personaId: String, forceRefresh: Bool = false) async {
         isLoading = true
         errorMessage = nil
 
         do {
+            if forceRefresh {
+                print("🔄 [PersonaChatViewModel] Force refreshing chat history from server")
+            }
+
             // Load message history from ChatService
             let history = try await chatService.loadHistory(personaId: personaId, limit: 50)
 
             self.messages = history
-            print("✅ [PersonaChatViewModel] Loaded \(history.count) messages")
+            print("✅ [PersonaChatViewModel] Loaded \(history.count) messages\(forceRefresh ? " (force refresh)" : "")")
 
         } catch {
             print("❌ [PersonaChatViewModel] Failed to load history: \(error)")

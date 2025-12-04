@@ -6,8 +6,6 @@ struct GeneralView: View {
     @State private var showNotificationMethod = false
     @State private var showDoNotDisturb = false
     @State private var showSpaceNotification = false
-    @State private var showEmergencyCall = false
-    @State private var showCallErrorHistory = false
     @State private var showFontSize = false
     @State private var showHomeLocationSetting = false
 
@@ -64,26 +62,6 @@ struct GeneralView: View {
                         showFontSize = true
                     }) {
                         GeneralRow(title: "글자 크기", fontSize: fontSizeManager.fontSize)
-                    }
-                    .buttonStyle(.plain)
-
-                    Divider()
-                        .padding(.vertical, 16)
-
-                    // 전화 section
-                    SectionHeader(title: "전화")
-
-                    Button(action: {
-                        showEmergencyCall = true
-                    }) {
-                        GeneralRow(title: "긴급전화 알림", fontSize: fontSizeManager.fontSize)
-                    }
-                    .buttonStyle(.plain)
-
-                    Button(action: {
-                        showCallErrorHistory = true
-                    }) {
-                        GeneralRow(title: "전화 요약 기록", fontSize: fontSizeManager.fontSize)
                     }
                     .buttonStyle(.plain)
 
@@ -149,16 +127,6 @@ struct GeneralView: View {
                     .onAppear {
                         print("🏠 HomeLocationSetupView appeared in sheet")
                     }
-            }
-        }
-        .sheet(isPresented: $showEmergencyCall) {
-            NavigationStack {
-                EmergencyCallView()
-            }
-        }
-        .sheet(isPresented: $showCallErrorHistory) {
-            NavigationStack {
-                CallErrorHistoryView()
             }
         }
         .sheet(isPresented: $showFontSize) {

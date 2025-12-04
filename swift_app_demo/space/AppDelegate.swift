@@ -86,15 +86,33 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         let userInfo = response.notification.request.content.userInfo
         print("👆 [AppDelegate] User tapped notification: \(userInfo)")
 
-        // Check if it's a Sendbird notification
-        if let sendbird = userInfo["sendbird"] as? [String: Any] {
+        // Check if it's a local chat notification
+        if let type = userInfo["type"] as? String, type == "chat_message",
+           let channelUrl = userInfo["channelUrl"] as? String {
+            print("📨 [AppDelegate] Local chat notification - Channel: \(channelUrl)")
+
+            // Post notification to trigger navigation
+            NotificationCenter.default.post(
+                name: NSNotification.Name("OpenChatChannel"),
+                object: nil,
+                userInfo: ["channelUrl": channelUrl]
+            )
+        }
+        // Check if it's a Sendbird push notification
+        else if let sendbird = userInfo["sendbird"] as? [String: Any] {
             print("📨 [AppDelegate] Sendbird notification data: \(sendbird)")
 
             // Extract channel URL if available
             if let channelUrl = sendbird["channel"] as? [String: Any],
                let url = channelUrl["channel_url"] as? String {
                 print("   Channel URL: \(url)")
-                // TODO: Navigate to chat view with this channel URL
+
+                // Post notification to trigger navigation
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("OpenChatChannel"),
+                    object: nil,
+                    userInfo: ["channelUrl": url]
+                )
             }
         }
 

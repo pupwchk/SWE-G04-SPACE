@@ -27,35 +27,6 @@ struct HaruApp: App {
         SendbirdManager.shared.initializeChat()
         print("📱 Sendbird Chat SDK initialized")
 
-        // Initialize Sendbird Calls SDK
-        SendbirdCallsManager.shared.initializeSDK(appId: Config.sendbirdAppId) { success in
-            if success {
-                print("📱 Sendbird Calls SDK initialized")
-
-                // Authenticate user with SendBird Calls after SDK initialization
-                Task {
-                    // Wait a bit for Supabase to be ready
-                    try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
-
-                    // Use FastAPI user_id from UserDefaults (NOT Supabase UUID or email)
-                    if let fastapiUserId = UserDefaults.standard.string(forKey: "fastapi_user_id") {
-                        // Use dual authentication method to register both user and AI assistant
-                        SendbirdManager.shared.authenticateForCalls(userId: fastapiUserId) { success, error in
-                            if success {
-                                print("✅ [App] Dual authentication complete - ready for calls")
-                            } else {
-                                print("❌ [App] Dual authentication failed: \(error?.localizedDescription ?? "unknown error")")
-                            }
-                        }
-                    } else {
-                        print("⚠️ [App] FastAPI user_id not found in UserDefaults - skipping SendBird Calls authentication")
-                    }
-                }
-            } else {
-                print("❌ Sendbird Calls SDK initialization failed")
-            }
-        }
-
         // Initialize WatchConnectivityManager singleton
         _ = WatchConnectivityManager.shared
         print("📱 iOS App initialized with WatchConnectivity")
