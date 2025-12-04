@@ -448,8 +448,14 @@ TV:
 
                 appliance_info.append(" ".join(info_parts))
 
-            prompt = f"""사용자가 집에 거의 도착했습니다.
+            # 대화 히스토리 요약
+            history_context = ""
+            if conversation_history and len(conversation_history) > 0:
+                history_context = "\n**이전 대화 내용:**\n"
+                history_context += "위 대화 히스토리를 참고하여, 이전 대화와 자연스럽게 연결되는 메시지를 작성하세요.\n"
 
+            prompt = f"""사용자가 집에 거의 도착했습니다.
+{history_context}
 **현재 상황:**
 - 온도: {weather.get('temperature')}°C
 - 습도: {weather.get('humidity')}%
@@ -459,6 +465,7 @@ TV:
 {chr(10).join(appliance_info)}
 
 사용자에게 친근하고 자연스럽게 **채팅으로** 가전 제어를 제안하는 메시지를 작성하세요.
+**중요: 이전 대화가 있다면, 그 맥락을 고려하여 자연스럽게 이어지는 대화를 작성하세요.**
 
 **반드시 지켜야 할 규칙:**
 1. 현재 상황(온도, 습도, 피로도)을 **간단히** 한 문장으로 언급
@@ -531,8 +538,14 @@ TV:
             자연스러운 인사 메시지
         """
         try:
-            prompt = f"""사용자가 집에 거의 도착했습니다.
+            # 대화 히스토리 요약
+            history_context = ""
+            if conversation_history and len(conversation_history) > 0:
+                history_context = "\n**이전 대화 내용:**\n"
+                history_context += "위 대화 히스토리를 참고하여, 이전 대화와 자연스럽게 연결되는 메시지를 작성하세요.\n"
 
+            prompt = f"""사용자가 집에 거의 도착했습니다.
+{history_context}
 **현재 상황:**
 - 온도: {weather.get('temperature')}°C
 - 습도: {weather.get('humidity')}%
@@ -541,6 +554,7 @@ TV:
 AI 분석 결과, 현재 날씨와 피로도 상태가 적정 범위라 따로 켤 가전은 없습니다.
 
 사용자에게 친근하게 집 도착을 환영하는 메시지를 작성하세요.
+**중요: 이전 대화가 있다면, 그 맥락을 고려하여 자연스럽게 이어지는 대화를 작성하세요.**
 
 **반드시 지켜야 할 규칙:**
 1. 현재 상태가 괜찮다는 것을 자연스럽게 전달
