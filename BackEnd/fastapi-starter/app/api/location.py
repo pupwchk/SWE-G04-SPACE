@@ -156,6 +156,7 @@ async def trigger_auto_notification(user_id: str, distance: float, event_type: s
             # 4. 가장 최근 생성된 페르소나 조회 (Supabase)
             persona_name = "AI 어시스턴트"  # 기본값
             persona_id = None  # Supabase 페르소나 ID
+            sendbird_user_id = None  # Sendbird에서 사용할 user_id (Supabase UUID)
 
             try:
                 from app.models.user import User
@@ -171,7 +172,15 @@ async def trigger_auto_notification(user_id: str, distance: float, event_type: s
                 user_email = user.email
                 logger.info(f"📧 User email: {user_email}")
 
-                # 4-2. Supabase에서 email로 가장 최근 페르소나 조회
+                # 4-2. email로 Supabase UUID 조회 (Sendbird user_id로 사용)
+                sendbird_user_id = supabase_persona_service.get_supabase_user_id_by_email(user_email)
+                if sendbird_user_id:
+                    logger.info(f"✅ Sendbird user_id (Supabase UUID): {sendbird_user_id}")
+                else:
+                    logger.warning(f"⚠️ Failed to get Supabase UUID for {user_email}, using DB UUID as fallback")
+                    sendbird_user_id = user_id  # Fallback to DB UUID
+
+                # 4-3. Supabase에서 email로 가장 최근 페르소나 조회
                 latest_persona = supabase_persona_service.get_latest_persona_by_email(user_email)
 
                 if latest_persona:
@@ -184,6 +193,9 @@ async def trigger_auto_notification(user_id: str, distance: float, event_type: s
             except Exception as e:
                 # Supabase 조회 실패 시 기본값 사용
                 logger.warning(f"⚠️ Failed to get latest persona from Supabase: {str(e)}, using default: {persona_name}")
+                # sendbird_user_id가 없으면 DB UUID 사용
+                if not sendbird_user_id:
+                    sendbird_user_id = user_id
 
             # 5. Sendbird 채팅으로 승인 요청 메시지 전송
             try:
@@ -200,7 +212,7 @@ async def trigger_auto_notification(user_id: str, distance: float, event_type: s
                     logger.warning(f"⚠️ No existing channel found, creating new one")
                     channel_data = await chat_client.create_channel(
                         channel_url=None,  # 자동 생성
-                        user_ids=[user_id, SendbirdConfig.AI_USER_ID],
+                        user_ids=[sendbird_user_id, SendbirdConfig.AI_USER_ID],  # Sendbird는 Supabase UUID 사용
                         name=f"Chat with {persona_name}"
                     )
                     channel_url = channel_data.get("channel_url")
@@ -287,6 +299,11 @@ async def trigger_auto_notification(user_id: str, distance: float, event_type: s
                     user_id=SendbirdConfig.AI_USER_ID
                 )
                 logger.info(f"💬 Approval request sent to {channel_url}")
+
+                # AI 메시지를 메모리에 저장 (대화 컨텍스트 유지)
+                # 메모리 키는 Sendbird user_id (Supabase UUID) 사용
+                memory_service.add_message(sendbird_user_id, "assistant", message)
+                logger.info(f"💾 AI message saved to memory for Sendbird user {sendbird_user_id}")
 
                 # TODO: 사용자 응답 대기 및 승인 시 가전 실행
                 # 추후 callback endpoint 구현 필요

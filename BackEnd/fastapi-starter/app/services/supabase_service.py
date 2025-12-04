@@ -431,6 +431,79 @@ class SupabasePersonaService:
             logger.error(f"❌ Error fetching latest persona for email {email}: {str(e)}")
             return None
 
+    def get_supabase_user_id_by_email(self, email: str) -> Optional[str]:
+        """
+        이메일로 Supabase user_id (Supabase Auth UUID) 조회
+
+        Args:
+            email: 사용자 이메일
+
+        Returns:
+            Supabase user_id (UUID) 또는 None
+        """
+        if not self.is_available():
+            return None
+
+        # user_profiles 테이블에서 email로 조회 (우선순위 1)
+        try:
+            user_result = self.client.table("user_profiles")\
+                .select("id, email")\
+                .eq("email", email)\
+                .execute()
+
+            if user_result.data:
+                if isinstance(user_result.data, list) and len(user_result.data) > 0:
+                    supabase_user_id = user_result.data[0].get("id")
+                elif isinstance(user_result.data, dict):
+                    supabase_user_id = user_result.data.get("id")
+
+                if supabase_user_id:
+                    logger.debug(f"✅ [SUPABASE-USER-ID] Found user_id via user_profiles: {supabase_user_id}")
+                    return supabase_user_id
+        except Exception as e:
+            logger.debug(f"ℹ️ [SUPABASE-USER-ID] user_profiles query failed: {str(e)}")
+
+        # users 테이블에서 email로 조회 (fallback 1)
+        try:
+            user_result = self.client.table("users")\
+                .select("id, email")\
+                .eq("email", email)\
+                .execute()
+
+            if user_result.data:
+                if isinstance(user_result.data, list) and len(user_result.data) > 0:
+                    supabase_user_id = user_result.data[0].get("id")
+                elif isinstance(user_result.data, dict):
+                    supabase_user_id = user_result.data.get("id")
+
+                if supabase_user_id:
+                    logger.debug(f"✅ [SUPABASE-USER-ID] Found user_id via users: {supabase_user_id}")
+                    return supabase_user_id
+        except Exception as e:
+            logger.debug(f"ℹ️ [SUPABASE-USER-ID] users query failed: {str(e)}")
+
+        # profiles 테이블에서 email로 조회 (fallback 2)
+        try:
+            profile_result = self.client.table("profiles")\
+                .select("id, email")\
+                .eq("email", email)\
+                .execute()
+
+            if profile_result.data:
+                if isinstance(profile_result.data, list) and len(profile_result.data) > 0:
+                    supabase_user_id = profile_result.data[0].get("id")
+                elif isinstance(profile_result.data, dict):
+                    supabase_user_id = profile_result.data.get("id")
+
+                if supabase_user_id:
+                    logger.debug(f"✅ [SUPABASE-USER-ID] Found user_id via profiles: {supabase_user_id}")
+                    return supabase_user_id
+        except Exception as e:
+            logger.debug(f"ℹ️ [SUPABASE-USER-ID] profiles query failed: {str(e)}")
+
+        logger.warning(f"⚠️ [SUPABASE-USER-ID] Could not find Supabase user_id for email: {email}")
+        return None
+
     def get_channel_url_by_email_and_persona(self, email: str, persona_id: str) -> Optional[str]:
         """
         email과 persona_id를 통해 persona_channels 테이블에서 채널 URL 조회
