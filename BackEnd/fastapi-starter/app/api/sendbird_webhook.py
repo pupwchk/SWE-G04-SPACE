@@ -6,7 +6,7 @@ import logging
 from fastapi import APIRouter, Request, HTTPException, BackgroundTasks
 from typing import Dict, Any, Optional
 
-from app.services.sendbird_client import SendbirdChatClient, SendbirdCallsClient
+from app.services.sendbird_client import SendbirdChatClient
 from app.services.llm_service import llm_service, memory_service, LLMAction
 from app.services.supabase_service import supabase_persona_service
 from app.config.sendbird import SendbirdConfig
@@ -16,7 +16,6 @@ router = APIRouter(prefix="/webhook/sendbird", tags=["Sendbird Webhook"])
 
 # 클라이언트 초기화
 chat_client = SendbirdChatClient()
-calls_client = SendbirdCallsClient()
 
 
 @router.post("/chat")
@@ -253,46 +252,14 @@ async def process_and_respond(
             memory_service.add_message(user_id, "assistant", response_text)
             logger.info("💾 [RESPONSE-DEBUG] AI response saved to memory")
 
-            # 액션 처리
-            if action == LLMAction.NONE:
-                # 일반 텍스트 응답
-                logger.info("📤 [RESPONSE-DEBUG] Sending text response via Sendbird...")
-                await chat_client.send_message(
-                    channel_url=channel_url,
-                    message=response_text,
-                    user_id=user_id
-                )
-                logger.info(f"✅ [RESPONSE-DEBUG] Text response sent to {user_id} successfully!")
-
-            elif action == LLMAction.CALL:
-                # 전화 걸기
-                await chat_client.send_message(
-                    channel_url=channel_url,
-                    message=response_text,
-                    user_id=user_id
-                )
-                await calls_client.make_call(
-                    caller_id=SendbirdConfig.AI_USER_ID,
-                    callee_id=user_id,
-                    call_type="voice"
-                )
-                logger.info(f"📞 Call initiated to {user_id}")
-
-            elif action == LLMAction.AUTO_CALL:
-                # 자동 전화
-                message_to_user = response.get("message_to_user", response_text)
-                await chat_client.send_message(
-                    channel_url=channel_url,
-                    message=message_to_user,
-                    user_id=user_id
-                )
-                await calls_client.make_call(
-                    caller_id=SendbirdConfig.AI_USER_ID,
-                    callee_id=user_id,
-                    call_type="voice"
-                )
-                logger.info(f"📞 Auto-call initiated to {user_id}")
-
+            # 텍스트 응답 전송 (전화 기능 제거됨)
+            logger.info("📤 [RESPONSE-DEBUG] Sending text response via Sendbird...")
+            await chat_client.send_message(
+                channel_url=channel_url,
+                message=response_text,
+                user_id=user_id
+            )
+            logger.info(f"✅ [RESPONSE-DEBUG] Text response sent to {user_id} successfully!")
             logger.info("=" * 80)
             return
 

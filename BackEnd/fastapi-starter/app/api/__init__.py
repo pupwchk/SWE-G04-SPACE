@@ -4,7 +4,7 @@ router = APIRouter()
 
 # Import your API routes here
 from . import users, tracking, characters, appliance
-from . import sendbird_webhook, sendbird_auth, sendbird_call, location, voice, hrv, weather, voice_realtime, chat
+from . import sendbird_webhook, sendbird_auth, location, voice, hrv, weather, voice_realtime, chat
 
 router.include_router(users.router, prefix="/users", tags=["users"])
 router.include_router(tracking.router)
@@ -14,7 +14,6 @@ router.include_router(appliance.router, prefix="/appliances", tags=["appliances"
 # Sendbird 관련 라우터
 router.include_router(sendbird_webhook.router)
 router.include_router(sendbird_auth.router)
-router.include_router(sendbird_call.router)
 
 # 음성 및 위치 관련 라우터
 router.include_router(location.router)

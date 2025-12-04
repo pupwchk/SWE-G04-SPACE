@@ -14,15 +14,7 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """FastAPI 앱 시작/종료 시 실행되는 이벤트"""
-    # 시작 시 AI assistant를 SendBird Calls에 등록
-    try:
-        from app.services.sendbird_client import SendbirdCallsClient
-        calls_client = SendbirdCallsClient()
-        await calls_client.register_ai_assistant()
-        logger.info("✅ AI assistant registered with SendBird Calls on startup")
-    except Exception as e:
-        logger.error(f"❌ Failed to register AI assistant on startup: {e}")
-        # 에러가 발생해도 서버는 계속 시작
+    logger.info("✅ FastAPI app starting up...")
 
     yield
 

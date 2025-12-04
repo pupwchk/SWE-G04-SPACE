@@ -16,8 +16,6 @@ client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY", ""))
 class LLMAction:
     """LLM 액션 타입"""
     NONE = "NONE"  # 일반 텍스트 응답
-    CALL = "CALL"  # 사용자가 요청한 전화
-    AUTO_CALL = "AUTO_CALL"  # GPS 기반 자동 전화
 
 
 class LLMService:
@@ -29,7 +27,7 @@ class LLMService:
     def _build_system_prompt(self, persona: Optional[Dict] = None) -> str:
         """
         시스템 프롬프트 생성
-        
+
         Args:
             persona: 페르소나 정보 (말투, 성격 등)
         """
@@ -39,41 +37,25 @@ class LLMService:
 - 사용자와 자연스럽게 대화
 - 집안일 도움 (가전제품 제어, 일정 관리 등)
 - 사용자의 상태 파악 (피로도, 스트레스 등)
-- 필요시 전화로 직접 대화 제안
+- 채팅을 통해 친근하게 소통
 
 **응답 형식:**
 반드시 JSON 형식으로 응답하세요:
 
-1. 일반 텍스트 응답:
 {
   "action": "NONE",
   "response": "응답 메시지"
 }
 
-2. 전화 걸기 (사용자가 요청했을 때):
-{
-  "action": "CALL",
-  "response": "전화 드릴게요!",
-  "reason": "사용자 요청"
-}
-
-3. GPS 기반 자동 전화 (집 근처 도착 시):
-{
-  "action": "AUTO_CALL",
-  "trigger": "GEO_FENCE",
-  "response": "집에 거의 다 오셨네요. 필요한 게 있을까요?",
-  "message_to_user": "잠시 후 전화 드릴게요."
-}
-
 **중요:**
 - 항상 JSON만 반환하세요
-- 사용자가 "전화해줘", "통화하자" 등을 말하면 action: "CALL"
-- 일상적인 대화는 action: "NONE"
+- 모든 대화는 채팅을 통해 이루어집니다
+- 자연스럽고 친근한 대화체를 사용하세요
 """
-        
+
         if persona:
             base_prompt += f"\n**말투/성격:**\n{persona.get('description', '')}\n"
-        
+
         return base_prompt
     
     async def generate_response(
@@ -98,7 +80,7 @@ class LLMService:
 
         Returns:
             {
-                "action": "NONE" | "CALL" | "AUTO_CALL",
+                "action": "NONE",
                 "response": "응답 메시지",
                 ...
             }
@@ -170,65 +152,6 @@ class LLMService:
                 "response": "일시적인 오류가 발생했어요. 잠시 후 다시 시도해주세요."
             }
     
-    async def generate_geofence_trigger(
-        self,
-        user_id: str,
-        distance: float,
-        context: Optional[Dict] = None
-    ) -> Dict[str, Any]:
-        """
-        Geofence 진입 시 자동 전화 트리거 생성
-        
-        Args:
-            user_id: 사용자 ID
-            distance: 집까지 거리 (미터)
-            context: 추가 컨텍스트
-        
-        Returns:
-            AUTO_CALL 액션
-        """
-        try:
-            prompt = f"""사용자가 집에서 {distance:.0f}m 거리에 있습니다.
-집에 거의 도착했으므로 자동으로 전화를 걸어 필요한 것이 있는지 물어보려고 합니다.
-
-다음 JSON 형식으로 응답하세요:
-{{
-  "action": "AUTO_CALL",
-  "trigger": "GEO_FENCE",
-  "response": "집에 도착하기 전에 전화로 필요한 것을 물어볼 메시지",
-  "message_to_user": "전화 걸기 전에 채팅으로 보낼 짧은 메시지"
-}}
-"""
-            
-            if context:
-                prompt += f"\n\n추가 정보:\n{json.dumps(context, ensure_ascii=False, indent=2)}"
-            
-            response = await client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": self._build_system_prompt()},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.7,
-                response_format={"type": "json_object"}
-            )
-            
-            content = response.choices[0].message.content
-            result = json.loads(content)
-            
-            logger.info(f"✅ Geofence trigger generated for user {user_id}")
-            return result
-            
-        except Exception as e:
-            logger.error(f"❌ Geofence trigger error: {str(e)}")
-            # Fallback
-            return {
-                "action": "AUTO_CALL",
-                "trigger": "GEO_FENCE",
-                "response": "집에 거의 다 오셨네요. 필요한 게 있을까요?",
-                "message_to_user": "집에 거의 도착하셨어요. 잠시 후 전화 드릴게요."
-            }
-
     async def parse_user_intent(self, user_message: str, context: Optional[Dict] = None) -> Dict[str, Any]:
         """
         사용자 의도 파싱 (시나리오 2용)
@@ -489,7 +412,8 @@ TV:
         appliances: List[Dict[str, Any]],
         weather: Dict[str, Any],
         fatigue_level: int,
-        persona: Optional[Dict] = None
+        persona: Optional[Dict] = None,
+        conversation_history: Optional[List[Dict]] = None
     ) -> str:
         """
         집 도착 시 가전 제어 제안 메시지 생성 (Proactive - 시나리오 1용)
@@ -499,6 +423,7 @@ TV:
             weather: 날씨 데이터
             fatigue_level: 피로도 레벨 (1-4)
             persona: 페르소나 정보 (nickname)
+            conversation_history: 대화 히스토리 (컨텍스트 유지)
 
         Returns:
             자연스러운 제안 메시지
@@ -560,12 +485,18 @@ TV:
             if persona:
                 system_prompt += f"\n당신의 이름은 {persona.get('nickname')}입니다."
 
+            # 메시지 구성 (대화 히스토리 포함)
+            messages = [{"role": "system", "content": system_prompt}]
+
+            # 대화 히스토리 추가 (최근 5개만)
+            if conversation_history:
+                messages.extend(conversation_history[-5:])
+
+            messages.append({"role": "user", "content": prompt})
+
             response = await client.chat.completions.create(
                 model=self.model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": prompt}
-                ],
+                messages=messages,
                 temperature=0.8,
                 max_tokens=150
             )
@@ -584,7 +515,8 @@ TV:
         self,
         weather: Dict[str, Any],
         fatigue_level: int,
-        persona: Optional[Dict] = None
+        persona: Optional[Dict] = None,
+        conversation_history: Optional[List[Dict]] = None
     ) -> str:
         """
         집 도착 시 가전 추천이 없을 때 메시지 생성 (Proactive - 시나리오 1용)
@@ -593,6 +525,7 @@ TV:
             weather: 날씨 데이터
             fatigue_level: 피로도 레벨 (1-4)
             persona: 페르소나 정보 (nickname)
+            conversation_history: 대화 히스토리 (컨텍스트 유지)
 
         Returns:
             자연스러운 인사 메시지
@@ -627,12 +560,18 @@ AI 분석 결과, 현재 날씨와 피로도 상태가 적정 범위라 따로 �
             if persona:
                 system_prompt += f"\n당신의 이름은 {persona.get('nickname')}입니다."
 
+            # 메시지 구성 (대화 히스토리 포함)
+            messages = [{"role": "system", "content": system_prompt}]
+
+            # 대화 히스토리 추가 (최근 5개만)
+            if conversation_history:
+                messages.extend(conversation_history[-5:])
+
+            messages.append({"role": "user", "content": prompt})
+
             response = await client.chat.completions.create(
                 model=self.model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": prompt}
-                ],
+                messages=messages,
                 temperature=0.8,
                 max_tokens=100
             )

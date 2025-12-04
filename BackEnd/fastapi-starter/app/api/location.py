@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from app.config.db import get_db
 from app.services.geofence_service import geofence_service
 from app.services.llm_service import llm_service, memory_service
-from app.services.sendbird_client import SendbirdChatClient, SendbirdCallsClient
+from app.services.sendbird_client import SendbirdChatClient
 from app.config.sendbird import SendbirdConfig
 from app.utils.user_utils import get_user_uuid_by_identifier
 
@@ -22,7 +22,6 @@ router = APIRouter(prefix="/location", tags=["Location"])
 
 # 클라이언트
 chat_client = SendbirdChatClient()
-calls_client = SendbirdCallsClient()
 
 
 class LocationUpdate(BaseModel):
@@ -256,6 +255,10 @@ async def trigger_auto_notification(user_id: str, distance: float, event_type: s
                         logger.warning(f"⚠️ Failed to save ChatSession: {str(e)}")
                         db.rollback()
 
+                # 대화 히스토리 조회 (컨텍스트 유지를 위해)
+                conversation_history = memory_service.get_history(sendbird_user_id, limit=5)
+                logger.info(f"📚 Retrieved {len(conversation_history)} conversation history items")
+
                 # 승인 요청 메시지 생성 (LLM으로 자연스럽게)
                 if appliances_to_control:
                     # LLM으로 자연스러운 메시지 생성
@@ -265,12 +268,13 @@ async def trigger_auto_notification(user_id: str, distance: float, event_type: s
                         if persona_name != "AI 어시스턴트":
                             persona_info = {"nickname": persona_name}
 
-                        # LLM 서비스로 자연스러운 메시지 생성
+                        # LLM 서비스로 자연스러운 메시지 생성 (대화 히스토리 포함)
                         message = await llm_service.generate_proactive_appliance_message(
                             appliances=appliances_to_control,
                             weather=weather_data,
                             fatigue_level=fatigue_level,
-                            persona=persona_info
+                            persona=persona_info,
+                            conversation_history=conversation_history
                         )
                     except Exception as e:
                         logger.warning(f"⚠️ Failed to generate LLM message, using fallback: {str(e)}")
@@ -287,7 +291,8 @@ async def trigger_auto_notification(user_id: str, distance: float, event_type: s
                         message = await llm_service.generate_proactive_no_appliance_message(
                             weather=weather_data,
                             fatigue_level=fatigue_level,
-                            persona=persona_info
+                            persona=persona_info,
+                            conversation_history=conversation_history
                         )
                     except Exception as e:
                         logger.warning(f"⚠️ Failed to generate LLM message, using fallback: {str(e)}")
@@ -304,6 +309,17 @@ async def trigger_auto_notification(user_id: str, distance: float, event_type: s
                 # 메모리 키는 Sendbird user_id (Supabase UUID) 사용
                 memory_service.add_message(sendbird_user_id, "assistant", message)
                 logger.info(f"💾 AI message saved to memory for Sendbird user {sendbird_user_id}")
+
+                # 가전 제안이 있는 경우, 대기 중인 제안을 장기 메모리에 저장
+                if appliances_to_control:
+                    from datetime import datetime, timezone
+                    memory_service.update_long_term_memory(sendbird_user_id, "pending_appliance_suggestion", {
+                        "appliances": appliances_to_control,
+                        "weather": weather_data,
+                        "fatigue_level": fatigue_level,
+                        "timestamp": datetime.now(timezone.utc).isoformat()
+                    })
+                    logger.info(f"💾 Pending appliance suggestion saved to long-term memory")
 
                 # TODO: 사용자 응답 대기 및 승인 시 가전 실행
                 # 추후 callback endpoint 구현 필요
