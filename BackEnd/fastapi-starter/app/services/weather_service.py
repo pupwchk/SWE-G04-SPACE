@@ -240,6 +240,16 @@ class WeatherService:
         weather_data = await self.fetch_weather_data(latitude, longitude)
         air_quality_data = await self.fetch_air_quality_data(sido_name)
 
+        # API 실패 시 더미 데이터 사용 (개발/테스트용)
+        if not weather_data:
+            logger.warning(f"⚠️ Weather API failed, using dummy data")
+            weather_data = {
+                "temperature": 0,
+                "humidity": 55.0,
+                "precipitation": 0.0,
+                "wind_speed": 2.5
+            }
+
         # 병합
         combined = {
             "temperature": weather_data.get("temperature") if weather_data else None,
