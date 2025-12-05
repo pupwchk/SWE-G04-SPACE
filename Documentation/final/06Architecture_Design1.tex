@@ -1,0 +1,382 @@
+\section{Architecture Design}
+
+\subsection{Overall Architecture}
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.5\textwidth]{junho/archi.png}
+    \caption{Architecture}
+\end{figure}
+
+The overall system architecture consists of four tightly connected layers—
+(1) data acquisition on Apple Watch,
+(2) preprocessing and context integration on the iOS client,
+(3) multimodal inference and personalization within the FastAPI backend, and
+(4) natural-language–based appliance control via an LLM agent.
+Each layer operates asynchronously but synchronizes through a unified data schema centered around the user identifier and temporal index.
+
+\subsubsection{Sensor and Context Data Acquisition Layer (Apple Watch \& iOS)}
+The acquisition layer runs on both the Apple Watch and the paired iPhone.
+The Apple Watch continuously collects high-frequency physiological signals such as heart rate, heart rate variability, respiratory rate, sleep stages, and workout metrics using HealthKit and motion sensors.
+
+The iPhone aggregates these signals with contextual information from CoreLocation (GPS traces, speed, heading) and ambient environment sources. All data points are normalized into time-series format, timestamped, and enriched with device metadata (device model, OS version, and sample source).
+A local buffering module ensures reliability by temporarily storing samples when network connectivity is unavailable and flushing them to the backend when the connection is restored.
+
+\subsubsection{Data Transmission and Preprocessing Layer (iOS → Backend)}
+The client sends health and context samples to the FastAPI backend through a lightweight REST protocol.
+Each batch upload includes:
+\begin{itemize}
+    \item user identifier and device identifier
+    \item time-series physiological measurements
+    \item location window and place-inference results (home/commute/office)
+    \item device state snapshots (lighting, AC, humidity)
+    \item weather tile index for the current GPS coordinate
+\end{itemize}
+
+Before storage, the backend applies validation (type checking, timestamp ordering, duplication removal using composite keys) and stores the data into domain-specific tables aligned with the ERD.
+
+This layer ensures:
+\begin{itemize}
+    \item schema normalization,
+    \item deduplication of rapidly updated sensors, and
+    \item efficient time-indexed insertion through dedicated indices.
+\end{itemize}
+
+\subsubsection{Backend Inference and Context Integration Layer}
+
+The core intelligence of the system resides in the backend, where multiple data streams are merged into a unified feature vector.
+
+The backend periodically assembles:
+\begin{itemize}
+    \item last 24-hour health signal windows,
+    \item matched weather observations (temperature, humidity, rainfall, PM2.5),
+    \item spatial context (home/office/commuting), and
+    \item user baseline statistics (HRV median, resting HR, sleep trend)
+\end{itemize}
+
+These combined features are passed through a hybrid inference module consisting of:
+
+\begin{itemize}
+    \item an LSTM encoder for temporal physiological patterns,
+    \item dense layers for environmental encoding, and
+    \item an attention mechanism for highlight periods that influence the user's present condition.
+\end{itemize}
+
+The model outputs four real-time indicators:
+stress, fatigue, sleep readiness, and environmental comfort.
+
+The backend maintains a preference memory that updates dynamically using:
+
+\begin{itemize}
+    \item user overrides on appliance settings,
+    \item action outcome logs,
+    \item RLHF-style feedback from approval/skip decisions, and
+    \item historical routines extracted from GPS–time clustering.
+\end{itemize}
+
+This module ensures that recommendations become more personalized over time.
+
+\subsubsection{LLM-Driven Appliance Control and Decision-making Layer}
+
+Once the backend produces the user state indicators, the system composes a structured prompt and sends it to an LLM
+
+The analyzed condition output is passed to a Generative AI module, which converts it into a structured prompt describing the user’s current physiological and environmental context. 
+The AI then generates personalized appliance-control commands—for example, ``activate dehumidifying mode at 27 °C after exercise,'' or ``set lighting to 50\% brightness and 3500 K color temperature for relaxation.'' 
+Each recommendation includes concise scientific rationale (e.g., HRV recovery facilitation or melatonin preservation) derived from established sources such as WHO, ISO 7730, and AASM sleep guidelines.
+
+\subsubsection{Execution, Logging, and Closed-loop Feedback Layer}
+
+After parsing the LLM output, the backend executes the valid commands through the appliance control interface, using direct API calls (LG ThinQ or custom device controllers).
+
+These logs form the feedback loop that continuously refines model thresholds, user preference embeddings, and the LLM prompt template—building a personalized and adaptive automation agent.
+
+\subsection{Directory Organization}
+
+\begin{table}[htbp]
+\caption{DIRECTORY-ORGANIZATION-IOS-APP}
+\label{tab:dir_ios_app}
+
+\begin{tabularx}{\linewidth}{|p{3.8cm}|X|}
+\hline
+\textbf{Directory} & \textbf{File Name} \\
+\hline
+\texttt{space/ (Root)} &
+spaceApp.swift \newline
+TimelineDataModel.swift \newline
+FastAPIService.swift \newline
+DeviceManager.swift \newline
+FontSizeManager.swift \newline
+CallHistoryManager.swift \newline
+WatchConnectivityManager.swift \newline
+HealthKitManager.swift \newline
+SupabaseManager.swift \newline
+LocationManager.swift \\
+\hline
+\end{tabularx}
+\end{table}
+
+\begin{table}[htbp]
+\begin{tabularx}{\linewidth}{|p{3.8cm}|X|}
+\hline
+\texttt{space/Views/Auth} &
+LoginView.swift \newline
+SignUpView.swift \newline
+SocialLoginButton.swift \\
+\hline
+
+\texttt{space/Views/Chat} &
+CallErrorHistoryView.swift \newline
+ChatView.swift \newline
+PhoneCallView.swift \\
+\hline
+
+\texttt{space/Views/Common} &
+ContentView.swift \newline
+MainTabView.swift \newline
+PersonalTestView.swift \\
+\hline
+
+\texttt{space/Views/Device} &
+AddItemWidget.swift \newline
+ApplianceCard.swift \newline
+ApplianceItemCard.swift \newline
+ApplianceView.swift \newline
+DeviceCard.swift \newline
+DeviceDetailView.swift \newline
+DeviceView.swift \\
+\hline
+
+\texttt{space/Views/Home} &
+HomeLocationSetupView.swift \newline
+HomeView.swift \newline
+LocationTagSheet.swift \newline
+SplashView.swift \\
+\hline
+
+\texttt{space/Views/Persona} &
+AdjectiveTagView.swift \newline
+PersonaBubbleWidgetNew.swift \newline
+PersonaChatView.swift \newline
+PersonaEditView.swift \newline
+PersonaListView.swift \newline
+PersonaWidget.swift \\
+\hline
+
+\texttt{space/Views/Settings} &
+DoNotDisturbView.swift \newline
+EmergencyCallView.swift \newline
+FontSizeView.swift \newline
+GeneralView.swift \newline
+MenuRow.swift \newline
+MenuView.swift \newline
+MyPageView.swift \newline
+NotificationMethodView.swift \newline
+SpaceNotificationView.swift \\
+\hline
+
+\texttt{space/Views/Timeline} &
+StateDetailView.swift \newline
+StateWidget.swift \newline
+TimelineDetailView.swift \newline
+TimelineWidget.swift \\
+\hline
+
+\texttt{space/Models} &
+AdjectiveModels.swift \newline
+TaggedLocation.swift \\
+\hline
+
+\texttt{space/Managers} &
+TaggedLocationManager.swift \\
+\hline
+
+\texttt{space/Repositories} &
+PersonaRepository.swift \\
+\hline
+
+\texttt{space/Services} &
+SupabaseService.swift \\
+\hline
+\end{tabularx}
+\end{table}
+
+
+\begin{table}[h]
+\caption{DIRECTORY-ORGANIZATION-WATCH-APP}
+\label{tab:dir_watch_app}
+\centering
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabularx}{\linewidth}{|p{4.2cm}|X|}
+\hline
+\textbf{Directory} & \textbf{File Name} \\
+\hline
+\texttt{space Watch App/ (Root)} &
+space\_Watch\_AppApp.swift \newline
+ContentView.swift \newline
+MapView.swift \newline
+WatchConnectivityManager.swift \newline
+WatchHealthKitManager.swift \newline
+WatchLocationManager.swift \\
+\hline
+
+\texttt{space Watch App/Assets.xcassets} &
+AppIcon.appiconset/ \newline
+AccentColor.colorset/ \newline
+Contents.json \\
+\hline
+\end{tabularx}
+\end{table}
+
+\clearpage
+
+
+\begin{table}[htbp]
+\caption{DIRECTORY ORGANIZATION - BACKEND}
+\label{tab:dir_backend}
+\centering
+\small
+\renewcommand{\arraystretch}{2}
+\begin{tabularx}{\linewidth}{|p{3.8cm}|X|}
+\hline
+\textbf{Directory} & \textbf{File Name} \\
+\hline
+\texttt{app/ (Root)} &
+\_\_init\_\_.py \newline
+main.py \newline
+models.py \newline
+schemas.py \\
+\hline
+
+\texttt{app/api} &
+\_\_init\_\_.py \newline
+users.py \newline
+chat.py \newline
+hrv.py \newline
+weather.py \newline
+location.py \newline
+appliance.py \newline
+voice.py \newline
+voice\_realtime.py \newline
+characters.py \newline
+sendbird\_webhook.py \newline
+tracking.py \\
+\hline
+
+\texttt{app/models} &
+\_\_init\_\_.py \newline
+user.py \newline
+hrv.py \newline
+appliance.py \newline
+weather.py \newline
+location.py \newline
+info.py \newline
+tracking.py \\
+\hline
+
+\texttt{app/schemas} &
+\_\_init\_\_.py \newline
+user.py \newline
+info.py \newline
+tracking.py \\
+\hline
+
+\texttt{app/cruds} &
+\_\_init\_\_.py \newline
+user.py \newline
+info.py \newline
+tracking.py \\
+\hline
+
+\texttt{app/services} &
+llm\_service.py \newline
+appliance\_rule\_engine.py \newline
+appliance\_control\_service.py \newline
+hrv\_service.py \newline
+weather\_service.py \newline
+geofence\_service.py \newline
+fatigue\_predictor.py \newline
+sendbird\_client.py \newline
+voice\_service.py \newline
+realtime\_voice\_agent.py \\
+\hline
+
+\texttt{app/config} &
+\_\_init\_\_.py \newline
+db.py \newline
+env.py \newline
+sendbird.py \\
+\hline
+
+\texttt{app/migrations} &
+env.py \\
+\hline
+\end{tabularx}
+\end{table}
+
+
+\begin{table}[htbp]
+\caption{DIRECTORY ORGANIZATION - AI MODULE}
+\label{tab:dir_ai}
+\centering
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabularx}{\linewidth}{|p{4.2cm}|X|}
+\hline
+\textbf{Directory/Component} & \textbf{Description} \\
+\hline
+\texttt{app/services/ llm\_service.py} &
+\textbf{LLMService} class: \newline
+- \_\_init\_\_() \newline
+- \_build\_system\_prompt() \newline
+- parse\_user\_intent() \newline
+- generate\_appliance\_suggestion() \newline
+- detect\_modification() \newline
+- generate\_response() \newline
+- generate\_geofence\_trigger() \newline
+\newline
+\textbf{MemoryService} class: \newline
+- add\_message() \newline
+- get\_history() \newline
+- update\_long\_term\_memory() \newline
+- get\_long\_term\_memory() \newline
+\newline
+\textbf{LLMAction} enum: \newline
+- NONE \newline
+- CALL \newline
+- AUTO\_CALL \\
+\hline
+
+\texttt{app/api/chat.py} &
+\textbf{RESTful Endpoints}: \newline
+- POST /chat/\{user\_id\}/message \newline
+- POST /chat/\{user\_id\}/approve \newline
+- GET /chat/\{user\_id\}/history \newline
+- DELETE /chat/\{user\_id\}/session \newline
+\newline
+\textbf{Request/Response Models}: \newline
+- ChatMessageRequest \newline
+- ChatMessageResponse \newline
+- ApplianceApprovalRequest \newline
+- ApplianceApprovalResponse \newline
+\newline
+\textbf{Session Management}: \newline
+- chat\_sessions (dict) \newline
+- get\_or\_create\_session() \\
+\hline
+
+\texttt{app/services/realtime \_voice\_agent.py} &
+\textbf{Voice Integration}: \newline
+- OpenAI Realtime API WebSocket handler \newline
+- Audio streaming management \newline
+- Real-time voice conversation \newline
+- Geofence-triggered call support \\
+\hline
+
+\texttt{app/api/voice \_realtime.py} &
+\textbf{WebSocket Endpoint}: \newline
+- WS /voice/realtime/\{user\_id\} \newline
+- Bidirectional audio streaming \newline
+- Integration with llm\_service \\
+\hline
+\end{tabularx}
+\end{table}

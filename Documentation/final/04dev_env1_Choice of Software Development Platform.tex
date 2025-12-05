@@ -1,0 +1,185 @@
+\subsection{Choice of Software Development Platform}
+\subsubsection{Development Platform}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em} 
+
+\paragraph{macOS Development Environment}
+\begin{adjustwidth}{2em}{0em}
+\setlength{\parindent}{1em}
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.2\textwidth]{junho/macos.png}
+    \caption{macOS}
+\end{figure}
+
+macOS served as the primary development environment for iOS and watchOS applications.  
+All implementations were carried out using \textbf{Xcode 16.0} on \textbf{macOS Sonoma 15.0}, running on an Apple MacBook Pro (M2, 16 GB RAM).  
+This platform ensured full compatibility with Apple’s SDKs and provided integrated tools for debugging, WatchKit simulation, and real-device testing.  
+The macOS environment also enabled seamless SwiftUI preview and build automation through Apple’s native developer ecosystem.
+\end{adjustwidth}
+\vspace{1em}
+
+
+\paragraph{Windows Environment for Backend Testing}
+\begin{adjustwidth}{2em}{0em}
+\setlength{\parindent}{1em}
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.3\textwidth]{junho/window.jpg}
+    \caption{windows11}
+\end{figure}
+Windows 11 was utilized as a secondary development environment to verify backend communication and data exchange between the FastAPI server and client devices.  
+Docker containers were configured to host FastAPI and PostgreSQL instances, providing a consistent testbed across both macOS and Windows.  
+This setup ensured that the backend could be validated independently from the Apple development environment and maintained cross-platform compatibility.
+\end{adjustwidth}
+\vspace{1em}
+
+\paragraph{iOS Platform (iPhone)}
+\begin{adjustwidth}{2em}{0em}
+\setlength{\parindent}{1em}
+The iOS application served as the main interface for collecting health, GPS, and contextual data.  
+Developed using \textbf{Swift 5.10} and \textbf{SwiftUI}, it integrates Apple frameworks such as \texttt{HealthKit}, \texttt{CoreLocation}, and \texttt{MapKit}.  
+Testing and optimization were performed on an \textbf{iPhone 14 (iOS 18.0)} device, ensuring stable background synchronization and low-latency data transfer through the \texttt{WCSession} framework.  
+The iOS platform also enabled direct visualization of health metrics and movement trajectories within the app’s dashboard.
+\end{adjustwidth}
+\vspace{1em}
+
+
+\paragraph{watchOS Platform (Apple Watch)}
+\begin{adjustwidth}{2em}{0em}
+\setlength{\parindent}{1em}
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.2\textwidth]{junho/watchos.png}
+    \caption{WatchOS}
+\end{figure}
+The watchOS component was responsible for collecting real-time biometric and activity data through the Apple Watch sensors.  
+An \textbf{Apple Watch SE (2nd generation, watchOS 10.1)} was paired with the iPhone for continuous synchronization of heart rate, HRV, and exercise sessions via the \texttt{HealthKit} and \texttt{WatchConnectivity} frameworks.  
+The lightweight watchOS design enabled background data capture with minimal power consumption, ensuring continuous monitoring without user intervention.  
+All collected data were serialized and securely transmitted to the iOS host app, forming the foundation of the system’s health monitoring pipeline.
+\end{adjustwidth}
+\vspace{1em}
+
+\end{adjustwidth}
+\subsubsection{Language/Framework}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em} 
+% 김도겸 작성중 - 백엔드스타트
+\paragraph{Docker}
+\begin{adjustwidth}{2em}{0em}
+\setlength{\parindent}{1em} 
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.2\textwidth]{dogyeom/env/docker.png}
+    \caption{Docker}
+\end{figure}
+Docker is an open-source containerization platform that enables developers to package applications and their dependencies into lightweight, portable containers.
+By isolating software components from the host system, Docker ensures consistent performance across development, testing, and production environments.
+It simplifies deployment pipelines and promotes scalability through container orchestration tools such as Docker Compose and Kubernetes.
+Docker’s image-based architecture allows reproducible builds, rapid scaling, and seamless collaboration among distributed teams.
+\end{adjustwidth}
+\vspace{1em}
+
+\paragraph{PostgreSQL}
+\begin{adjustwidth}{2em}{0em}
+\setlength{\parindent}{1em} 
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.2\textwidth]{dogyeom/env/psql.png}
+    \caption{PostgreSQL}
+\end{figure}
+PostgreSQL is a widely used open-source relational database management system based on Structured Query Language (SQL).
+It provides reliable data storage, indexing, and querying capabilities for web and enterprise applications.
+PostgreSQL ensures data integrity through ACID compliance and supports multi-user access with transaction control and authentication mechanisms.
+In this project, PostgreSQL was used to manage structured data efficiently, offering strong scalability and compatibility with Docker-based deployments.
+
+\end{adjustwidth}
+\vspace{1em}
+
+\paragraph{Mermaid}
+\begin{adjustwidth}{2em}{0em}
+\setlength{\parindent}{1em} 
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.1\textwidth]{dogyeom/env/Mermaid_Logo.svg.png}
+    \caption{Mermaid}
+\end{figure}
+Mermaid is a JavaScript-based diagramming and visualization tool that converts text definitions into dynamic charts and diagrams.
+It supports flowcharts, sequence diagrams, entity-relationship diagrams (ERD), and Gantt charts, enabling engineers to describe complex architectures in a simple, markdown-style syntax.
+Within this project, Mermaid was employed to visualize database schemas and backend architecture, enhancing documentation clarity and maintainability.
+
+\end{adjustwidth}
+\vspace{1em}
+
+\paragraph{Amazon Web Services}
+\begin{adjustwidth}{2em}{0em}
+\setlength{\parindent}{1em} 
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.2\textwidth]{dogyeom/env/aws.png}
+    \caption{Amazon Web Services}
+\end{figure}
+Amazon Web Services(AWS) is a comprehensive suite of cloud computing services provided by Amazon.
+It offers scalable infrastructure for computing, storage, networking, and machine learning applications.
+AWS enables developers to deploy and manage containerized applications using services such as Cloud Run, Compute Engine, and Kubernetes Engine. In this project, AWS was used to host backend APIs and manage containerized environments with high scalability and reliability.
+
+\end{adjustwidth}
+\vspace{1em}
+
+\paragraph{FastAPI}
+\begin{adjustwidth}{2em}{0em}
+\setlength{\parindent}{1em} 
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.2\textwidth]{dogyeom/env/logo-teal.png}
+    \caption{FastAPI}
+\end{figure}
+FastAPI is a modern, high-performance web framework for building APIs with Python 3.7+ based on standard type hints.
+It supports asynchronous I/O and automatic request validation using Python type annotations, making it both efficient and developer-friendly.
+FastAPI automatically generates interactive API documentation using OpenAPI and Swagger UI, improving testing and maintainability.
+In this project, FastAPI served as the backend framework responsible for connecting user interfaces, databases, and external services such as the Korea Meteorological Administration (KMA) API.
+
+\end{adjustwidth}
+\vspace{1em}
+
+\paragraph{KMA OpenAPI}
+\begin{adjustwidth}{2em}{0em}
+\setlength{\parindent}{1em} 
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.2\textwidth]{dogyeom/env/sig5.png}
+    \caption{Korea Meteorological Administration}
+\end{figure}
+The KMA OpenAPI provides official weather data released by the Korea Meteorological Administration.
+It offers various endpoints including ultra-short-term observation, ultra-short-term forecast, and village forecast, which provide weather information at intervals of 10 minutes to 1 hour based on a 5 km × 5 km grid (nx, ny) system.
+This API enables real-time access to weather conditions such as temperature, humidity, precipitation, wind speed, and sky condition across South Korea.
+In this project, the KMA API was integrated into the backend system to collect localized weather data, which was later combined with user health and location information to enhance contextual analysis and AI-driven stress prediction.
+
+\end{adjustwidth}
+\vspace{1em}
+
+% 임동현 부분 
+\paragraph{Swift / SwiftUI}
+\begin{adjustwidth}{2em}{0em}
+\setlength{\parindent}{1em}
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.1\textwidth]{Donghyun/swift.png}
+    \caption{Swift / SwiftUI}
+\end{figure}
+Swift is Apple’s modern programming language optimized for safety, performance, and expressiveness.  
+In this project, Swift 5.10 and SwiftUI were used to implement both the iPhone and Apple Watch interfaces.  
+SwiftUI’s declarative syntax simplified reactive UI updates in response to changing health and GPS data, while seamless state synchronization between watchOS and iOS enabled real-time visualization of sensor readings.  
+The combination of Swift and SwiftUI improved maintainability and reduced boilerplate code, allowing faster iteration and debugging throughout the development cycle.
+\end{adjustwidth}
+
+\vspace{1em}
+
+
+
+\end{adjustwidth}
+
+% 김도겸 작성중 - 백엔드엔드
+
+
+

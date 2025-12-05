@@ -1,0 +1,313 @@
+\section{App Specification}
+
+\subsection{Splash Page Page}
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.18\textwidth]{app/splash.png}
+    \caption{Splash Page}
+\end{figure}
+
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+When the application is launched, a splash page is displayed for approximately 1--2 seconds.
+This prevents a blank loading state from appearing while the application initializes essential components such as session tokens, device bindings, and background synchronization tasks.
+By presenting a stable visual entry point, the splash page ensures a smooth and aesthetically consistent startup experience.
+\end{adjustwidth}
+
+% ===================== Login =====================
+
+\subsection{Login Page}
+
+\subsubsection{Login Interface}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.18\textwidth]{app/login.png}
+    \caption{Login Page}
+\end{figure}
+
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+Users can authenticate through multiple login methods, including email--password login, Google, Apple, Naver, and Kakao.
+Email and password fields include real-time validation feedback, and incorrect formatting prevents login attempts.
+A ``Forgot Password'' button directs users to Supabase's password reset workflow.
+Upon successful authentication, a user session is created both in the iOS client and the backend, enabling synchronization of health data, devices, and preferences.
+\end{adjustwidth}
+
+\FloatBarrier
+
+% ===================== Sign Up =====================
+
+\subsection{Sign Up Page}
+
+\subsubsection{Sign Up -- Basic Information}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.18\textwidth]{app/signup.png}
+    \caption{Signup Page}
+\end{figure}
+
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+The Sign Up page collects essential user data, including username, email address, and password.
+All fields include structured validation to ensure proper formatting and compliance with minimum security requirements.
+\end{adjustwidth}
+
+\subsubsection{Sign Up -- Password Validation}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+Password requirements include a minimum length and a combination of character types.
+Visual indicators provide real-time feedback, turning green when conditions are satisfied and red when they are not.
+The ``Sign Up'' button becomes active only when all constraints are fulfilled.
+\end{adjustwidth}
+
+\subsubsection{Sign Up -- Consent Agreement}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+Users must acknowledge the Terms of Service and Privacy Policy.
+The system prevents account creation unless all required consents are explicitly confirmed.
+\end{adjustwidth}
+
+\subsubsection{Sign Up -- Registration Completion}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+Once validated, the system creates a Supabase user record and initializes preset configurations on the backend.
+These include default appliance preferences, persona profiles, and personalized environment parameters essential for downstream inference tasks.
+\end{adjustwidth}
+
+\FloatBarrier
+% --------------------------------------------------
+
+\subsection{Home Page}
+
+\subsubsection{My Home Page}
+\begin{figure}[ht]
+    \centering
+    % 첫 번째 홈 화면
+    \begin{minipage}[b]{0.22\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{app/home_none.png}
+        \caption{Home Page1}
+    \end{minipage}
+    \hspace{0.02\textwidth}
+    % 두 번째 홈 화면
+    \begin{minipage}[b]{0.22\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{app/home_use.png}
+        \caption{Home Page2}
+    \end{minipage}
+\end{figure}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+The Home page provides an overview of the user's health and contextual data.
+This includes the timeline widget for movement summaries, HRV-based wellness indicators, and the currently active AI personas.
+\end{adjustwidth}
+
+\subsubsection{Connected Devices}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+Paired devices such as Apple Watch and iPhone are displayed with real-time connection status, battery levels, and last synchronization timestamps.
+\end{adjustwidth}
+
+\subsubsection{Home Appliances Overview}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+All registered appliances are displayed as horizontally scrollable cards showing key parameters such as power state, temperature, and humidity.
+Each card includes quick toggles and navigational access to detailed controls.
+\end{adjustwidth}
+
+% --------------------------------------------------
+
+\subsection{Appliances Page}
+\subsubsection{Appliance Home Page}
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.18\textwidth]{app/appliances_home.png}
+    \caption{Appliance Home Page}
+\end{figure}
+
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+The appliance home page displays all devices registered under the user’s account.  
+Devices are automatically grouped by type—air conditioner, lighting, air purifier, humidifier, dehumidifier, and television.  
+Each appliance is represented as a card component showing:
+
+\begin{itemize}
+    \item \textbf{Current Status:} ON/OFF indicator with color-coded visual feedback.
+    \item \textbf{Primary Parameter:} e.g., temperature, brightness, or humidity.
+    \item \textbf{Room Location:} device placement such as “Living Room” or “Bedroom.”
+    \item \textbf{Operation Mode:} e.g., Auto, Sleep, Turbo, or Manual.
+\end{itemize}
+
+Users can perform quick toggles directly on each card for immediate control, while the interface applies optimistic UI updates to maintain responsiveness.  
+A pull-to-refresh action retrieves the latest state from the backend, and tapping on any appliance card opens the detailed control interface.
+\end{adjustwidth}
+
+% --------------------------------------------------
+\subsubsection{Appliance Detail Page}
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.18\textwidth]{app/appliance_detail.png}
+    \caption{Appliance Detail Page}
+\end{figure}
+
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+Each appliance type has a dedicated detailed control page that exposes adjustable operational parameters.  
+All settings are synchronized in real time with the backend FastAPI controller.  
+Supported device types and available control functions include:
+
+\begin{itemize}
+    \item \textbf{Air Conditioner:} mode (Cooling, Heating, Auto), temperature (16–30°C), and fan speed levels (1–5).
+    \item \textbf{Lighting:} brightness (0–100\%), color temperature (2700K–6500K), and scene presets (Reading, Relax, Night).
+    \item \textbf{Air Purifier:} fan speed control, air quality indicator (PM10, PM2.5), and mode selection (Auto, Turbo, Sleep).
+    \item \textbf{Humidifier / Dehumidifier:} humidity target setting and mist/fan intensity.
+    \item \textbf{TV:} volume, input source, and page brightness.
+\end{itemize}
+
+Each change triggers an API request to update device states on the backend, and a confirmation response is reflected immediately in the frontend through state binding.  
+In case of communication failure, the system rolls back to the previous state to ensure interface consistency and prevent user confusion.
+\end{adjustwidth}
+
+% --------------------------------------------------
+\subsection{Chat Page}
+
+\subsubsection{General User Conversation}
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.18\textwidth]{app/General_User_Conversatiol.png}
+    \caption{General User Conversatiol Page}
+\end{figure}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+The Chat page lists all AI personas registered by the user.
+Each persona is displayed with a nickname, adjective tags describing its personality, and the time of the last interaction.
+When the user selects a persona, a real-time conversation window opens, powered by Sendbird and an LLM-based dialogue engine.
+In this mode, the user can ask general questions, receive lifestyle or wellness guidance, and engage in free-form conversation without necessarily controlling any devices.
+\end{adjustwidth}
+
+\subsubsection{Appliance Control via user}
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.18\textwidth]{app/Appliance_Control_Via_User_Chat_Page.png}
+    \caption{Appliance Control Via User Chat Page}
+\end{figure}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+Beyond casual conversation, the chat interface allows the user to control home appliances using natural language commands.
+For example, the user may request, ``Make the living room cooler'' or ``Turn off the bedroom lights at 11 p.m.''
+The LLM interprets the intent, maps it to specific appliance actions (device type, location, target value), and generates a structured control request.
+This request is transmitted to the backend smart-control API, which updates the corresponding appliance states.
+Confirmation messages are then returned to the chat window so that the user can verify which devices were changed and how.
+\end{adjustwidth}
+
+\subsubsection{Trigger-Based Notifications and Suggested Control}
+\begin{figure}[ht]
+    \centering
+    % 트리거 알림 화면
+    \begin{minipage}[b]{0.22\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{app/Trigger-Based_Notifications.png}
+        \caption{Trigger-Based Notification}
+    \end{minipage}
+    \hspace{0.02\textwidth}
+    % 추천 컨트롤 화면
+    \begin{minipage}[b]{0.22\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{app/Suggested_Control.png}
+        \caption{Suggested Control Chat Page}
+    \end{minipage}
+\end{figure}
+
+% --------------------------------------------------
+
+\subsection{Timeline Page}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.18\textwidth]{app/timeline.png}
+    \caption{Timeline Page}
+\end{figure}
+
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+The Timeline page visualizes the user's daily movement combined with physiological metrics.
+Its main features include:
+\begin{itemize}
+    \item GPS polylines representing movement routes,
+    \item Checkpoints with heart rate, HRV, steps, and calorie data,
+    \item Weather annotations such as temperature, humidity, and particulate matter levels,
+    \item Mini-map previews for past records, and
+    \item Start/Stop Recording controls.
+\end{itemize}
+This page integrates Apple Watch health data with CoreLocation routes for a comprehensive behavioral overview.
+\end{adjustwidth}
+
+% --------------------------------------------------
+
+\subsection{Persona Page}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.18\textwidth]{app/persona.png}
+    \caption{Persona Page}
+\end{figure}
+
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+The Persona page allows the creation and management of AI personas.
+Users can:
+\begin{itemize}
+    \item Add new personas by selecting nickname and character traits,
+    \item Activate up to five personas simultaneously,
+    \item Edit or delete existing personas, and
+    \item Use personas as conversational agents for controlling appliances.
+\end{itemize}
+\end{adjustwidth}
+
+% --------------------------------------------------
+
+\subsection{Menu Page}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.18\textwidth]{app/menu.png}
+    \caption{Menu Page}
+\end{figure}
+
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+The Menu page serves as the settings and profile management hub.
+It includes:
+\begin{itemize}
+    \item User profile details (name, email),
+    \item Account settings and general preferences,
+    \item Font size settings,
+    \item Notification configuration,
+    \item Do-Not-Disturb scheduling,
+    \item Auto-tracking toggle, and
+    \item Logout button.
+\end{itemize}
+Logging out clears all client-side session data and disconnects active messaging channels.
+\end{adjustwidth}
+
+% --------------------------------------------------
+
+\subsection{Settings Page}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.18\textwidth]{app/settings.png}
+    \caption{Settings Page}
+\end{figure}
+
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+The Settings page provides global configuration options such as:
+\begin{itemize}
+    \item Font scaling options,
+    \item Notification settings,
+    \item Do-Not-Disturb settings, and
+    \item Auto-tracking permissions.
+\end{itemize}
+User preferences persist across sessions using HARU's settings manager.
+\end{adjustwidth}

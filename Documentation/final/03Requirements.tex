@@ -1,0 +1,185 @@
+\subsection{User Management}
+
+\subsubsection{Sign Up}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em} 
+The registration process requires the following information:
+
+\begin{itemize}
+    \item Mobile number: Verified through carrier authentication and later used as the login ID
+    \item Password: Must be at least 8 characters long and include three of the following: uppercase letters, lowercase letters, numbers, and special characters. When requirements are met, indicators turn green; when unmet, they turn red. Password input is masked for security
+    \item Name: Required field; used as the default nickname upon first login and for ID recovery
+    \item Date of birth: Required field; triggers birthday pop-up notification annually and used for ID recovery
+    \item Email: Used for account recovery, additional authentication, and receiving important notices
+\end{itemize}
+\end{adjustwidth}
+
+\subsubsection{Sign In}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em} 
+The system supports two authentication methods:
+
+\begin{itemize}
+    \item Local login: Users enter their ID (mobile number) and password. If credentials match, the system redirects to the main page; otherwise, a "Member does not exist" popup is displayed.
+
+    \item SNS login: Users can authenticate via Apple, Google, Kakao, or other social platforms. After consent, the system connects to the same user profile based on mobile key linkage.
+\end{itemize}
+\end{adjustwidth}
+
+
+\subsection{Device Management}
+\subsubsection{Register Home Appliance}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em} 
+The system provides two registration methods:
+\begin{itemize}
+    \item QR scan (requires camera permission)
+    \item Device search via Wi-Fi/BLE scan or manual input of model and serial number
+\end{itemize}
+Import from LG ThinQ:
+After OAuth consent, the system imports registered appliances, room layout, and smart routines. Imported data is used exclusively for control and automation suggestions.
+\end{adjustwidth}
+
+\subsection{Data Collection and Privacy}
+\subsubsection{Data Sources and Permissions}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em} 
+The system collects data from multiple sources with explicit user consent
+\begin{itemize}
+    \item Biometric and activity data: Collected from wearable devices and phone sensors, including heart rate, activity levels, sleep patterns, and step counts. Data collection is minimal and requires explicit consent.
+
+    \item Weather and environment data: Obtained from external weather APIs and indoor sensors measuring temperature, humidity, CO2 levels, and other environmental factors.
+
+    \item Required permissions: The system requests notifications, location (for weather data), and health/activity data access. The purpose and retention period for each permission are clearly disclosed to users.
+
+\end{itemize}
+\end{adjustwidth}
+
+
+\subsubsection{RLHF Feedback Loop and Continuous Optimization}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+These AI-generated suggestions are presented to the user in a card interface, allowing quick responses such as Run now, In 30 min, or Skip today. 
+All user interactions feed back into a Reinforcement Learning from Human Feedback (RLHF) loop, where approval rates, adjustment patterns, and contextual variables are used to continuously refine prompt templates, decision thresholds, and model confidence levels. 
+Over time, the system evolves into a personalized predictive assistant that learns from each interaction and aligns closely with the user’s preferences and habits.
+\end{adjustwidth}
+
+\subsection{Apple Watch Integration}
+\subsubsection{GPS and Location Awareness}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+The Apple Watch integration enables real-time tracking of the user’s geographical context through GPS data. 
+By continuously monitoring location, the system determines whether the user is near home or traveling. 
+This spatial awareness allows the agent to adapt its behavior — for instance, adjusting home device readiness when the user is approaching or providing location-based reminders. 
+Additionally, accumulated GPS traces are visualized on an adaptive map, supporting routine pattern analysis such as daily commuting routes, time spent outdoors, and regional activity trends.
+\end{adjustwidth}
+
+\subsubsection{Health Data Synchronization}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+Through Apple’s HealthKit framework, the agent securely retrieves physiological and activity data including heart rate, sleep duration, step count, and exercise sessions. 
+These metrics are continuously analyzed to infer the user’s physical condition, stress levels, and lifestyle patterns. 
+Based on the analysis, the system can generate personalized insights — such as recommending rest after elevated stress detection or adjusting environmental conditions (e.g., temperature or lighting) following high activity levels.
+\end{adjustwidth}
+
+\subsubsection{Behavioral Mapping and Wellness Insights}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+By combining GPS-derived mobility data with real-time health indicators, the agent constructs a comprehensive behavioral map of the user’s daily life. 
+This integration allows it to identify correlations — for example, linking reduced step count with poor sleep quality or detecting stress patterns associated with long commutes. 
+Ultimately, the Apple Watch module transforms raw sensor data into actionable wellness intelligence, enhancing personalization, safety, and long-term health awareness.
+\end{adjustwidth}
+
+\subsection{Personalization}
+\subsubsection{Persona Configuration}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em} 
+The personalization framework is centered on the concept of an AI persona configured during the onboarding phase. 
+Upon initial setup, the user selects the agent’s tone and communication style — for instance, friendly, professional, or concise — and provides basic profile information such as name, date of birth, occupation, sleep–wake cycle, and weekly exercise frequency. 
+This data directly influences the tone of notifications, phrasing of suggestions, and communication style in voice or text interfaces.
+\end{adjustwidth}
+
+\subsubsection{Adaptive Personalization and Behavioral Learning}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em} 
+As the system observes real user behavior and feedback, it gradually increases personalization depth. 
+For example, if a user consistently approves ``cooler settings after exercise,'' the agent autonomously learns to trigger air conditioning suggestions post-workout. 
+Similarly, recurring actions such as ``dim lights at night'' become embedded as personal automation rules, minimizing the need for repeated confirmations.
+\end{adjustwidth}
+
+\subsubsection{Safety and Transparency}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em} 
+High-risk or low-confidence actions (e.g., oven or gas control) always require explicit user confirmation. 
+Every automation remains overrideable at any time, ensuring user safety, transparency, and trust. 
+Through continuous learning, the agent transitions from a static rule-based assistant to an adaptive, user-aware smart companion.
+\end{adjustwidth}
+
+\subsection{Proactive Automation}
+\subsubsection{Autonomous Appliance Adjustment}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em} 
+Instead of waiting for user confirmation, the system autonomously adjusts appliances based on real-time user condition analysis. 
+When the AI detects significant fatigue, elevated stress, or temperature discomfort, it immediately configures connected devices such as lighting, air conditioning, or air purifiers to match the predicted comfort range without requiring prior user input. 
+This enables seamless environmental adaptation that aligns with the user’s physiological and contextual state.
+\end{adjustwidth}
+
+\subsubsection{User Feedback and Re-adjustment}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+After an automatic adjustment is applied, users can freely modify or reject the new settings. 
+For instance, if the user changes the air conditioner temperature or disables lighting adjustments, the system interprets this as a negative feedback signal. 
+All such interactions are recorded as behavioral feedback data and used to update the internal preference model.
+\end{adjustwidth}
+
+\subsubsection{Adaptive Learning Loop}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+Each user correction or rejection is treated as a learning instance. 
+The reinforcement loop continually analyzes these signals to fine-tune decision thresholds, preferred control parameters, and contextual mappings. 
+Over time, this process transforms the automation from a static ruleset into a personalized predictive controller that autonomously optimizes appliance behavior based on accumulated feedback and evolving user preferences.
+\end{adjustwidth}
+
+\subsubsection{Safety and Transparency}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em}
+For safety-critical or high-impact actions (e.g., oven, gas, or electrical control), the system enforces reconfirmation or multi-factor authentication. 
+All adjustments remain transparent and reversible; users can override or reset automated actions at any time, ensuring reliability, trust, and control in the automation process.
+\end{adjustwidth}
+
+\subsection{Communication System}
+\subsubsection{Communication Channels}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em} 
+Push notifications serve as the default communication method, with SMS and email available as alternatives. For urgent alerts or complex issues, the system can initiate voice calls to establish direct agent-user phone connection through Voice call (VoIP/ARS).
+In addition, Users can configure do-not-disturb hours, priority levels, guardian designation, and language preferences through contact settings.
+
+\end{adjustwidth}
+
+\subsection{Security and Compliance}
+\subsubsection{Privacy, Security, and Consent}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em} 
+The system implements comprehensive privacy and security measures:
+
+Data handling: Minimal data collection principle is enforced, with encryption applied during both transmission and storage. Personally identifiable information (PII) is separated from telemetry data.
+
+ThinQ integration: Minimal permission scope is requested from LG ThinQ, with prior disclosure of all retrieved items.
+
+User rights: Users can download or delete their data, unlink ThinQ integration, and deactivate their account at any time.
+
+Audit trail: Every automation execution and contact attempt is logged for audit purposes.
+\end{adjustwidth}
+
+\subsubsection{Reliability, Error Handling, and Offline Support}
+\begin{adjustwidth}{1em}{0em}
+\setlength{\parindent}{1em} 
+The system implements robust error handling mechanisms:
+
+Device availability: Offline devices are detected and indicated, with recovery guidance provided. Non-critical commands are queued for later execution.
+
+Conflict resolution: When ThinQ and local status information conflict, the system presents a resolution prompt or applies a single-source policy.
+
+Schema compatibility: Core controls are limited to finalized schemas, with older values displayed as legacy indicators.
+\end{adjustwidth}
+
