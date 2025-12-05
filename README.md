@@ -4,9 +4,12 @@
 ---
 
 ## 📄 Project Overview
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/33b8282c-ec06-42ec-a378-6ed671ab247e" />
+
 
 HARU is an intelligent smart-home automation platform that integrates wearable health data with contextual information to create a personalized and adaptive living environment. The system continuously collects real-time biometric metrics from the Apple Watch—such as heart rate, heart rate variability (HRV), sleep patterns, and activity levels. Then, It estimates the user’s physiological and psychological state through HRV range. Unlike traditional rule-based smart-home systems, HARU leverages LLM-based reasoning to interpret the user’s condition and generate natural-language policies for controlling home appliances. These policies are then converted into structured commands to adjust lighting, temperature, humidity, and other devices automatically. By combining physiological signals with contextual data such as weather forecasts, GPS location, time-of-day patterns, and user preferences, HARU provides **context-aware, proactive home automation**. HARU aims to shift the paradigm from “A user controlling smart home” to “a home that understands the user and adapts itself accordingly.”
 
+## [🎥 Video](https://youtu.be/I9-Sp5B4hgw)
 ---
 ## Architecture
 
@@ -24,9 +27,6 @@ HARU is an intelligent smart-home automation platform that integrates wearable h
 6. Policies are parsed and executed (AC, lights, humidifier, etc.).
 7. Actions are logged and used to update user preferences.
 8. Sendbird chatbot allows conversation-based control and feedback.
-
----
-## 🎥 Video
 
 ---
 ## Key Features
@@ -84,6 +84,7 @@ This enables a highly adaptive environment that goes beyond simple “if tired �
 
 Copyright (c) 2025 HARU
 This project is licensed under the MIT License — see the [LICENSE](./LICENSE) file for details.
+
 
 
 
