@@ -392,15 +392,40 @@ async def process_and_respond(
         # 2. 가전 제어가 필요 없는 경우 (일반 대화)
         if intent_type == "general_chat" or not needs_control:
             logger.info("💬 [RESPONSE-DEBUG] General chat - generating normal response...")
+
+            # 날씨 정보 조회 (일반 대화에도 컨텍스트 제공)
+            user_location = db.query(UserLocation).filter(UserLocation.user_id == actual_user.id).first()
+            home_lat = user_location.home_latitude if user_location else 37.5665
+            home_lng = user_location.home_longitude if user_location else 126.9780
+
+            weather_data = await weather_service.get_combined_weather(
+                db=db,
+                latitude=home_lat,
+                longitude=home_lng,
+                sido_name=os.getenv("DEFAULT_SIDO_NAME", "서울")
+            )
+
+            # 피로도 정보도 제공
+            fatigue_level = hrv_service.get_latest_fatigue_level(db, actual_user.id)
+
+            # 컨텍스트 구성
+            context = {
+                "weather": weather_data,
+                "fatigue_level": fatigue_level,
+                "location": {
+                    "latitude": home_lat,
+                    "longitude": home_lng
+                },
+                "user_id": user_id,
+                "channel_url": channel_url
+            }
+
             response = await llm_service.generate_response(
                 user_message=message,
                 conversation_history=history,
                 persona=persona,
                 appliance_states=appliance_states,
-                context={
-                    "user_id": user_id,
-                    "channel_url": channel_url
-                }
+                context=context
             )
 
             action = response.get("action", "NONE")
