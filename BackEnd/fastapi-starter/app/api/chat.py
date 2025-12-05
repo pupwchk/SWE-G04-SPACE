@@ -265,10 +265,36 @@ async def send_chat_message(
                 for msg in session["conversation_history"][-10:]  # 최근 10개
             ]
 
+            # 날씨 정보 조회 (일반 대화에도 컨텍스트 제공)
+            user_location = db.query(UserLocation).filter(UserLocation.user_id == UUID(user_id)).first()
+            home_lat = user_location.home_latitude if user_location else 37.5665
+            home_lng = user_location.home_longitude if user_location else 126.9780
+
+            weather_data = await weather_service.get_combined_weather(
+                db=db,
+                latitude=home_lat,
+                longitude=home_lng,
+                sido_name=os.getenv("DEFAULT_SIDO_NAME", "서울")
+            )
+
+            # 피로도 정보도 제공
+            fatigue_level = hrv_service.get_latest_fatigue_level(db, UUID(user_id))
+
+            # 컨텍스트 구성
+            context = {
+                "weather": weather_data,
+                "fatigue_level": fatigue_level,
+                "location": {
+                    "latitude": home_lat,
+                    "longitude": home_lng
+                }
+            }
+
             llm_result = await llm_service.generate_response(
                 user_message=request.message,
                 conversation_history=history_for_llm,  # ← 대화 히스토리 전달
                 persona=persona,
+                context=context,  # ← 날씨 및 상태 정보 전달
                 appliance_states=appliance_states,  # ← 현재 가전 상태 전달
                 dialogue_state=session["dialogue_state"]  # ← DST 상태 전달
             )
