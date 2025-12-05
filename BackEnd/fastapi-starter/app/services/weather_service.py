@@ -83,10 +83,23 @@ class WeatherService:
             # 격자 좌표 변환
             nx, ny = self._convert_to_grid(latitude, longitude)
 
-            # 현재 시각 기준
-            now = datetime.now()
-            base_date = now.strftime("%Y%m%d")
-            base_time = (now - timedelta(hours=1)).strftime("%H00")  # 매시각 정각 발표
+            # 현재 시각 기준 (KST)
+            from datetime import timezone, timedelta as td
+            kst = timezone(td(hours=9))
+            now_kst = datetime.now(kst)
+
+            # 기상청 초단기실황은 매시 정각 기준, 10분 후 발표
+            # 현재 시각이 정각+10분 이전이면 2시간 전, 아니면 1시간 전 데이터 사용
+            if now_kst.minute < 10:
+                # 아직 이번 시간 데이터가 발표 안됨
+                base_datetime = now_kst - timedelta(hours=2)
+            else:
+                base_datetime = now_kst - timedelta(hours=1)
+
+            base_date = base_datetime.strftime("%Y%m%d")
+            base_time = base_datetime.strftime("%H00")  # 정각으로 맞춤
+
+            logger.info(f"🕐 Weather API request: {base_date} {base_time} (KST: {now_kst.strftime('%Y-%m-%d %H:%M')})")
 
             params = {
                 "serviceKey": self.weather_api_key,
