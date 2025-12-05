@@ -123,7 +123,21 @@ class LLMService:
 
             # 컨텍스트 추가
             if context:
-                context_str = f"\n\n**현재 상황:**\n{json.dumps(context, ensure_ascii=False, indent=2)}"
+                # datetime 객체를 문자열로 변환
+                from datetime import datetime
+
+                def serialize_context(obj):
+                    """datetime 객체를 문자열로 변환"""
+                    if isinstance(obj, datetime):
+                        return obj.isoformat()
+                    elif isinstance(obj, dict):
+                        return {k: serialize_context(v) for k, v in obj.items()}
+                    elif isinstance(obj, list):
+                        return [serialize_context(item) for item in obj]
+                    return obj
+
+                serialized_context = serialize_context(context)
+                context_str = f"\n\n**현재 상황:**\n{json.dumps(serialized_context, ensure_ascii=False, indent=2)}"
                 messages.append({"role": "system", "content": context_str})
 
             # 사용자 메시지 추가
