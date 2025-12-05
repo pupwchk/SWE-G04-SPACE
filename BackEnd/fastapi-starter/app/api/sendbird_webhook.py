@@ -460,8 +460,14 @@ async def process_and_respond(
 
         # 사용자 위치 정보 조회 (actual_user는 이미 조회됨)
         user_location = db.query(UserLocation).filter(UserLocation.user_id == actual_user.id).first()
-        home_lat = user_location.home_latitude if user_location else 37.5665
-        home_lng = user_location.home_longitude if user_location else 126.9780
+        home_lat = user_location.home_latitude if user_location and user_location.home_latitude else 37.5665
+        home_lng = user_location.home_longitude if user_location and user_location.home_longitude else 126.9780
+
+        # 위치가 0,0이면 서울 기본 위치 사용
+        if home_lat == 0.0 or home_lng == 0.0:
+            logger.warning(f"⚠️ Invalid location (0,0), using default Seoul location")
+            home_lat = 37.5665
+            home_lng = 126.9780
 
         # 날씨 정보 조회
         logger.info("🌤️ [RESPONSE-DEBUG] Fetching weather data...")
