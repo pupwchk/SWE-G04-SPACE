@@ -207,13 +207,13 @@ class ApplianceRuleEngine:
                     # 학습된 선호 세팅 사용
                     settings_json = preference.settings_json
 
-                    # 에어컨의 경우 냉방/난방 모드 선택
+                    # 에어컨의 경우 냉방/난방 모드 선택 (condition_json의 mode 필드 사용)
                     if rule.appliance_type == "에어컨" and isinstance(settings_json, dict):
-                        mode = rule.condition_json.get("mode", "cool")
-                        if mode in settings_json:
+                        mode = rule.condition_json.get("mode")  # "cool" 또는 "heat"
+                        if mode and mode in settings_json:
                             settings = settings_json[mode]
                         else:
-                            # cool/heat 중 하나만 있거나 직접 설정인 경우
+                            # mode가 없거나 settings_json에 해당 키가 없으면 전체 사용
                             settings = settings_json
                     else:
                         settings = settings_json
@@ -221,7 +221,30 @@ class ApplianceRuleEngine:
                     logger.info(f"📚 Using learned preference (is_learned=True) for {rule.appliance_type} at fatigue {fatigue_level}")
                 else:
                     # 기본 규칙 세팅 사용 (is_learned=False이거나 preference가 없는 경우)
-                    settings = rule.settings_json or {}
+                    # preference 테이블에서 기본값(is_learned=False) 조회
+                    if preference and not preference.is_learned:
+                        settings_json = preference.settings_json
+
+                        # 에어컨의 경우 냉방/난방 모드 선택 (condition_json의 mode 필드 사용)
+                        if rule.appliance_type == "에어컨" and isinstance(settings_json, dict):
+                            mode = rule.condition_json.get("mode")  # "cool" 또는 "heat"
+                            if mode and mode in settings_json:
+                                settings = settings_json[mode]
+                            else:
+                                # mode가 없거나 settings_json에 해당 키가 없으면 전체 사용
+                                settings = settings_json
+                        else:
+                            settings = settings_json
+                    else:
+                        # preference가 아예 없으면 rule의 settings_json 사용
+                        settings = rule.settings_json or {}
+
+                        # 에어컨의 경우 condition_json의 mode를 settings에 추가
+                        if rule.appliance_type == "에어컨" and isinstance(settings, dict):
+                            mode = rule.condition_json.get("mode")  # "cool" 또는 "heat"
+                            if mode:
+                                settings["mode"] = mode
+
                     logger.info(f"📋 Using default rule settings for {rule.appliance_type}")
 
                 # 제어 정보 생성
