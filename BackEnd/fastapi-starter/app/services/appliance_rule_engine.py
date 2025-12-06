@@ -194,7 +194,7 @@ class ApplianceRuleEngine:
                         logger.info(f"⏭️ Skipping {rule.appliance_type}: cannot set while OFF")
                         continue
 
-                # 📚 우선순위: UserAppliancePreference > ApplianceConditionRule.settings_json
+                # 📚 우선순위: UserAppliancePreference (is_learned=True) > ApplianceConditionRule.settings_json
                 # 사용자가 학습한 선호 세팅이 있는지 먼저 확인
                 preference = db.query(UserAppliancePreference).filter(
                     UserAppliancePreference.user_id == UUID(user_id),
@@ -202,7 +202,8 @@ class ApplianceRuleEngine:
                     UserAppliancePreference.appliance_type == rule.appliance_type
                 ).first()
 
-                if preference:
+                # ✅ is_learned=True인 경우만 학습된 선호 세팅으로 취급
+                if preference and preference.is_learned:
                     # 학습된 선호 세팅 사용
                     settings_json = preference.settings_json
 
@@ -217,9 +218,9 @@ class ApplianceRuleEngine:
                     else:
                         settings = settings_json
 
-                    logger.info(f"📚 Using learned preference for {rule.appliance_type} at fatigue {fatigue_level}")
+                    logger.info(f"📚 Using learned preference (is_learned=True) for {rule.appliance_type} at fatigue {fatigue_level}")
                 else:
-                    # 기본 규칙 세팅 사용
+                    # 기본 규칙 세팅 사용 (is_learned=False이거나 preference가 없는 경우)
                     settings = rule.settings_json or {}
                     logger.info(f"📋 Using default rule settings for {rule.appliance_type}")
 
@@ -499,10 +500,11 @@ class ApplianceRuleEngine:
             )
             db.add(rule)
 
-        # 선호 세팅 생성
+        # 선호 세팅 생성 (기본값은 is_learned=False)
         for pref_data in default_preferences:
             pref = UserAppliancePreference(
                 user_id=user_id,
+                is_learned=False,  # ✅ 시스템 기본값이므로 학습되지 않음으로 표시
                 **pref_data
             )
             db.add(pref)

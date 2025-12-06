@@ -284,16 +284,18 @@ async def process_and_respond(
                             if action == "on" and settings:
                                 if preference:
                                     preference.settings_json = settings
-                                    logger.info(f"📝 [LEARNING] Updated preference for {appliance_type}")
+                                    preference.is_learned = True  # ✅ 사용자가 승인했으므로 학습됨으로 표시
+                                    logger.info(f"📝 [LEARNING] Updated preference (is_learned=True) for {appliance_type}")
                                 else:
                                     new_preference = UserAppliancePreference(
                                         user_id=UUID(actual_user_id),
                                         fatigue_level=fatigue_level,
                                         appliance_type=appliance_type,
-                                        settings_json=settings
+                                        settings_json=settings,
+                                        is_learned=True  # ✅ 사용자가 승인했으므로 학습됨으로 표시
                                     )
                                     db.add(new_preference)
-                                    logger.info(f"✨ [LEARNING] Created preference for {appliance_type}")
+                                    logger.info(f"✨ [LEARNING] Created preference (is_learned=True) for {appliance_type}")
                                 db.commit()
                         except Exception as pref_error:
                             logger.error(f"⚠️ [LEARNING] Failed to save preference: {str(pref_error)}")
@@ -360,8 +362,89 @@ async def process_and_respond(
                 return
 
             elif not approved:
-                # 거절됨
-                logger.info("❌ [APPROVAL-CHECK] User declined appliance control")
+                # 거절됨 - 시나리오 1
+                logger.info("❌ [APPROVAL-CHECK] User declined appliance control (Scenario 1)")
+
+                # ✅ 기각된 가전들의 ApplianceConditionRule 조건 임계값 수정
+                from app.models.appliance import ApplianceConditionRule
+                from uuid import UUID
+
+                if pending_suggestion and pending_suggestion.get("appliances"):
+                    fatigue_level = pending_suggestion.get("fatigue_level")
+                    weather_data = pending_suggestion.get("weather", {})
+
+                    # 현재 날씨 정보
+                    current_temp = weather_data.get("temperature")
+                    current_humidity = weather_data.get("humidity")
+                    current_pm10 = weather_data.get("pm10")
+
+                    for appliance_info in pending_suggestion["appliances"]:
+                        appliance_type = appliance_info.get("appliance_type")
+
+                        # 해당 가전의 조건 규칙 조회 및 임계값 수정
+                        try:
+                            rules = db.query(ApplianceConditionRule).filter(
+                                ApplianceConditionRule.user_id == UUID(actual_user_id),
+                                ApplianceConditionRule.fatigue_level == fatigue_level,
+                                ApplianceConditionRule.appliance_type == appliance_type
+                            ).all()
+
+                            for rule in rules:
+                                condition = rule.condition_json.copy()
+                                updated = False
+
+                                # 온도 기반 조건 수정
+                                if "temp_threshold" in condition and current_temp is not None:
+                                    old_threshold = condition["temp_threshold"]
+                                    margin = 3  # 3도 마진
+
+                                    if condition.get("operator") == ">=":
+                                        new_threshold = max(current_temp + margin, old_threshold + margin)
+                                        condition["temp_threshold"] = new_threshold
+                                        updated = True
+                                        logger.info(f"📈 [LEARNING] Updated temp threshold (>=): {old_threshold}°C → {new_threshold}°C for {appliance_type}")
+                                    elif condition.get("operator") == "<=":
+                                        new_threshold = min(current_temp - margin, old_threshold - margin)
+                                        condition["temp_threshold"] = new_threshold
+                                        updated = True
+                                        logger.info(f"📉 [LEARNING] Updated temp threshold (<=): {old_threshold}°C → {new_threshold}°C for {appliance_type}")
+
+                                # 습도 기반 조건 수정
+                                if "humidity_threshold" in condition and current_humidity is not None:
+                                    old_threshold = condition["humidity_threshold"]
+                                    margin = 5  # 5% 마진
+
+                                    if condition.get("operator") == ">=":
+                                        new_threshold = max(current_humidity + margin, old_threshold + margin)
+                                        condition["humidity_threshold"] = new_threshold
+                                        updated = True
+                                        logger.info(f"📈 [LEARNING] Updated humidity threshold (>=): {old_threshold}% → {new_threshold}% for {appliance_type}")
+                                    elif condition.get("operator") == "<=":
+                                        new_threshold = min(current_humidity - margin, old_threshold - margin)
+                                        condition["humidity_threshold"] = new_threshold
+                                        updated = True
+                                        logger.info(f"📉 [LEARNING] Updated humidity threshold (<=): {old_threshold}% → {new_threshold}% for {appliance_type}")
+
+                                # 미세먼지 기반 조건 수정
+                                if "pm10_threshold" in condition and current_pm10 is not None:
+                                    old_threshold = condition["pm10_threshold"]
+                                    margin = 10  # 10㎍/㎥ 마진
+
+                                    if condition.get("operator") == ">=":
+                                        new_threshold = max(current_pm10 + margin, old_threshold + margin)
+                                        condition["pm10_threshold"] = new_threshold
+                                        updated = True
+                                        logger.info(f"📈 [LEARNING] Updated pm10 threshold: {old_threshold} → {new_threshold} for {appliance_type}")
+
+                                if updated:
+                                    rule.condition_json = condition
+
+                            db.commit()
+                            logger.info(f"✅ [LEARNING] Updated condition thresholds for {appliance_type} (rejected in scenario1)")
+                        except Exception as e:
+                            logger.error(f"⚠️ [LEARNING] Failed to update condition for {appliance_type}: {str(e)}")
+                            db.rollback()
+
                 response_text = "알겠습니다. 필요하시면 언제든 말씀해주세요."
                 memory_service.add_message(user_id, "assistant", response_text)
                 memory_service.update_long_term_memory(user_id, "pending_appliance_suggestion", None)

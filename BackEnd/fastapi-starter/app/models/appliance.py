@@ -61,6 +61,10 @@ class UserAppliancePreference(Base):
     # 가습기: {"mode": "auto", "target_humidity_pct": 50}
     settings_json = Column(JSON, nullable=False, comment="선호 세팅")
 
+    # 학습 여부 (기본값은 False - 시스템 기본값)
+    is_learned = Column(Boolean, nullable=False, server_default="false",
+                       comment="사용자가 실제로 승인/수정한 학습된 선호 세팅인지 여부")
+
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
 

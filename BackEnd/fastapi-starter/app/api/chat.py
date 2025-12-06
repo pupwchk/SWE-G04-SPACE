@@ -390,8 +390,9 @@ async def send_chat_message(
                     UserAppliancePreference.appliance_type == appliance_type
                 ).first()
 
-                if preference and preference.settings_json:
-                    # 학습된 선호 세팅 사용
+                # ✅ is_learned=True인 경우만 학습된 선호 세팅으로 취급
+                if preference and preference.settings_json and preference.is_learned:
+                    # 사용자가 실제로 승인/수정한 학습된 선호 세팅 사용
                     settings_json = preference.settings_json
                     settings_source = "preference"
 
@@ -481,6 +482,7 @@ async def send_chat_message(
             "recommendations": recommendations,
             "weather": weather_data,
             "fatigue_level": fatigue_level,
+            "intent_type": intent_type,  # ✅ intent_type 저장 (preference 학습 여부 판단용)
             "timestamp": None  # TODO: 타임스탬프 추가
         }
 
@@ -603,8 +605,100 @@ async def approve_appliance_control(
 
         logger.info(f"📝 Approval: {approval_result}")
 
-        # 2. 거절인 경우
+        # 2. 거절인 경우 (시나리오 2)
         if not approval_result.get("approved", False):
+            # ✅ environment_complaint인 경우만 조건 임계값 수정
+            # appliance_request (직접 명령)는 조건 테이블 수정 안함
+            from app.models.appliance import ApplianceConditionRule
+
+            pending = session.get("pending_suggestions")
+            original_intent = pending.get("intent_type") if pending else None
+
+            if pending and pending.get("recommendations") and original_intent == "environment_complaint":
+                # "덥다", "건조하다" 등 환경 불편 표현 → 조건 기반 추천 → 기각 시 조건 수정 ✅
+                fatigue_level = pending.get("fatigue_level")
+                weather_data = pending.get("weather", {})
+
+                # 현재 날씨 정보
+                current_temp = weather_data.get("temperature")
+                current_humidity = weather_data.get("humidity")
+                current_pm10 = weather_data.get("pm10")
+
+                for rec in pending["recommendations"]:
+                    appliance_type = rec.get("appliance_type")
+
+                    # 해당 가전의 조건 규칙 조회 및 임계값 수정
+                    try:
+                        rules = db.query(ApplianceConditionRule).filter(
+                            ApplianceConditionRule.user_id == user_uuid,
+                            ApplianceConditionRule.fatigue_level == fatigue_level,
+                            ApplianceConditionRule.appliance_type == appliance_type
+                        ).all()
+
+                        for rule in rules:
+                            condition = rule.condition_json.copy()
+                            updated = False
+
+                            # 온도 기반 조건 수정
+                            if "temp_threshold" in condition and current_temp is not None:
+                                old_threshold = condition["temp_threshold"]
+                                margin = 3  # 3도 마진
+
+                                if condition.get("operator") == ">=":
+                                    # "더울 때 켜기" 규칙 → 임계값 상향 (더 더워야 켜짐)
+                                    new_threshold = max(current_temp + margin, old_threshold + margin)
+                                    condition["temp_threshold"] = new_threshold
+                                    updated = True
+                                    logger.info(f"📈 Updated temp threshold (>=): {old_threshold}°C → {new_threshold}°C for {appliance_type}")
+                                elif condition.get("operator") == "<=":
+                                    # "추울 때 켜기" 규칙 → 임계값 하향 (더 추워야 켜짐)
+                                    new_threshold = min(current_temp - margin, old_threshold - margin)
+                                    condition["temp_threshold"] = new_threshold
+                                    updated = True
+                                    logger.info(f"📉 Updated temp threshold (<=): {old_threshold}°C → {new_threshold}°C for {appliance_type}")
+
+                            # 습도 기반 조건 수정
+                            if "humidity_threshold" in condition and current_humidity is not None:
+                                old_threshold = condition["humidity_threshold"]
+                                margin = 5  # 5% 마진
+
+                                if condition.get("operator") == ">=":
+                                    # "습할 때 켜기" (제습기) → 임계값 상향
+                                    new_threshold = max(current_humidity + margin, old_threshold + margin)
+                                    condition["humidity_threshold"] = new_threshold
+                                    updated = True
+                                    logger.info(f"📈 Updated humidity threshold (>=): {old_threshold}% → {new_threshold}% for {appliance_type}")
+                                elif condition.get("operator") == "<=":
+                                    # "건조할 때 켜기" (가습기) → 임계값 하향
+                                    new_threshold = min(current_humidity - margin, old_threshold - margin)
+                                    condition["humidity_threshold"] = new_threshold
+                                    updated = True
+                                    logger.info(f"📉 Updated humidity threshold (<=): {old_threshold}% → {new_threshold}% for {appliance_type}")
+
+                            # 미세먼지 기반 조건 수정
+                            if "pm10_threshold" in condition and current_pm10 is not None:
+                                old_threshold = condition["pm10_threshold"]
+                                margin = 10  # 10㎍/㎥ 마진
+
+                                if condition.get("operator") == ">=":
+                                    # "미세먼지 나쁠 때 켜기" → 임계값 상향
+                                    new_threshold = max(current_pm10 + margin, old_threshold + margin)
+                                    condition["pm10_threshold"] = new_threshold
+                                    updated = True
+                                    logger.info(f"📈 Updated pm10 threshold: {old_threshold} → {new_threshold} for {appliance_type}")
+
+                            if updated:
+                                rule.condition_json = condition
+
+                        db.commit()
+                        logger.info(f"✅ Updated condition thresholds for {appliance_type} (rejected in scenario2, intent=environment_complaint)")
+                    except Exception as e:
+                        logger.error(f"⚠️ Failed to update condition for {appliance_type}: {str(e)}")
+                        db.rollback()
+            elif original_intent == "appliance_request":
+                # "에어컨 켜줘" 등 직접 명령 → 기각해도 조건 테이블 수정 안함
+                logger.info(f"⏭️ Skipping condition update on rejection [appliance_request - user direct command]")
+
             ai_response = "알겠습니다. 필요하시면 언제든 말씀해주세요."
             session["conversation_history"].append({
                 "role": "user",
@@ -668,33 +762,44 @@ async def approve_appliance_control(
                 })
                 logger.info(f"✅ {appliance_type} {action} success")
 
-                # ✨ 선호 세팅 학습: UserAppliancePreference에 저장
-                try:
-                    preference = db.query(UserAppliancePreference).filter(
-                        UserAppliancePreference.user_id == user_uuid,
-                        UserAppliancePreference.fatigue_level == fatigue_level,
-                        UserAppliancePreference.appliance_type == appliance_type
-                    ).first()
+                # ✨ 선호 세팅 학습: environment_complaint인 경우만 학습
+                # appliance_request (직접 명령)는 학습하지 않음
+                pending = session.get("pending_suggestions")
+                original_intent = pending.get("intent_type") if pending else None
 
-                    if preference:
-                        # 기존 선호 세팅 업데이트
-                        preference.settings_json = settings
-                        logger.info(f"📝 Updated preference for {appliance_type} at fatigue {fatigue_level}")
-                    else:
-                        # 새로운 선호 세팅 생성
-                        new_preference = UserAppliancePreference(
-                            user_id=user_uuid,
-                            fatigue_level=fatigue_level,
-                            appliance_type=appliance_type,
-                            settings_json=settings
-                        )
-                        db.add(new_preference)
-                        logger.info(f"✨ Created new preference for {appliance_type} at fatigue {fatigue_level}")
+                if action == "on" and settings and original_intent == "environment_complaint":
+                    # "덥다", "건조하다" 등 환경 불편 표현 → 조건 기반 추천 → 학습 ✅
+                    try:
+                        preference = db.query(UserAppliancePreference).filter(
+                            UserAppliancePreference.user_id == user_uuid,
+                            UserAppliancePreference.fatigue_level == fatigue_level,
+                            UserAppliancePreference.appliance_type == appliance_type
+                        ).first()
 
-                    db.commit()
-                except Exception as pref_error:
-                    logger.error(f"⚠️ Failed to save preference: {str(pref_error)}")
-                    db.rollback()
+                        if preference:
+                            # 기존 선호 세팅 업데이트
+                            preference.settings_json = settings
+                            preference.is_learned = True  # ✅ 사용자가 승인했으므로 학습됨으로 표시
+                            logger.info(f"📝 Updated preference (is_learned=True) for {appliance_type} at fatigue {fatigue_level} [environment_complaint]")
+                        else:
+                            # 새로운 선호 세팅 생성
+                            new_preference = UserAppliancePreference(
+                                user_id=user_uuid,
+                                fatigue_level=fatigue_level,
+                                appliance_type=appliance_type,
+                                settings_json=settings,
+                                is_learned=True  # ✅ 사용자가 승인했으므로 학습됨으로 표시
+                            )
+                            db.add(new_preference)
+                            logger.info(f"✨ Created new preference (is_learned=True) for {appliance_type} at fatigue {fatigue_level} [environment_complaint]")
+
+                        db.commit()
+                    except Exception as pref_error:
+                        logger.error(f"⚠️ Failed to save preference: {str(pref_error)}")
+                        db.rollback()
+                elif original_intent == "appliance_request":
+                    # "에어컨 켜줘" 등 직접 명령 → 학습하지 않음 ❌
+                    logger.info(f"⏭️ Skipping preference learning for {appliance_type} [appliance_request - user direct command]")
 
             except Exception as e:
                 execution_results.append({
