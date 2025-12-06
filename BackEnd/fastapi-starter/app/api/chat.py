@@ -810,54 +810,51 @@ async def approve_appliance_control(
                 })
                 logger.error(f"❌ {appliance_type} {action} error: {str(e)}")
 
-        # 4. 응답 메시지 생성 - 자세한 실행 결과 포함
+        # 4. 응답 메시지 생성 - LLM을 사용해서 자연스럽게
         success_count = sum(1 for r in execution_results if r["status"] == "success")
         total_count = len(execution_results)
 
-        # 성공한 가전들의 상세 정보
-        success_details = []
-        for r in execution_results:
-            if r["status"] == "success":
-                appliance_name = r["appliance"]
-                action = r["action"]
-                settings = r.get("settings", {})
+        if success_count > 0:
+            # 성공한 가전 정보 수집
+            success_appliances = []
+            for r in execution_results:
+                if r["status"] == "success":
+                    success_appliances.append({
+                        "appliance_type": r["appliance"],
+                        "action": r["action"],
+                        "settings": r.get("settings", {})
+                    })
 
-                if action == "on":
-                    # 설정값이 있으면 포함
-                    if settings:
-                        # 주요 설정만 추출
-                        details = []
-                        if "target_temp_c" in settings:
-                            details.append(f"{settings['target_temp_c']}도")
-                        if "target_humidity_pct" in settings:
-                            details.append(f"습도 {settings['target_humidity_pct']}%")
-                        if "mode" in settings:
-                            details.append(f"{settings['mode']} 모드")
-                        if "brightness_pct" in settings:
-                            details.append(f"밝기 {settings['brightness_pct']}%")
+            # LLM으로 자연스러운 메시지 생성
+            try:
+                # 페르소나 정보 조회 (session에서)
+                persona = None
+                db_session = chat_cruds.get_or_create_session(
+                    db=db,
+                    user_id=user_uuid,
+                    persona_id=None,
+                    persona_nickname=None
+                )
+                if db_session.persona_id:
+                    # Supabase 페르소나 시스템 시도
+                    if supabase_persona_service.is_available():
+                        persona = supabase_persona_service.get_persona_for_llm(db_session.persona_id)
 
-                        if details:
-                            success_details.append(f"{appliance_name}을(를) {', '.join(details)}로 켰습니다")
-                        else:
-                            success_details.append(f"{appliance_name}을(를) 켰습니다")
-                    else:
-                        success_details.append(f"{appliance_name}을(를) 켰습니다")
-                elif action == "off":
-                    success_details.append(f"{appliance_name}을(를) 껐습니다")
-                elif action == "set":
-                    success_details.append(f"{appliance_name} 설정을 변경했습니다")
-
-        if success_count == total_count:
-            if has_modification:
-                ai_response = f"수정하신 내용으로 제어했습니다. {', '.join(success_details)}."
-            else:
-                ai_response = f"{', '.join(success_details)}."
+                ai_response = await llm_service.generate_appliance_execution_result(
+                    appliances=success_appliances,
+                    has_modification=has_modification,
+                    persona=persona
+                )
+            except Exception as llm_error:
+                logger.warning(f"⚠️ LLM response generation failed, using fallback: {llm_error}")
+                # Fallback
+                if has_modification:
+                    ai_response = "수정하신 내용으로 제어했어요!"
+                else:
+                    ai_response = "알겠습니다. 제어했어요!"
         else:
-            # 일부만 성공한 경우
-            if success_details:
-                ai_response = f"{', '.join(success_details)}. (총 {success_count}/{total_count}개 성공)"
-            else:
-                ai_response = f"가전 제어에 실패했습니다. ({success_count}/{total_count}개 성공)"
+            # 전부 실패한 경우
+            ai_response = f"가전 제어에 실패했습니다. ({success_count}/{total_count}개 성공)"
 
         # 세션 업데이트
         session["conversation_history"].append({

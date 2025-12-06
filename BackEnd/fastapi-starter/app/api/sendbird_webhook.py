@@ -310,39 +310,35 @@ async def process_and_respond(
                         })
                         logger.error(f"❌ [APPLIANCE-CONTROL] {appliance_type} error: {str(e)}")
 
-                # 실행 결과 메시지 생성
+                # LLM을 사용해서 자연스러운 실행 결과 메시지 생성
                 success_count = sum(1 for r in execution_results if r["status"] == "success")
-                success_details = []
-
-                for r in execution_results:
-                    if r["status"] == "success":
-                        appliance_name = r["appliance"]
-                        action = r["action"]
-                        settings = r.get("settings", {})
-
-                        if action == "on" and settings:
-                            details = []
-                            if "target_temp_c" in settings:
-                                details.append(f"{settings['target_temp_c']}도")
-                            if "target_humidity_pct" in settings:
-                                details.append(f"습도 {settings['target_humidity_pct']}%")
-                            if "mode" in settings:
-                                details.append(f"{settings['mode']} 모드")
-                            if "brightness_pct" in settings:
-                                details.append(f"밝기 {settings['brightness_pct']}%")
-
-                            if details:
-                                success_details.append(f"{appliance_name}을(를) {', '.join(details)}로 켰습니다")
-                            else:
-                                success_details.append(f"{appliance_name}을(를) 켰습니다")
-                        elif action == "off":
-                            success_details.append(f"{appliance_name}을(를) 껐습니다")
 
                 if success_count > 0:
-                    if has_modification:
-                        response_text = f"수정하신 내용으로 제어했습니다. {', '.join(success_details)}."
-                    else:
-                        response_text = f"{', '.join(success_details)}."
+                    # 성공한 가전 정보 수집
+                    success_appliances = []
+                    for r in execution_results:
+                        if r["status"] == "success":
+                            success_appliances.append({
+                                "appliance_type": r["appliance"],
+                                "action": r["action"],
+                                "settings": r.get("settings", {})
+                            })
+
+                    # LLM으로 자연스러운 메시지 생성
+                    try:
+                        # 페르소나 정보 (이미 로드되어 있음)
+                        response_text = await llm_service.generate_appliance_execution_result(
+                            appliances=success_appliances,
+                            has_modification=has_modification,
+                            persona=persona
+                        )
+                    except Exception as llm_error:
+                        logger.warning(f"⚠️ LLM response generation failed, using fallback: {llm_error}")
+                        # Fallback: 간단한 메시지
+                        if has_modification:
+                            response_text = "수정하신 내용으로 제어했어요!"
+                        else:
+                            response_text = "알겠습니다. 제어했어요!"
                 else:
                     response_text = "가전 제어에 실패했습니다. 다시 시도해주세요."
 

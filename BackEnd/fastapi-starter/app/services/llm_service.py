@@ -760,6 +760,113 @@ AI 분석 결과, 현재 날씨와 피로도 상태가 적정 범위라 따로 �
             appliance_names = [a["appliance_type"] for a in appliances]
             return f"현재 날씨와 피로도를 고려해서 {', '.join(appliance_names)}을(를) 켜드릴까요?"
 
+    async def generate_appliance_execution_result(
+        self,
+        appliances: List[Dict[str, Any]],
+        has_modification: bool = False,
+        persona: Optional[Dict] = None
+    ) -> str:
+        """
+        가전 제어 실행 후 자연스러운 응답 메시지 생성
+
+        Args:
+            appliances: 실행된 가전 목록
+            has_modification: 사용자가 수정했는지 여부
+            persona: 페르소나 정보
+
+        Returns:
+            자연스러운 응답 메시지
+        """
+        try:
+            # 가전 정보를 자연어로 변환
+            appliance_info = []
+            for app in appliances:
+                appliance_type = app["appliance_type"]
+                action = app.get("action", "on")
+                settings = app.get("settings", {})
+
+                if action == "on":
+                    details = []
+                    if "mode" in settings:
+                        details.append(f"{settings['mode']}")
+                    if "target_temp_c" in settings:
+                        details.append(f"{settings['target_temp_c']}도")
+                    if "target_humidity_pct" in settings:
+                        details.append(f"습도 {settings['target_humidity_pct']}%")
+                    if "brightness_pct" in settings:
+                        details.append(f"밝기 {settings['brightness_pct']}%")
+                    if "fan_speed" in settings:
+                        details.append(f"풍속 {settings['fan_speed']}")
+
+                    if details:
+                        appliance_info.append(f"{appliance_type}: {' '.join(details)}")
+                    else:
+                        appliance_info.append(f"{appliance_type}: 켜짐")
+                elif action == "off":
+                    appliance_info.append(f"{appliance_type}: 꺼짐")
+
+            appliances_str = "\n".join(appliance_info)
+
+            modification_note = ""
+            if has_modification:
+                modification_note = "\n**중요: 사용자가 설정을 수정했으므로, 수정 내용을 반영했다는 것을 자연스럽게 표현하세요.**"
+
+            prompt = f"""사용자가 요청한 가전 제어를 완료했습니다.
+
+**실행된 가전:**
+{appliances_str}
+{modification_note}
+
+위 가전 제어 결과를 사용자에게 자연스럽고 친근하게 알려주는 짧은 메시지를 작성하세요.
+
+**반드시 지켜야 할 규칙:**
+1. 한 문장으로 간결하게 (최대 50자 이내)
+2. "~했습니다", "~켰습니다" 같은 딱딱한 표현 대신 "~했어요", "~켰어요" 같은 부드러운 표현 사용
+3. "을(를)", "이(가)" 같은 조사는 자연스럽게 선택
+4. 구체적인 설정값(온도, 모드 등)을 자연스럽게 포함
+5. 페르소나의 말투가 있다면 그에 맞게 작성
+
+**좋은 예시:**
+- "에어컨 23도 냉방으로 켰어요!"
+- "수정하신 대로 난방 모드로 바꿔서 켰어요!"
+- "에어컨이랑 공기청정기 켰어요!"
+- "알겠습니다. 25도 난방으로 켜뒀어요!"
+
+**나쁜 예시 (절대 하지 마세요):**
+- "에어컨을(를) 23도로 켰습니다." (딱딱함)
+- "제어를 완료했습니다." (너무 기계적)
+- "에어컨: 켜짐, 설정: 23도" (기술 문서 같음)
+
+반드시 일반 텍스트로만 응답하세요 (JSON 아님).
+"""
+
+            # 시스템 프롬프트
+            system_prompt = "당신은 사용자의 스마트홈 AI 어시스턴트입니다. 친근하고 자연스럽게 대화하세요."
+            if persona:
+                system_prompt += f"\n**말투/성격:**\n{persona.get('description', '')}"
+
+            response = await client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.8,
+                max_tokens=100
+            )
+
+            message = response.choices[0].message.content.strip()
+            logger.info(f"✅ Execution result message generated: {message}")
+            return message
+
+        except Exception as e:
+            logger.error(f"❌ Execution result generation error: {str(e)}")
+            # Fallback
+            if has_modification:
+                return "수정하신 내용으로 제어했어요!"
+            else:
+                return "알겠습니다. 제어했어요!"
+
     async def detect_modification(
         self,
         original_plan: Dict[str, Any],
@@ -813,11 +920,19 @@ AI 분석 결과, 현재 날씨와 피로도 상태가 적정 범위라 따로 �
   "reason": "판단 이유"
 }}
 
+**중요: 에어컨 모드 수정 처리 방법**
+- 사용자가 "냉방", "난방", "송풍", "제습", "자동" 등의 모드를 언급하면 반드시 수정으로 처리
+- mode 키의 값은 한글 그대로 사용 (예: "냉방", "난방", "송풍", "제습", "자동")
+- 온도와 모드를 함께 수정하는 경우, 두 설정 모두 포함
+
 **예시:**
-- "좋아", "그래", "응" → approved: true, has_modification: false
+- "좋아", "그래", "응", "네", "ㅇㅇ" → approved: true, has_modification: false
 - "에어컨은 24도로" → approved: true, has_modification: true, modifications: {{"에어컨": {{"target_temp_c": 24}}}}
+- "에어컨 난방으로 바꿔" → approved: true, has_modification: true, modifications: {{"에어컨": {{"mode": "난방"}}}}
+- "온도는 그대로 하고 냉방모드를 난방모드로 바꿔" → approved: true, has_modification: true, modifications: {{"에어컨": {{"mode": "난방"}}}}
+- "23도 난방으로" → approved: true, has_modification: true, modifications: {{"에어컨": {{"target_temp_c": 23, "mode": "난방"}}}}
 - "공기청정기는 끄고" → approved: true, has_modification: true, modifications: {{"공기청정기": {{"action": "off"}}}}
-- "아니야", "괜찮아" → approved: false
+- "아니야", "괜찮아", "싫어", "됐어" → approved: false
 """
 
             response = await client.chat.completions.create(
@@ -834,6 +949,8 @@ AI 분석 결과, 현재 날씨와 피로도 상태가 적정 범위라 따로 �
             result = json.loads(content)
 
             logger.info(f"✅ Modification detected: approved={result.get('approved')}, has_mod={result.get('has_modification')}")
+            if result.get('modifications'):
+                logger.info(f"   Modifications: {result['modifications']}")
             return result
 
         except Exception as e:
