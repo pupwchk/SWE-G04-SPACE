@@ -259,6 +259,11 @@ async def process_and_respond(
                     if has_modification and appliance_type in modifications:
                         user_modifications = modifications[appliance_type].copy()
 
+                        # action 변경 체크 (off 요청 시)
+                        if "action" in user_modifications:
+                            action = user_modifications["action"]
+                            logger.info(f"🔧 [APPLIANCE-CONTROL] User changed action for {appliance_type}: {action}")
+
                         # 에어컨 모드 변경 시 한글→영문 변환 및 해당 모드 설정 가져오기
                         if appliance_type == "에어컨" and "mode" in user_modifications:
                             korean_mode = user_modifications["mode"]
@@ -302,12 +307,14 @@ async def process_and_respond(
                                     else:
                                         settings = {"mode": english_mode}
 
-                        # 다른 수정사항 적용 (온도 등)
+                        # 다른 수정사항 적용 (온도 등, action 제외)
                         for key, value in user_modifications.items():
+                            if key == "action":
+                                continue  # action은 위에서 이미 처리
                             if key != "mode" or appliance_type != "에어컨":  # 에어컨 모드는 위에서 이미 처리
                                 settings[key] = value
 
-                        logger.info(f"🔧 [APPLIANCE-CONTROL] Modified {appliance_type}: {settings}")
+                        logger.info(f"🔧 [APPLIANCE-CONTROL] Modified {appliance_type}: action={action}, settings={settings}")
 
                     # 가전 제어 실행
                     try:
