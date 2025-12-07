@@ -255,10 +255,17 @@ async def process_and_respond(
                     action = rec.get("action", "on")
                     settings = rec.get("settings", {}).copy()  # 원본 보존을 위해 복사
 
-                    # 수정 사항 적용
-                    if has_modification and appliance_type in modifications:
-                        user_modifications = modifications[appliance_type].copy()
+                    # 수정 사항 적용 (대소문자 무시)
+                    user_modifications = None
+                    if has_modification:
+                        # 대소문자 구분 없이 매칭
+                        for mod_key, mod_value in modifications.items():
+                            if mod_key.lower() == appliance_type.lower():
+                                user_modifications = mod_value.copy()
+                                logger.info(f"🔍 [MODIFICATION-MATCH] Found modification for {appliance_type} (matched with {mod_key})")
+                                break
 
+                    if user_modifications:
                         # action 변경 체크 (off 요청 시)
                         if "action" in user_modifications:
                             action = user_modifications["action"]
