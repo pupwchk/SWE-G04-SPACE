@@ -211,7 +211,11 @@ class ApplianceRuleEngine:
                     if rule.appliance_type == "에어컨" and isinstance(settings_json, dict):
                         mode = rule.condition_json.get("mode")  # "cool" 또는 "heat"
                         if mode and mode in settings_json:
-                            settings = settings_json[mode]
+                            settings = settings_json[mode].copy()
+                            # 영문 모드를 한글로 변환
+                            if "mode" in settings and settings["mode"] in ["cool", "heat", "fan", "dry", "auto"]:
+                                mode_translation = {"cool": "냉방", "heat": "난방", "fan": "송풍", "dry": "제습", "auto": "자동"}
+                                settings["mode"] = mode_translation.get(settings["mode"], settings["mode"])
                         else:
                             # mode가 없거나 settings_json에 해당 키가 없으면 전체 사용
                             settings = settings_json
@@ -229,7 +233,11 @@ class ApplianceRuleEngine:
                         if rule.appliance_type == "에어컨" and isinstance(settings_json, dict):
                             mode = rule.condition_json.get("mode")  # "cool" 또는 "heat"
                             if mode and mode in settings_json:
-                                settings = settings_json[mode]
+                                settings = settings_json[mode].copy()
+                                # 영문 모드를 한글로 변환
+                                if "mode" in settings and settings["mode"] in ["cool", "heat", "fan", "dry", "auto"]:
+                                    mode_translation = {"cool": "냉방", "heat": "난방", "fan": "송풍", "dry": "제습", "auto": "자동"}
+                                    settings["mode"] = mode_translation.get(settings["mode"], settings["mode"])
                             else:
                                 # mode가 없거나 settings_json에 해당 키가 없으면 전체 사용
                                 settings = settings_json
@@ -239,12 +247,20 @@ class ApplianceRuleEngine:
                         # preference가 아예 없으면 rule의 settings_json 사용
                         settings = dict(rule.settings_json) if rule.settings_json else {}
 
-                        # 에어컨의 경우 condition_json의 mode를 settings에 추가
+                        # 에어컨의 경우 condition_json의 mode를 settings에 추가 (영문→한글 변환)
                         if rule.appliance_type == "에어컨":
                             mode = rule.condition_json.get("mode")  # "cool" 또는 "heat"
                             if mode:
-                                settings["mode"] = mode
-                                logger.info(f"🌡️ Added mode '{mode}' to settings for 에어컨")
+                                # 영문 모드를 한글로 변환 (LLM이 한글을 사용하므로)
+                                mode_translation = {
+                                    "cool": "냉방",
+                                    "heat": "난방",
+                                    "fan": "송풍",
+                                    "dry": "제습",
+                                    "auto": "자동"
+                                }
+                                settings["mode"] = mode_translation.get(mode, mode)
+                                logger.info(f"🌡️ Added mode '{settings['mode']}' (from '{mode}') to settings for 에어컨")
 
                     logger.info(f"📋 Using default rule settings for {rule.appliance_type}: {settings}")
 

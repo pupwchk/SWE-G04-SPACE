@@ -320,13 +320,24 @@ async def process_and_respond(
                             triggered_by="scenario1_approved"
                         )
 
-                        execution_results.append({
-                            "appliance": appliance_type,
-                            "action": action,
-                            "settings": settings,
-                            "status": "success"
-                        })
-                        logger.info(f"✅ [APPLIANCE-CONTROL] {appliance_type} {action} success")
+                        # 실행 결과 확인
+                        if result.get("success", False):
+                            execution_results.append({
+                                "appliance": appliance_type,
+                                "action": action,
+                                "settings": settings,
+                                "status": "success"
+                            })
+                            logger.info(f"✅ [APPLIANCE-CONTROL] {appliance_type} {action} success")
+                        else:
+                            execution_results.append({
+                                "appliance": appliance_type,
+                                "action": action,
+                                "status": "error",
+                                "error": result.get("error_message", "Unknown error")
+                            })
+                            logger.error(f"❌ [APPLIANCE-CONTROL] {appliance_type} {action} failed: {result.get('error_message')}")
+                            continue  # 실패한 경우 선호 세팅 학습 건너뛰기
 
                         # 선호 세팅 학습
                         try:
@@ -627,6 +638,10 @@ async def process_and_respond(
         else:
             logger.info(f"   Fatigue level: {fatigue_level}")
 
+        # 사용자가 특정 가전을 명시적으로 요청했는지 확인
+        appliance_keywords = ["에어컨", "조명", "공기청정기", "제습기", "가습기", "TV"]
+        user_mentioned_appliance = any(keyword in message for keyword in appliance_keywords)
+
         # 피로도 기반 가전 제어 추천 생성 (자동 조건 기반) - 실제 DB user_id 사용
         logger.info("🔧 [RESPONSE-DEBUG] Generating appliance recommendations based on fatigue...")
         recommendations = appliance_rule_engine.get_appliances_to_control(
@@ -636,10 +651,13 @@ async def process_and_respond(
             fatigue_level=fatigue_level
         )
 
-        # 사용자가 직접 불편을 표현한 경우, LLM이 판단하도록 함
+        # 사용자가 직접 불편을 표현하거나 특정 가전을 요청한 경우, LLM이 판단하도록 함
         # 조건 테이블에 맞지 않더라도 사용자 요청을 우선
-        if not recommendations:
-            logger.info("ℹ️ [RESPONSE-DEBUG] No rule-based recommendations, asking LLM to suggest based on user message...")
+        if not recommendations or user_mentioned_appliance:
+            if user_mentioned_appliance:
+                logger.info(f"🎯 [RESPONSE-DEBUG] User mentioned specific appliance, asking LLM to suggest based on user message...")
+            else:
+                logger.info("ℹ️ [RESPONSE-DEBUG] No rule-based recommendations, asking LLM to suggest based on user message...")
             # LLM에게 사용자 메시지와 현재 가전 상태를 주고 제안 요청
             response_result = await llm_service.generate_user_request_suggestion(
                 user_message=message,
