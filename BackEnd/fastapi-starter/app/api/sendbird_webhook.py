@@ -257,16 +257,56 @@ async def process_and_respond(
 
                     # 수정 사항 적용
                     if has_modification and appliance_type in modifications:
-                        user_modifications = modifications[appliance_type]
+                        user_modifications = modifications[appliance_type].copy()
 
-                        # 에어컨 모드 변경 시 한글→영문 변환
+                        # 에어컨 모드 변경 시 한글→영문 변환 및 해당 모드 설정 가져오기
                         if appliance_type == "에어컨" and "mode" in user_modifications:
                             korean_mode = user_modifications["mode"]
                             if korean_mode in MODE_TRANSLATION:
-                                user_modifications["mode"] = MODE_TRANSLATION[korean_mode]
-                                logger.info(f"🔄 [MODE-TRANSLATION] '{korean_mode}' → '{user_modifications['mode']}'")
+                                english_mode = MODE_TRANSLATION[korean_mode]
+                                user_modifications["mode"] = english_mode
+                                logger.info(f"🔄 [MODE-TRANSLATION] '{korean_mode}' → '{english_mode}'")
 
-                        settings.update(user_modifications)
+                                # 해당 모드의 기본 설정을 UserAppliancePreference에서 가져오기
+                                from app.models.appliance import UserAppliancePreference
+                                from uuid import UUID
+
+                                try:
+                                    preference = db.query(UserAppliancePreference).filter(
+                                        UserAppliancePreference.user_id == UUID(actual_user_id),
+                                        UserAppliancePreference.fatigue_level == fatigue_level,
+                                        UserAppliancePreference.appliance_type == appliance_type
+                                    ).first()
+
+                                    if preference and preference.settings_json:
+                                        # 모드별 설정이 있는지 확인 (예: {"cool": {...}, "heat": {...}})
+                                        if isinstance(preference.settings_json, dict):
+                                            if english_mode in preference.settings_json:
+                                                # 해당 모드의 전체 설정 가져오기
+                                                mode_settings = preference.settings_json[english_mode]
+                                                settings = mode_settings.copy()
+                                                logger.info(f"✨ [MODE-CHANGE] Loaded settings for '{english_mode}' mode: {settings}")
+                                            elif "mode" in preference.settings_json:
+                                                # 단일 설정 구조인 경우
+                                                settings = preference.settings_json.copy()
+                                                settings["mode"] = english_mode
+                                            else:
+                                                # 기본 설정에 모드만 추가
+                                                settings["mode"] = english_mode
+                                except Exception as pref_error:
+                                    logger.warning(f"⚠️ Failed to load preference for mode change: {pref_error}")
+                                    # Fallback: 온도만 유지하고 모드 변경
+                                    if "target_temp_c" in settings:
+                                        temp = settings["target_temp_c"]
+                                        settings = {"mode": english_mode, "target_temp_c": temp}
+                                    else:
+                                        settings = {"mode": english_mode}
+
+                        # 다른 수정사항 적용 (온도 등)
+                        for key, value in user_modifications.items():
+                            if key != "mode" or appliance_type != "에어컨":  # 에어컨 모드는 위에서 이미 처리
+                                settings[key] = value
+
                         logger.info(f"🔧 [APPLIANCE-CONTROL] Modified {appliance_type}: {settings}")
 
                     # 가전 제어 실행
