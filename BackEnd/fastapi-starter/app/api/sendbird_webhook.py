@@ -719,6 +719,14 @@ async def process_and_respond(
             "fatigue_level": fatigue_level
         }
 
+        # 가전 제안을 pending으로 저장 (사용자 승인 대기)
+        memory_service.update_long_term_memory(user_id, "pending_appliance_suggestion", {
+            "appliances": recommendations,
+            "fatigue_level": fatigue_level,
+            "weather": weather_data
+        })
+        logger.info("💾 [RESPONSE-DEBUG] Saved pending appliance suggestion for approval")
+
         # Sendbird로 메시지 전송 (메타데이터 포함)
         logger.info("📤 [RESPONSE-DEBUG] Sending appliance suggestion via Sendbird...")
         await chat_client.send_message(
