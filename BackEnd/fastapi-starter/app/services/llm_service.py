@@ -788,7 +788,16 @@ AI 분석 결과, 현재 날씨와 피로도 상태가 적정 범위라 따로 �
                 if action == "on":
                     details = []
                     if "mode" in settings:
-                        details.append(f"{settings['mode']}")
+                        # 영문 모드를 한글로 변환
+                        mode_map = {
+                            "cool": "냉방",
+                            "heat": "난방",
+                            "fan": "송풍",
+                            "dry": "제습",
+                            "auto": "자동"
+                        }
+                        mode_kr = mode_map.get(settings['mode'], settings['mode'])
+                        details.append(f"{mode_kr}")
                     if "target_temp_c" in settings:
                         details.append(f"{settings['target_temp_c']}도")
                     if "target_humidity_pct" in settings:

@@ -730,16 +730,34 @@ async def approve_appliance_control(
         if fatigue_level is None:
             fatigue_level = 2  # 기본값
 
+        # 한글 모드명을 영문으로 변환하는 매핑
+        MODE_TRANSLATION = {
+            "냉방": "cool",
+            "난방": "heat",
+            "송풍": "fan",
+            "제습": "dry",
+            "자동": "auto"
+        }
+
         execution_results = []
 
         for rec in recommendations:
             appliance_type = rec["appliance_type"]
             action = rec["action"]
-            settings = rec.get("settings", {})
+            settings = rec.get("settings", {}).copy()  # 원본 보존을 위해 복사
 
             # 수정 사항 적용
             if has_modification and appliance_type in modifications:
-                settings.update(modifications[appliance_type])
+                user_modifications = modifications[appliance_type]
+
+                # 에어컨 모드 변경 시 한글→영문 변환
+                if appliance_type == "에어컨" and "mode" in user_modifications:
+                    korean_mode = user_modifications["mode"]
+                    if korean_mode in MODE_TRANSLATION:
+                        user_modifications["mode"] = MODE_TRANSLATION[korean_mode]
+                        logger.info(f"🔄 [MODE-TRANSLATION] '{korean_mode}' → '{user_modifications['mode']}'")
+
+                settings.update(user_modifications)
                 logger.info(f"🔧 Modified {appliance_type}: {settings}")
 
             # 가전 제어 실행
