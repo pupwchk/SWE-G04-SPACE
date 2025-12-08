@@ -1,10 +1,10 @@
-<img width="365" height="751" alt="2" src="https://github.com/user-attachments/assets/5afc4754-bac1-4c36-ac3b-0ab6cc64b91d" /># HARU
+# HARU
 **Home Adaptive Routine Understanding**
 
 ---
 
 ## 📄 Project Overview
-<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/33b8282c-ec06-42ec-a378-6ed671ab247e" />
+[<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/33b8282c-ec06-42ec-a378-6ed671ab247e" />](https://www.miricanvas.com/login?redirect=%2Fv2%2Fdesign2%2F60ab7078-dfa8-4e23-9e4a-c0c611815c5a)
 
 
 HARU is an intelligent smart-home automation platform that integrates wearable health data with contextual information to create a personalized and adaptive living environment. The system continuously collects real-time biometric metrics from the Apple Watch—such as heart rate, heart rate variability (HRV), sleep patterns, and activity levels. Then, It estimates the user’s physiological and psychological state through HRV range. Unlike traditional rule-based smart-home systems, HARU leverages LLM-based reasoning to interpret the user’s condition and generate natural-language policies for controlling home appliances. These policies are then converted into structured commands to adjust lighting, temperature, humidity, and other devices automatically. By combining physiological signals with contextual data such as weather forecasts, GPS location, time-of-day patterns, and user preferences, HARU provides **context-aware, proactive home automation**. HARU aims to shift the paradigm from “A user controlling smart home” to “a home that understands the user and adapts itself accordingly.”
@@ -56,13 +56,6 @@ This enables a highly adaptive environment that goes beyond simple “if tired �
 - Continuously refines lighting, temperature, and humidity settings over time
 - Improves accuracy and personalization as more data is collected
 
-<p align="center">  
-  <img width="25%" height="747" alt="1" src="https://github.com/user-attachments/assets/1668fca6-9141-4e40-ba77-1cc1f0221772" />
-  <img width="25%" height="751" alt="2" src="https://github.com/user-attachments/assets/41f66aa7-ca4e-4d09-a6c8-794e912d4b90" />
-  <img width="25%" height="747" alt="3" src="https://github.com/user-attachments/assets/89b3af9a-c371-4385-aa02-96547b92ea36" />
-  <img width="25%" height="750" alt="4" src="https://github.com/user-attachments/assets/865abb05-4e6d-4d4c-9f58-617bd7690287" />
-</p>
-
 ---
 
 ## Tech Stack
@@ -91,6 +84,7 @@ This enables a highly adaptive environment that goes beyond simple “if tired �
 
 Copyright (c) 2025 HARU
 This project is licensed under the MIT License — see the [LICENSE](./LICENSE) file for details.
+
 
 
 
