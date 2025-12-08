@@ -1,4 +1,4 @@
-# HARU
+<img width="365" height="751" alt="2" src="https://github.com/user-attachments/assets/5afc4754-bac1-4c36-ac3b-0ab6cc64b91d" /># HARU
 **Home Adaptive Routine Understanding**
 
 ---
@@ -56,6 +56,13 @@ This enables a highly adaptive environment that goes beyond simple â€œif tired â
 - Continuously refines lighting, temperature, and humidity settings over time
 - Improves accuracy and personalization as more data is collected
 
+<p align="center">  
+  <img width="25%" height="747" alt="1" src="https://github.com/user-attachments/assets/1668fca6-9141-4e40-ba77-1cc1f0221772" />
+  <img width="25%" height="751" alt="2" src="https://github.com/user-attachments/assets/41f66aa7-ca4e-4d09-a6c8-794e912d4b90" />
+  <img width="25%" height="747" alt="3" src="https://github.com/user-attachments/assets/89b3af9a-c371-4385-aa02-96547b92ea36" />
+  <img width="25%" height="750" alt="4" src="https://github.com/user-attachments/assets/865abb05-4e6d-4d4c-9f58-617bd7690287" />
+</p>
+
 ---
 
 ## Tech Stack
@@ -84,6 +91,7 @@ This enables a highly adaptive environment that goes beyond simple â€œif tired â
 
 Copyright (c) 2025 HARU
 This project is licensed under the MIT License â€” see the [LICENSE](./LICENSE) file for details.
+
 
 
 
