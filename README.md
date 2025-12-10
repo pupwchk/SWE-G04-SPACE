@@ -13,7 +13,8 @@ HARU is an intelligent smart-home automation platform that integrates wearable h
 ---
 ## Architecture
 
-<img width="1112" height="680" alt="archi" src="https://github.com/user-attachments/assets/8ef7a965-4e6c-4752-84e3-689b64984b1a" />
+<img width="2623" height="1705" alt="image" src="https://github.com/user-attachments/assets/e94d78d4-0839-4c0e-bace-161a14339753" />
+
 
 ---
 
@@ -84,6 +85,7 @@ This enables a highly adaptive environment that goes beyond simple “if tired �
 
 Copyright (c) 2025 HARU
 This project is licensed under the MIT License — see the [LICENSE](./LICENSE) file for details.
+
 
 
 
