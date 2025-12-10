@@ -907,6 +907,7 @@ AI 분석 결과, 현재 날씨와 피로도 상태가 적정 범위라 따로 �
         - "에어컨은 24도로" → {"에어컨": {"target_temp_c": 24}}
         - "공기청정기는 끄고" → {"공기청정기": {"action": "off"}}
         - "그대로 해줘" → {}
+        - "안녕" → unrelated: true (가전 제어와 무관한 대화)
 
         Args:
             original_plan: 원래 제안했던 가전 제어 계획
@@ -914,12 +915,13 @@ AI 분석 결과, 현재 날씨와 피로도 상태가 적정 범위라 따로 �
 
         Returns:
             {
+                "approved": true/false,
                 "has_modification": true/false,
                 "modifications": {
                     "에어컨": {"target_temp_c": 24},
                     "공기청정기": {"action": "off"}
                 },
-                "approved": true/false
+                "unrelated": true/false  (가전 제어와 무관한 대화인지)
             }
         """
         try:
@@ -936,7 +938,7 @@ AI 분석 결과, 현재 날씨와 피로도 상태가 적정 범위라 따로 �
 
 사용자 응답: "{user_response}"
 
-사용자가 수정을 요청했는지, 그대로 승인했는지, 거부했는지 판단하세요.
+사용자가 수정을 요청했는지, 그대로 승인했는지, 거부했는지, 아니면 가전 제어와 무관한 대화인지 판단하세요.
 
 다음 JSON 형식으로 응답하세요:
 {{
@@ -945,8 +947,14 @@ AI 분석 결과, 현재 날씨와 피로도 상태가 적정 범위라 따로 �
   "modifications": {{
     "가전종류": {{"설정키": 값}}
   }},
+  "unrelated": true/false,
   "reason": "판단 이유"
 }}
+
+**중요: unrelated 판단 기준**
+- 사용자 응답이 가전 제어 제안과 **전혀 관련 없는 일반 대화**인 경우 unrelated: true
+- 예: "안녕", "날씨 어때?", "피곤해", "뭐해?", "고마워", "ㅋㅋ" 등
+- unrelated: true인 경우 approved: false, has_modification: false로 설정
 
 **중요: 에어컨 모드 수정 처리 방법**
 - 사용자가 "냉방", "난방", "송풍", "제습", "자동" 등의 모드를 언급하면 반드시 수정으로 처리
@@ -954,13 +962,14 @@ AI 분석 결과, 현재 날씨와 피로도 상태가 적정 범위라 따로 �
 - 온도와 모드를 함께 수정하는 경우, 두 설정 모두 포함
 
 **예시:**
-- "좋아", "그래", "응", "네", "ㅇㅇ" → approved: true, has_modification: false
-- "에어컨은 24도로" → approved: true, has_modification: true, modifications: {{"에어컨": {{"target_temp_c": 24}}}}
-- "에어컨 난방으로 바꿔" → approved: true, has_modification: true, modifications: {{"에어컨": {{"mode": "난방"}}}}
-- "온도는 그대로 하고 냉방모드를 난방모드로 바꿔" → approved: true, has_modification: true, modifications: {{"에어컨": {{"mode": "난방"}}}}
-- "23도 난방으로" → approved: true, has_modification: true, modifications: {{"에어컨": {{"target_temp_c": 23, "mode": "난방"}}}}
-- "공기청정기는 끄고" → approved: true, has_modification: true, modifications: {{"공기청정기": {{"action": "off"}}}}
-- "아니야", "괜찮아", "싫어", "됐어" → approved: false
+- "좋아", "그래", "응", "네", "ㅇㅇ" → approved: true, has_modification: false, unrelated: false
+- "에어컨은 24도로" → approved: true, has_modification: true, unrelated: false, modifications: {{"에어컨": {{"target_temp_c": 24}}}}
+- "에어컨 난방으로 바꿔" → approved: true, has_modification: true, unrelated: false, modifications: {{"에어컨": {{"mode": "난방"}}}}
+- "온도는 그대로 하고 냉방모드를 난방모드로 바꿔" → approved: true, has_modification: true, unrelated: false, modifications: {{"에어컨": {{"mode": "난방"}}}}
+- "23도 난방으로" → approved: true, has_modification: true, unrelated: false, modifications: {{"에어컨": {{"target_temp_c": 23, "mode": "난방"}}}}
+- "공기청정기는 끄고" → approved: true, has_modification: true, unrelated: false, modifications: {{"공기청정기": {{"action": "off"}}}}
+- "아니야", "괜찮아", "싫어", "됐어" → approved: false, unrelated: false
+- "안녕", "날씨 어때?", "고마워" → approved: false, has_modification: false, unrelated: true
 """
 
             response = await client.chat.completions.create(
@@ -987,6 +996,7 @@ AI 분석 결과, 현재 날씨와 피로도 상태가 적정 범위라 따로 �
                 "approved": True,
                 "has_modification": False,
                 "modifications": {},
+                "unrelated": False,
                 "reason": "파싱 실패 - 원래 계획 실행"
             }
 

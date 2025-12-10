@@ -230,10 +230,18 @@ async def process_and_respond(
             approved = approval_result.get("approved", False)
             has_modification = approval_result.get("has_modification", False)
             modifications = approval_result.get("modifications", {})
+            unrelated = approval_result.get("unrelated", False)
 
-            logger.info(f"📝 [APPROVAL-CHECK] Approved: {approved}, Has modification: {has_modification}")
+            logger.info(f"📝 [APPROVAL-CHECK] Approved: {approved}, Has modification: {has_modification}, Unrelated: {unrelated}")
 
-            if approved:
+            # 무관한 대화인 경우 - pending 유지하고 일반 의도 파싱으로 진행
+            if unrelated:
+                logger.info("💬 [APPROVAL-CHECK] Message is unrelated to appliance control - treating as general chat")
+                logger.info("   Keeping pending suggestion for later, proceeding to intent parsing")
+                # pending은 유지 (나중에 다시 물어볼 수 있음)
+                # if 블록을 빠져나가서 아래의 의도 파싱 로직으로 진행
+                pass  # if 블록 끝까지 가서 자연스럽게 빠져나감
+            elif approved:
                 # 승인됨 - 가전 제어 실행
                 logger.info("✅ [APPLIANCE-CONTROL] User approved! Executing appliance controls...")
 
@@ -440,9 +448,9 @@ async def process_and_respond(
                 logger.info("=" * 80)
                 return
 
-            elif not approved:
-                # 거절됨 - 시나리오 1
-                logger.info("❌ [APPROVAL-CHECK] User declined appliance control (Scenario 1)")
+            elif not approved and not unrelated:
+                # 명시적 거절 - 시나리오 1
+                logger.info("❌ [APPROVAL-CHECK] User explicitly declined appliance control (Scenario 1)")
 
                 # ✅ 기각된 가전들의 ApplianceConditionRule 조건 임계값 수정
                 from app.models.appliance import ApplianceConditionRule
